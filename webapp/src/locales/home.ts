@@ -1,9 +1,10 @@
-export type HomeLang = "en" | "zh" | "ja";
+export type HomeLang = "en" | "zh" | "ja" | "de";
 
 export interface HomeStrings {
   // Header
   logIn: string;
   dashboard: string;
+  help: string;
 
   // Hero
   heroTagline: string;
@@ -40,6 +41,10 @@ export interface HomeStrings {
 
   // Footer
   footerTagline: string;
+
+  // Manual page
+  manualTitle: string;
+  manualIntro: string;
 }
 
 /** Ordered list for the language dropdown. Add new languages here and to HomeLang + homeStrings/researchStrings. */
@@ -47,12 +52,14 @@ export const LANGUAGES: { code: HomeLang; label: string }[] = [
   { code: "en", label: "English" },
   { code: "zh", label: "中文" },
   { code: "ja", label: "日本語" },
+  { code: "de", label: "Deutsch" },
 ];
 
 export const homeStrings: Record<HomeLang, HomeStrings> = {
   en: {
     logIn: "Log in",
     dashboard: "Dashboard",
+    help: "Help",
     heroTagline: "Learning with spaced repetition",
     heroSubtitle: "Build decks, add facts, and review with science-backed scheduling for better retention. For any subject — languages, exams, or anything you want to remember. Web and mobile.",
     whySrsTitle: "Why spaced repetition?",
@@ -80,10 +87,13 @@ export const homeStrings: Record<HomeLang, HomeStrings> = {
     featureTagging: "Robust tagging system for flexible reviewing",
     featureHoliday: "Holiday rescheduling of all cards so you don't get overwhelmed",
     footerTagline: "Retentio — learning with spaced repetition for lasting retention",
+    manualTitle: "User manual",
+    manualIntro: "How to use Retentio: create decks, add facts, and review cards. Content will be expanded here.",
   },
   zh: {
     logIn: "登录",
     dashboard: "控制台",
+    help: "帮助",
     heroTagline: "用间隔重复学习",
     heroSubtitle: "创建牌组、添加词条，用科学排程复习，提升记忆保留。语言、考试或任何你想记住的内容都适用。支持网页与移动端。",
     whySrsTitle: "为什么用间隔重复？",
@@ -110,10 +120,13 @@ export const homeStrings: Record<HomeLang, HomeStrings> = {
     featureTagging: "完善的标签系统，支持灵活复习",
     featureHoliday: "假期统一调整卡片排程，避免积压",
     footerTagline: "Retentio — 用间隔重复学习，持久保留",
+    manualTitle: "用户手册",
+    manualIntro: "如何使用 Retentio：创建牌组、添加词条、复习卡片。此处内容将逐步完善。",
   },
   ja: {
     logIn: "ログイン",
     dashboard: "ダッシュボード",
+    help: "ヘルプ",
     heroTagline: "間隔反復で学ぶ",
     heroSubtitle:
       "デッキを作成し、ファクトを追加し、科学的なスケジュールで復習して記憶の定着を高めます。言語、試験、覚えたいあらゆる内容に対応。Webとモバイル。",
@@ -144,5 +157,46 @@ export const homeStrings: Record<HomeLang, HomeStrings> = {
     featureTagging: "充実したタグで柔軟に復習",
     featureHoliday: "休暇時に全カードのスケジュールを調整し、負荷を分散",
     footerTagline: "Retentio — 間隔反復で持続する記憶定着",
+    manualTitle: "ユーザーマニュアル",
+    manualIntro: "Retentio の使い方：デッキ作成、ファクト追加、カード復習。ここに内容を追記します。",
+  },
+  de: {
+    logIn: "Anmelden",
+    dashboard: "Dashboard",
+    help: "Hilfe",
+    heroTagline: "Lernen mit Karteikarten und Abstand",
+    heroSubtitle:
+      "Erstellen Sie Karteikarten, fügen Sie Fakten hinzu und wiederholen Sie mit wissenschaftlich fundierter Planung für bessere Merkleistung. Für Sprachen, Prüfungen oder alles, was Sie behalten möchten. Web und mobil.",
+    whySrsTitle: "Warum Karteikarten mit Abstand?",
+    whySrsP1:
+      "Ein Karteikartensystem plant Wiederholungen in optimalen Abständen, sodass Sie mit weniger Aufwand mehr behalten und langfristig besser memorieren. Statt zu pauken, sehen Sie jede Karte genau dann, wenn Sie sie fast vergessen hätten.",
+    whySrsP2: "Das Ergebnis: bessere Langzeit-Merkleistung und weniger Zeit fürs Neulernen.",
+    whySrsBullet1: "Zur richtigen Zeit wiederholen — weder zu früh noch zu spät",
+    whySrsBullet2: "Stärkere Langzeiterinnerung mit weniger Sitzungen",
+    whySrsBullet3: "Weniger Pauken, nachhaltigeres Lernen",
+    whySrsLearnMore: "Mehr zur Forschung",
+    whatIsRetentioTitle: "Was ist Retentio?",
+    whatIsRetentioDesc:
+      "Retentio leitet sich vom lateinischen Wort für „Behalten“ ab — das Festhalten von etwas im Gedächtnis. Wir haben den Namen gewählt, weil die App auf Karteikarten und Abständen aufbaut und langfristiges Behalten fördert. Der Name steht dafür, was wir tun: mehr behalten, länger behalten.",
+    whatTitle: "Was Retentio kann",
+    whatVerified: "Von Menschen geprüfte Übersetzungen",
+    whatVerifiedDesc:
+      "Übersetzungen von Wörtern und Phrasen werden von Menschen geprüft für bessere Genauigkeit und Merkleistung als reine Maschinenausgabe.",
+    whatAlgorithm: "Verbesserter Karteikarten-Algorithmus",
+    whatAlgorithmDesc:
+      "Ein neuer Algorithmus, der Grenzen bestehender Systeme adressiert für effektivere Planung und besseres Behalten.",
+    whatUi: "Übersichtliche Oberfläche",
+    whatUiDesc:
+      "Klare, fokussierte Oberfläche, damit Sie Zeit mit dem Stoff verbringen, nicht mit dem Tool.",
+    whatPremadeDecks: "KI-gestützte Karteikarten",
+    whatPremadeDecksDesc:
+      "KI-Analyse vergangener Prüfungen für Muster und Fokus auf das Wichtigste — effizienteres Lernen.",
+    featuresTitle: "Funktionen",
+    featureTagging: "Stabiles Tagging für flexibles Wiederholen",
+    featureHoliday: "Urlaubs-Verschiebung aller Karten, damit Sie nicht überlastet werden",
+    footerTagline: "Retentio — Lernen mit Karteikarten für dauerhaftes Behalten",
+    manualTitle: "Benutzerhandbuch",
+    manualIntro:
+      "So nutzen Sie Retentio: Karteikarten anlegen, Fakten hinzufügen, Karten wiederholen. Der Inhalt wird hier schrittweise ergänzt.",
   },
 };

@@ -110,13 +110,15 @@ export default function DeckPage() {
     }
   }, [token, id]);
 
-  const handleGetNextCard = useCallback(async () => {
+  const handleGetNextCard = useCallback(async (keepCurrentCard?: boolean) => {
     if (!token || !id) return;
     setCardError("");
-    setCardSuccess("");
+    if (!keepCurrentCard) setCardSuccess("");
     setLoadingNextCard(true);
-    setNextCard(null);
-    setNextCardFact(null);
+    if (!keepCurrentCard) {
+      setNextCard(null);
+      setNextCardFact(null);
+    }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
       setNextCard(res.data);
@@ -127,6 +129,8 @@ export default function DeckPage() {
       setNextCardFact(factRes.data.fact);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
+      setNextCard(null);
+      setNextCardFact(null);
     } finally {
       setLoadingNextCard(false);
     }
@@ -291,14 +295,29 @@ export default function DeckPage() {
         token,
         body: JSON.stringify(body),
       });
-      setNextCard(null);
-      setNextCardFact(null);
       setCardSuccess("Card reviewed.");
-      await fetchDeck();
       await fetchCards();
-      await handleGetNextCard();
+      await handleGetNextCard(true);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Update failed");
+    }
+  }
+
+  async function handleHideCard(cardId: string) {
+    if (!token || !id) return;
+    setCardError("");
+    try {
+      await request<UpdateCardRes>(`/api/decks/${id}/card`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ card_id: cardId, hidden: true } as UpdateCardReq),
+      });
+      setCardSuccess("Card hidden.");
+      await fetchDeck();
+      await fetchCards();
+      await handleGetNextCard(false);
+    } catch (e) {
+      setCardError(e instanceof Error ? e.message : "Hide failed");
     }
   }
 
@@ -331,8 +350,8 @@ export default function DeckPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen w-full p-4 md:p-6">
+      <div className="w-full max-w-6xl mx-auto space-y-6">
         <DeckHeader onLogout={handleLogout} />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -357,7 +376,7 @@ export default function DeckPage() {
             }}
           />
         ) : (
-          <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full min-w-0 [&>*]:min-w-0">
             <CardSection
               deck={deck}
               cardStats={cardStats}
@@ -368,6 +387,18 @@ export default function DeckPage() {
               cardError={cardError}
               cardSuccess={cardSuccess}
               onUpdateCard={handleUpdateCard}
+              onHideCard={handleHideCard}
+            />
+            <DeckInfoCard
+              deck={deck}
+              onEdit={() => {
+                setEditing(true);
+                setSuccessMessage("");
+              }}
+              deleteConfirm={deleteConfirm}
+              onDeleteConfirm={() => setDeleteConfirm(true)}
+              onDeleteCancel={() => setDeleteConfirm(false)}
+              onDelete={handleDelete}
             />
             <AddFactsForm
               deck={deck}
@@ -395,18 +426,7 @@ export default function DeckPage() {
               deleteFactId={deleteFactId}
               setDeleteFactId={setDeleteFactId}
             />
-            <DeckInfoCard
-              deck={deck}
-              onEdit={() => {
-                setEditing(true);
-                setSuccessMessage("");
-              }}
-              deleteConfirm={deleteConfirm}
-              onDeleteConfirm={() => setDeleteConfirm(true)}
-              onDeleteCancel={() => setDeleteConfirm(false)}
-              onDelete={handleDelete}
-            />
-          </>
+          </div>
         )}
       </div>
     </div>

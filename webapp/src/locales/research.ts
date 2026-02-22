@@ -115,6 +115,37 @@ export const researchStrings: Record<HomeLang, ResearchStrings> = {
     readFullReport: "完全レポートを読む",
     backToHome: "ホームに戻る",
   },
+  de: {
+    title: "Karteikarten mit Abstand: eine Zusammenfassung",
+    summaryP1:
+      "Ein Karteikartensystem (SRS) plant Wiederholungen in zunehmenden Abständen. Statt dieselbe Karte täglich zu sehen oder vor der Prüfung zu pauken, wiederholen Sie jede Karte, wenn sie fällig ist — und der Abstand wird länger, je öfter Sie sich erinnern. Jahrzehnte an Forschung zeigen: über die Zeit verteilte Wiederholungen führen zu deutlich besserer Langzeit-Merkleistung als geballte Übung oder Pauken.",
+    summaryP2:
+      "Die Idee ist einfach: sehen Sie etwas zu früh, verschwenden Sie Zeit; sehen Sie es zu spät, haben Sie schon vergessen und müssen neu lernen. Karteikarten mit Abstand zielen auf den richtigen Zeitpunkt — Wiederholung kurz vor dem Vergessen — sodass jede Wiederholung das Gedächtnis stärkt, ohne unnötige Wiederholung.",
+    summaryP3:
+      "Diese Zusammenfassung stützt sich auf den Bericht aus der Yudame-Research-Podcastfolge zu Karteikarten (Algorithms for Life, Ep. 1). Im Folgenden die zentralen Konzepte und warum sie fürs Lernen wichtig sind.",
+    sectionSpacing: "Der Abstandseffekt",
+    summaryP4:
+      "Der Abstandseffekt ist einer der am besten replizierten Befunde der Kognitionspsychologie: Lernen Sie denselben Stoff in zwei Sitzungen, behalten Sie mehr, wenn die Sitzungen zeitlich getrennt sind, als wenn sie direkt hintereinander liegen. Hermann Ebbinghaus zeigte das in den 1880er Jahren mit sinnfreien Silben; spätere Forschung hat es für Vokabeln, Fakten und Fähigkeiten in vielen Bereichen bestätigt.",
+    summaryP5:
+      "Warum wirkt Abstand? Eine führende Erklärung: Jedes erfolgreiche Abrufen nach einer Pause stärkt die Langzeitspur. Ein bisschen zu vergessen (aber nicht ganz), bevor man wiederholt, scheint die Erinnerung haltbarer zu machen. Pauken erzeugt dagegen starkes Kurzzeitgedächtnis, das schnell verblasst.",
+    sectionForgetting: "Die Vergessenskurve",
+    summaryP6:
+      "Ebbinghaus beschrieb auch die Vergessenskurve: Nach dem Lernen fällt die Behaltensleistung zuerst schnell, dann flacht sie ab. Ohne Wiederholung geht das meiste von dem, was wir in einer Sitzung „gelernt“ haben, innerhalb von Tagen verloren. Die Kurve ist nicht fix — sie ändert sich mit der Stärke der Erinnerung und wie wir den Stoff encodieren.",
+    summaryP7:
+      "Karteikarten mit Abstand nutzen diese Kurve. Indem Sie genau vor oder am Punkt des Vergessens wiederholen, verlängern Sie den Abstand jedes Mal. Leichte Karten wandern zu längeren Abständen (Tage, Wochen, Monate); schwere bleiben zunächst kürzer, bis sie stabil sind. So verbringen Sie die meiste Zeit mit Karten, die wirklich Wiederholung brauchen, nicht mit solchen, die Sie schon können.",
+    sectionAlgorithms: "Wie SRS-Algorithmen funktionieren",
+    summaryP8:
+      "Manuelles Planen von Abständen ist möglich, aber in größerem Umfang schwer zu handhaben. Algorithmen wie SM-2 (in Anki und vielen anderen Tools) automatisieren die Entscheidung: Nach jeder Wiederholung berechnen sie den nächsten Abstand aus Ihrem Abruferfolg. War das Abrufen leicht, wird der Abstand größer; war es mühsam oder vergessen, wird er verkürzt oder zurückgesetzt. Die genaue Formel variiert, das Prinzip ist dasselbe: Ihr Verhalten steuert die nächste Wiederholung.",
+    summaryP9:
+      "Retentio folgt diesem Ansatz. Jede Karte hat ein Fälligkeitsdatum; wenn Sie sie wiederholen, aktualisiert das System Abstand und nächstes Fälligkeitsdatum. Sie wählen nicht, wann Sie welche Karte sehen — der Algorithmus tut das. So können Sie sich aufs Antworten konzentrieren und das System übernimmt die Planung.",
+    sectionPractice: "Warum das in der Praxis zählt",
+    summaryP10:
+      "Karteikarten mit Abstand sind kein Trick, sondern eine Methode, Lernen an die tatsächliche Funktionsweise des Gedächtnisses anzupassen. Die Gesamtlernzeit sinkt, weil Sie bereits Gekonntes nicht mehr über-wiederholen und sich auf Verblassendes konzentrieren. Es reduziert auch Stress: Statt Last-Minute-Pauken eine gleichmäßige tägliche Wiederholungsmenge, das System behält den Überblick, was fällig ist.",
+    summaryP11:
+      "Ob Sie eine Sprache lernen, Prüfungen vorbereiten oder eine Wissensbasis aus Fakten und Konzepten aufbauen — Wiederholungen mit Abstand machen den Aufwand effizienter und die Ergebnisse dauerhafter. Für mehr Tiefe und Details siehe den verlinkten vollständigen Bericht.",
+    readFullReport: "Vollständigen Bericht lesen",
+    backToHome: "Zurück zur Startseite",
+  },
 };
 
 const RESEARCH_REPORT_URL =
