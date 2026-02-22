@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
@@ -52,6 +54,7 @@ interface CardSectionProps {
   cardSuccess: string;
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
+  onSaveFact?: (factId: string, values: string[]) => Promise<void>;
 }
 
 const SLIDER_DEFAULT = 0.5;
@@ -67,10 +70,16 @@ export function CardSection({
   cardSuccess,
   onUpdateCard,
   onHideCard,
+  onSaveFact,
 }: CardSectionProps) {
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
+  const [editPopupOpen, setEditPopupOpen] = useState(false);
+  const [editFactId, setEditFactId] = useState<string | null>(null);
+  const [editFactValues, setEditFactValues] = useState<string[]>([]);
+  const [editError, setEditError] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     if (nextCard) setSliderValue(SLIDER_DEFAULT);
@@ -99,6 +108,33 @@ export function CardSection({
     onUpdateCard(Math.round(intervalSec));
   };
 
+  const openEditPopup = (factId: string, fields: string[]) => {
+    setEditFactId(factId);
+    setEditFactValues([...fields]);
+    setEditError("");
+    setEditPopupOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onSaveFact || !editFactId || !deck) return;
+    const values = editFactValues.map((s) => s.trim());
+    if (values.length !== deck.field.length || values.some((v) => !v)) {
+      setEditError(`Each field is required. Expected ${deck.field.length} values.`);
+      return;
+    }
+    setEditError("");
+    setEditSaving(true);
+    try {
+      await onSaveFact(editFactId, values);
+      setEditPopupOpen(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="text-center">
@@ -121,8 +157,13 @@ export function CardSection({
           <div className="relative rounded-lg border p-4 space-y-3">
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
+                {onSaveFact && (
+                  <DropdownMenuItem onClick={() => openEditPopup(nextCardFact.id, nextCardFact.fields)} disabled={loadingNextCard}>
+                    Edit fact
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => onHideCard(nextCard.card.id)} disabled={loadingNextCard}>
-                  Hide
+                  Hide card
                 </DropdownMenuItem>
               </DropdownMenu>
             </div>
@@ -201,6 +242,43 @@ export function CardSection({
           </div>
         )}
       </CardContent>
+
+      {editPopupOpen && deck && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setEditPopupOpen(false)} aria-hidden="true" />
+          <div className="relative z-50 w-full max-w-md rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4">
+            <h2 className="text-lg font-semibold">Edit fact</h2>
+            <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
+              {editError && <p className="text-sm text-destructive">{editError}</p>}
+              <div className="space-y-3">
+                {deck.field.map((fieldName, i) => (
+                  <div key={i} className="space-y-1">
+                    <Label htmlFor={`card-edit-field-${i}`}>{fieldName}</Label>
+                    <Input
+                      id={`card-edit-field-${i}`}
+                      value={editFactValues[i] ?? ""}
+                      onChange={(e) => {
+                        const next = [...editFactValues];
+                        next[i] = e.target.value;
+                        setEditFactValues(next);
+                      }}
+                      disabled={editSaving}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditPopupOpen(false)} disabled={editSaving}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={editSaving}>
+                  {editSaving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

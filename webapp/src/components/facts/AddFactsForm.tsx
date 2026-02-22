@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
 
 interface AddFactsFormProps {
   deck: DeckItem;
-  factsInput: string;
-  setFactsInput: (v: string) => void;
+  factsRows: string[][];
+  setFactsRows: (v: string[][]) => void;
   addFactOp: AddFactOperation;
   setAddFactOp: (v: AddFactOperation) => void;
   addingFacts: boolean;
@@ -17,42 +18,50 @@ interface AddFactsFormProps {
 
 export function AddFactsForm({
   deck,
-  factsInput,
-  setFactsInput,
+  factsRows,
+  setFactsRows,
   addFactOp,
   setAddFactOp,
   addingFacts,
   addFactsError,
   onSubmit,
 }: AddFactsFormProps) {
+  const row = factsRows[0] ?? deck.field.map(() => "");
+  const setCell = (colIndex: number, value: string) => {
+    const next = [...row];
+    next[colIndex] = value;
+    setFactsRows([next]);
+  };
+
   return (
     <Card>
       <CardHeader className="text-center">
         <CardTitle>Add facts</CardTitle>
         <p className="text-sm font-normal text-muted-foreground">
-          One fact per line. Separate values by comma or tab. This deck has {deck.field.length}{" "}
-          fields: {deck.field.join(", ")}.
+          Enter one fact. Each field has its own box.
         </p>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={onSubmit} className="space-y-4">
           {addFactsError && <p className="text-sm text-destructive">{addFactsError}</p>}
           <div className="space-y-2">
-            <Label htmlFor="facts">Facts</Label>
-            <textarea
-              id="facts"
-              rows={5}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder={"Apple, 苹果\nBanana, 香蕉"}
-              value={factsInput}
-              onChange={(e) => setFactsInput(e.target.value)}
-            />
+            {deck.field.map((fieldName, colIndex) => (
+              <div key={colIndex} className="space-y-1">
+                <Label htmlFor={`fact-0-${colIndex}`}>{fieldName}</Label>
+                <Input
+                  id={`fact-0-${colIndex}`}
+                  value={row[colIndex] ?? ""}
+                  onChange={(e) => setCell(colIndex, e.target.value)}
+                  disabled={addingFacts}
+                />
+              </div>
+            ))}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="op">Operation</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="op" className="sr-only">Operation</Label>
             <select
               id="op"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={addFactOp}
               onChange={(e) => setAddFactOp(e.target.value as AddFactOperation)}
             >
@@ -61,10 +70,10 @@ export function AddFactsForm({
               <option value="shuffle">Shuffle</option>
               <option value="spread">Spread</option>
             </select>
+            <Button type="submit" disabled={addingFacts || row.every((s) => !s.trim())}>
+              {addingFacts ? "Adding…" : "Add facts"}
+            </Button>
           </div>
-          <Button type="submit" disabled={addingFacts}>
-            {addingFacts ? "Adding…" : "Add facts"}
-          </Button>
         </form>
       </CardContent>
     </Card>
