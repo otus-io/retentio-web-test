@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 interface DeckEditFormProps {
   name: string;
   setName: (v: string) => void;
-  fieldsStr: string;
-  setFieldsStr: (v: string) => void;
+  fieldNames: string[];
+  setFieldNames: (v: string[]) => void;
   sibling: boolean;
   setSibling: (v: boolean) => void;
   rate: number;
@@ -20,8 +20,8 @@ interface DeckEditFormProps {
 export function DeckEditForm({
   name,
   setName,
-  fieldsStr,
-  setFieldsStr,
+  fieldNames,
+  setFieldNames,
   sibling,
   setSibling,
   rate,
@@ -42,13 +42,36 @@ export function DeckEditForm({
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="fields">Fields (comma-separated, at least 2)</Label>
-            <Input
-              id="fields"
-              value={fieldsStr}
-              onChange={(e) => setFieldsStr(e.target.value)}
-              placeholder="English, Chinese"
-            />
+            <p className="text-sm font-medium">Fields</p>
+            <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
+            {fieldNames.map((value, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Label htmlFor={`edit-field-${i}`} className="sr-only">Field {i + 1}</Label>
+                <Input
+                  id={`edit-field-${i}`}
+                  value={value}
+                  onChange={(e) => {
+                    const next = [...fieldNames];
+                    next[i] = e.target.value;
+                    setFieldNames(next);
+                  }}
+                  placeholder={`Field ${i + 1}`}
+                />
+                {fieldNames.length > 2 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-destructive shrink-0"
+                    onClick={() => setFieldNames(fieldNames.filter((_, j) => j !== i))}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button type="button" variant="outline" onClick={() => setFieldNames([...fieldNames, ""])}>
+              Add field
+            </Button>
           </div>
           <div className="flex items-center gap-2">
             <input

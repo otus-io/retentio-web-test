@@ -14,7 +14,7 @@ export default function DeckEditPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [fieldsStr, setFieldsStr] = useState("");
+  const [fieldNames, setFieldNames] = useState<string[]>([]);
   const [sibling, setSibling] = useState(false);
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
@@ -28,7 +28,7 @@ export default function DeckEditPage() {
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       setName(res.data.name);
-      setFieldsStr(res.data.field.join(", "));
+      setFieldNames([...res.data.field]);
       setSibling(res.data.templates.length === 2);
       setRate(res.data.rate);
     } catch (e) {
@@ -45,7 +45,7 @@ export default function DeckEditPage() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !id) return;
-    const fields = fieldsStr.split(",").map((s) => s.trim()).filter(Boolean);
+    const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
     const templates: number[][] = sibling ? [[0, 1], [1, 0]] : [[0, 1]];
     if (fields.length < 2) {
       setError("At least two fields required");
@@ -92,8 +92,8 @@ export default function DeckEditPage() {
         <DeckEditForm
           name={name}
           setName={setName}
-          fieldsStr={fieldsStr}
-          setFieldsStr={setFieldsStr}
+          fieldNames={fieldNames}
+          setFieldNames={setFieldNames}
           sibling={sibling}
           setSibling={setSibling}
           rate={rate}

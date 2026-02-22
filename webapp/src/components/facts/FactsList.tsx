@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
@@ -15,9 +16,9 @@ interface FactsListProps {
   factError: string;
   factSuccess: string;
   editingFactId: string | null;
-  editingFactFields: string;
+  editingFactValues: string[];
   setEditingFactId: (id: string | null) => void;
-  setEditingFactFields: (v: string) => void;
+  setEditingFactValues: (v: string[]) => void;
   setFactError: (v: string) => void;
   onUpdateFact: (e: React.FormEvent) => void;
   onDeleteFact: (factId: string) => void;
@@ -32,9 +33,9 @@ export function FactsList({
   factError,
   factSuccess,
   editingFactId,
-  editingFactFields,
+  editingFactValues,
   setEditingFactId,
-  setEditingFactFields,
+  setEditingFactValues,
   setFactError,
   onUpdateFact,
   onDeleteFact,
@@ -76,12 +77,20 @@ export function FactsList({
               {paginatedFacts.map((f) => (
               <li key={f.id} className="px-3 py-2 first:pt-2 hover:bg-muted/50">
                 {editingFactId === f.id ? (
-                  <form onSubmit={onUpdateFact} className="w-full space-y-2">
-                    <Input
-                      value={editingFactFields}
-                      onChange={(e) => setEditingFactFields(e.target.value)}
-                      placeholder={deck.field.join(", ")}
-                    />
+                  <form onSubmit={onUpdateFact} className="w-full space-y-3">
+                    {deck.field.map((fieldName, i) => (
+                      <div key={i} className="space-y-1">
+                        <Label className="text-xs font-medium text-muted-foreground">{fieldName}</Label>
+                        <Input
+                          value={editingFactValues[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...editingFactValues];
+                            next[i] = e.target.value;
+                            setEditingFactValues(next);
+                          }}
+                        />
+                      </div>
+                    ))}
                     <div className="flex gap-2">
                       <Button type="submit">Save</Button>
                       <Button
@@ -89,6 +98,7 @@ export function FactsList({
                         variant="outline"
                         onClick={() => {
                           setEditingFactId(null);
+                          setEditingFactValues([]);
                           setFactError("");
                         }}
                       >
@@ -103,7 +113,7 @@ export function FactsList({
                       <DropdownMenuItem
                         onClick={() => {
                           setEditingFactId(f.id);
-                          setEditingFactFields(f.fields.join(", "));
+                          setEditingFactValues([...f.fields]);
                           setFactError("");
                         }}
                       >

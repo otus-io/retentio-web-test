@@ -25,7 +25,7 @@ export default function ProfilePage() {
   const [loadingDecks, setLoadingDecks] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
-  const [createFields, setCreateFields] = useState("English, Chinese");
+  const [createFieldNames, setCreateFieldNames] = useState<string[]>(["English", "Chinese"]);
   const [createSibling, setCreateSibling] = useState(false);
   const [createRate, setCreateRate] = useState(20);
   const [creating, setCreating] = useState(false);
@@ -77,7 +77,7 @@ export default function ProfilePage() {
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    const fields = createFields.split(",").map((s) => s.trim()).filter(Boolean);
+    const fields = createFieldNames.map((s) => s.trim()).filter(Boolean);
     const templates: number[][] = createSibling ? [[0, 1], [1, 0]] : [[0, 1]];
     if (fields.length < 2) {
       setCreateError("At least two fields required");
@@ -94,7 +94,7 @@ export default function ProfilePage() {
       await request<CreateDeckRes>("/api/decks", { method: "POST", token, body: JSON.stringify(body) });
       setCreateOpen(false);
       setCreateName("");
-      setCreateFields("English, Chinese");
+      setCreateFieldNames(["English", "Chinese"]);
       setCreateSibling(false);
       setCreateRate(20);
       setCreateSuccess("Deck created.");
@@ -163,19 +163,19 @@ export default function ProfilePage() {
             {loadingProfile ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : profile ? (
-              <dl className="grid gap-2 text-sm">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div>
-                  <dt className="font-medium text-muted-foreground">Username</dt>
-                  <dd>{profile.data.username}</dd>
+                  <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Username</dt>
+                  <dd className="mt-0.5">{profile.data.username}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-muted-foreground">Email</dt>
-                  <dd>{profile.data.email}</dd>
+                  <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Email</dt>
+                  <dd className="mt-0.5">{profile.data.email}</dd>
                 </div>
                 {profile.meta?.created_at && (
                   <div>
-                    <dt className="font-medium text-muted-foreground">Member since</dt>
-                    <dd>{formatDate(profile.meta.created_at)}</dd>
+                    <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Member since</dt>
+                    <dd className="mt-0.5">{formatDate(profile.meta.created_at)}</dd>
                   </div>
                 )}
               </dl>
@@ -204,15 +204,43 @@ export default function ProfilePage() {
             {deleteSuccess && <p className="text-sm text-green-600">{deleteSuccess}</p>}
             {createSuccess && <p className="text-sm text-green-600">{createSuccess}</p>}
             {createOpen && (
-              <form onSubmit={handleCreateDeck} className="rounded-lg border p-4 space-y-3">
+              <form onSubmit={handleCreateDeck} className="rounded-lg border p-4 space-y-4">
                 {createError && <p className="text-sm text-destructive">{createError}</p>}
                 <div className="space-y-2">
                   <Label htmlFor="create-name">Name</Label>
                   <Input id="create-name" value={createName} onChange={(e) => setCreateName(e.target.value)} required placeholder="My deck" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="create-fields">Fields (comma-separated)</Label>
-                  <Input id="create-fields" value={createFields} onChange={(e) => setCreateFields(e.target.value)} placeholder="English, Chinese" />
+                  <p className="text-sm font-medium">Fields</p>
+                  <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
+                  {createFieldNames.map((value, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Label htmlFor={`create-field-${i}`} className="sr-only">Field {i + 1}</Label>
+                      <Input
+                        id={`create-field-${i}`}
+                        value={value}
+                        onChange={(e) => {
+                          const next = [...createFieldNames];
+                          next[i] = e.target.value;
+                          setCreateFieldNames(next);
+                        }}
+                        placeholder={`Field ${i + 1}`}
+                      />
+                      {createFieldNames.length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-destructive shrink-0"
+                          onClick={() => setCreateFieldNames(createFieldNames.filter((_, j) => j !== i))}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={() => setCreateFieldNames([...createFieldNames, ""])}>
+                    Add field
+                  </Button>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -236,9 +264,9 @@ export default function ProfilePage() {
             ) : decks.length === 0 ? (
               <p className="text-muted-foreground">No decks yet. Create one above.</p>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y rounded-md border">
                 {decks.map((d) => (
-                  <li key={d.id} className="py-3 first:pt-0">
+                  <li key={d.id} className="px-3 py-3 first:pt-3 hover:bg-muted/50">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="font-medium">
