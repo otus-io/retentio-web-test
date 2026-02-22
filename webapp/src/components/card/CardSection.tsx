@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
 
@@ -69,14 +70,23 @@ export function CardSection({
 }: CardSectionProps) {
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
+  const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
 
   useEffect(() => {
     if (nextCard) setSliderValue(SLIDER_DEFAULT);
   }, [nextCard?.card.id]);
 
   useEffect(() => {
-    if (nextCard) setFlipped(false);
+    if (nextCard) {
+      setFlipped(false);
+      setHasFlippedOnce(false);
+    }
   }, [nextCard?.card.id]);
+
+  const handleFlip = () => {
+    setFlipped((f) => !f);
+    setHasFlippedOnce(true);
+  };
 
   const { minIntervalSec, maxIntervalSec, intervalSec } = useMemo(() => {
     if (!nextCard) return { minIntervalSec: 60, maxIntervalSec: 86400, intervalSec: 43200 };
@@ -91,10 +101,10 @@ export function CardSection({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
         <CardTitle>Cards</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 text-center">
         {cardError && <p className="text-sm text-destructive">{cardError}</p>}
         {cardSuccess && <p className="text-sm text-green-600">{cardSuccess}</p>}
         {!nextCard && loadingNextCard ? (
@@ -108,7 +118,14 @@ export function CardSection({
           </p>
         ) : null}
         {nextCard && nextCardFact && deck && (
-          <div className="rounded-lg border p-4 space-y-3">
+          <div className="relative rounded-lg border p-4 space-y-3">
+            <div className="absolute top-2 right-2">
+              <DropdownMenu align="end">
+                <DropdownMenuItem onClick={() => onHideCard(nextCard.card.id)} disabled={loadingNextCard}>
+                  Hide
+                </DropdownMenuItem>
+              </DropdownMenu>
+            </div>
             <p className="text-xs text-muted-foreground">
               Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
             </p>
@@ -118,13 +135,13 @@ export function CardSection({
               return (
                 <div
                   className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
-                  onClick={() => setFlipped((f) => !f)}
+                  onClick={handleFlip}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setFlipped((f) => !f);
+                      handleFlip();
                     }
                   }}
                   aria-label={flipped ? "Flip to front" : "Flip to back"}
@@ -158,36 +175,29 @@ export function CardSection({
                 </div>
               );
             })()}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Hard</span>
-                <span>{formatInterval(intervalSec)}</span>
-                <span>Easy</span>
+            {hasFlippedOnce && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Hard</span>
+                  <span>{formatInterval(intervalSec)}</span>
+                  <span>Easy</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={sliderValue}
+                  onChange={(e) => setSliderValue(parseFloat(e.target.value))}
+                  className="w-full h-2 rounded-full bg-muted cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0"
+                />
+                <div className="flex justify-center">
+                  <Button type="button" className="h-8 px-3 text-xs" onClick={handleSubmit} disabled={loadingNextCard}>
+                    {loadingNextCard ? "Loading…" : "Review"}
+                  </Button>
+                </div>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={sliderValue}
-                onChange={(e) => setSliderValue(parseFloat(e.target.value))}
-                className="w-full h-2 rounded-full bg-muted cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0"
-              />
-              <div className="flex gap-2">
-                <Button type="button" className="h-8 px-3 text-xs" onClick={handleSubmit} disabled={loadingNextCard}>
-                  {loadingNextCard ? "Loading…" : "Review"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => onHideCard(nextCard.card.id)}
-                  disabled={loadingNextCard}
-                >
-                  Hide
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </CardContent>

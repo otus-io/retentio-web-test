@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import DeckEditPage from "@/pages/DeckEditPage";
 import DeckPage from "@/pages/DeckPage";
 import HomePage from "@/pages/HomePage";
 import ResearchPage from "@/pages/ResearchPage";
@@ -32,6 +33,14 @@ export const routes = [
     element: (
       <ProtectedRoute>
         <MediaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/decks/:id/edit",
+    element: (
+      <ProtectedRoute>
+        <DeckEditPage />
       </ProtectedRoute>
     ),
   },

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
@@ -154,7 +156,7 @@ export default function ProfilePage() {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Profile</CardTitle>
           </CardHeader>
           <CardContent>
@@ -184,11 +186,18 @@ export default function ProfilePage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Decks</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => { setCreateOpen(!createOpen); setCreateError(""); setCreateSuccess(""); }}>
-              {createOpen ? "Cancel" : "Create deck"}
-            </Button>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <div className="flex-1" />
+            <CardTitle className="text-center flex-1">List of Decks</CardTitle>
+            <div className="flex-1 flex justify-end">
+              <DropdownMenu align="end">
+                {createOpen ? (
+                  <DropdownMenuItem onClick={() => { setCreateOpen(false); setCreateError(""); setCreateSuccess(""); }}>Cancel</DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => { setCreateOpen(true); setCreateError(""); setCreateSuccess(""); }}>Create deck</DropdownMenuItem>
+                )}
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
@@ -240,19 +249,10 @@ export default function ProfilePage() {
                           {d.stats.due_cards > 0 && ` · ${d.stats.due_cards} due`}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/decks/${d.id}`}>Edit</Link>
-                        </Button>
-                        {deleteId === d.id ? (
-                          <>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteDeck(d.id)}>Confirm</Button>
-                            <Button variant="ghost" size="sm" onClick={() => setDeleteId(null)}>Cancel</Button>
-                          </>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { setDeleteId(d.id); setDeleteError(""); setDeleteSuccess(""); }}>Delete</Button>
-                        )}
-                      </div>
+                      <DropdownMenu align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/decks/${d.id}/edit`)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onClick={() => { setDeleteId(d.id); setDeleteError(""); setDeleteSuccess(""); }}>Delete</DropdownMenuItem>
+                      </DropdownMenu>
                     </div>
                   </li>
                 ))}
@@ -260,6 +260,20 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog
+          open={deleteId !== null}
+          onOpenChange={(open) => !open && setDeleteId(null)}
+          title="Delete deck?"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={() => deleteId && handleDeleteDeck(deleteId)}
+        >
+          {deleteId && (
+            <>Are you sure you want to delete &quot;{decks.find((d) => d.id === deleteId)?.name ?? "this deck"}&quot;? This cannot be undone.</>
+          )}
+        </Dialog>
       </div>
     </div>
   );

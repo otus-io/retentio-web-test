@@ -27,7 +27,7 @@ export function AddFactsForm({
 }: AddFactsFormProps) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
         <CardTitle>Add facts</CardTitle>
         <p className="text-sm font-normal text-muted-foreground">
           One fact per line. Separate values by comma or tab. This deck has {deck.field.length}{" "}

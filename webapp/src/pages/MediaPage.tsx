@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -172,32 +174,13 @@ export default function MediaPage() {
                         <td className="py-2 text-muted-foreground">{m.mime}</td>
                         <td className="py-2 text-muted-foreground">{formatSize(m.size)}</td>
                         <td className="py-2 text-muted-foreground">{formatDate(m.created_at)}</td>
-                        <td className="py-2 text-right space-x-2">
-                          <Button
-                            variant="link"
-                            className="h-auto p-0 text-primary"
-                            onClick={() => handleDownload(m)}
-                          >
-                            Download
-                          </Button>
-                          {deleteConfirm === m.id ? (
-                            <>
-                              <Button variant="destructive" onClick={() => handleDelete(m.id)}>
-                                Confirm
-                              </Button>
-                              <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => setDeleteConfirm(m.id)}
-                            >
+                        <td className="py-2 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuItem onClick={() => handleDownload(m)}>Download</DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => setDeleteConfirm(m.id)}>
                               Delete
-                            </Button>
-                          )}
+                            </DropdownMenuItem>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     ))}
@@ -207,6 +190,20 @@ export default function MediaPage() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog
+          open={deleteConfirm !== null}
+          onOpenChange={(open) => !open && setDeleteConfirm(null)}
+          title="Delete file?"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
+        >
+          {deleteConfirm && (
+            <>Are you sure you want to delete &quot;{items.find((x) => x.id === deleteConfirm)?.filename ?? "this file"}&quot;? This cannot be undone.</>
+          )}
+        </Dialog>
       </div>
     </div>
   );
