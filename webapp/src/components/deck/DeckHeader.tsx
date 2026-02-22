@@ -7,8 +7,7 @@ interface DeckHeaderProps {
 
 export function DeckHeader({ onLogout }: DeckHeaderProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <h1 className="text-2xl font-semibold">Deck</h1>
+    <div className="flex flex-wrap items-center justify-end gap-4">
       <nav className="flex items-center gap-2">
         <Link
           to="/profile"

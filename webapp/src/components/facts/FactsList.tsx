@@ -1,7 +1,12 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
+
+const DEFAULT_PAGE_SIZE = 5;
 
 interface FactsListProps {
   deck: DeckItem;
@@ -36,12 +41,29 @@ export function FactsList({
   deleteFactId,
   setDeleteFactId,
 }: FactsListProps) {
+  const [page, setPage] = useState(1);
+  const pageSize = DEFAULT_PAGE_SIZE;
+
+  const total = factsList.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = (page - 1) * pageSize;
+  const paginatedFacts = factsList.slice(start, start + pageSize);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>Facts</CardTitle>
+        {!loadingFacts && total > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {total} fact{total !== 1 ? "s" : ""}
+          </span>
+        )}
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-4">
         {factError && <p className="text-sm text-destructive">{factError}</p>}
         {factSuccess && <p className="text-sm text-green-600">{factSuccess}</p>}
         {loadingFacts ? (
@@ -49,11 +71,12 @@ export function FactsList({
         ) : factsList.length === 0 ? (
           <p className="text-muted-foreground">No facts yet. Add some above.</p>
         ) : (
-          <ul className="divide-y">
-            {factsList.map((f) => (
-              <li key={f.id} className="py-2 first:pt-0">
+          <>
+            <ul className="divide-y rounded-md border">
+              {paginatedFacts.map((f) => (
+              <li key={f.id} className="px-3 py-2 first:pt-2 hover:bg-muted/50">
                 {editingFactId === f.id ? (
-                  <form onSubmit={onUpdateFact} className="space-y-2">
+                  <form onSubmit={onUpdateFact} className="w-full space-y-2">
                     <Input
                       value={editingFactFields}
                       onChange={(e) => setEditingFactFields(e.target.value)}
@@ -75,11 +98,9 @@ export function FactsList({
                   </form>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm">{f.fields.join(" · ")}</span>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                    <span className="text-sm min-w-0 flex-1">{f.fields.join(" · ")}</span>
+                    <DropdownMenu>
+                      <DropdownMenuItem
                         onClick={() => {
                           setEditingFactId(f.id);
                           setEditingFactFields(f.fields.join(", "));
@@ -87,38 +108,63 @@ export function FactsList({
                         }}
                       >
                         Edit
-                      </Button>
-                      {deleteFactId === f.id ? (
-                        <>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => onDeleteFact(f.id)}
-                          >
-                            Confirm
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setDeleteFactId(null)}>
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => setDeleteFactId(f.id)}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteFactId(f.id)}>
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenu>
                   </div>
                 )}
               </li>
             ))}
-          </ul>
+            </ul>
+            {totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                <p className="text-xs text-muted-foreground">
+                  Showing {start + 1}–{Math.min(start + pageSize, total)} of {total}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-2 text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
+      <Dialog
+        open={deleteFactId !== null}
+        onOpenChange={(open) => !open && setDeleteFactId(null)}
+        title="Delete fact?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => deleteFactId && onDeleteFact(deleteFactId)}
+      >
+        {deleteFactId && (() => {
+          const fact = factsList.find((x) => x.id === deleteFactId);
+          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.fields.join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
+        })()}
+      </Dialog>
     </Card>
   );
 }

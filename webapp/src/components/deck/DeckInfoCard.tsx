@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem } from "@/lib/api";
 
 function formatLastReview(unixSec: number): string {
@@ -34,60 +35,59 @@ export function DeckInfoCard({
   onDelete,
 }: DeckInfoCardProps) {
   return (
-    <Card>
-      <CardHeader>
+    <Card className="relative">
+      <div className="absolute top-2 right-2 z-10">
+        <DropdownMenu align="end">
+          <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDeleteConfirm}>
+            Delete deck
+          </DropdownMenuItem>
+        </DropdownMenu>
+      </div>
+      <Dialog
+        open={deleteConfirm}
+        onOpenChange={(open) => !open && onDeleteCancel()}
+        title="Delete deck?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={onDelete}
+      >
+        Are you sure you want to delete &quot;{deck.name}&quot;? This cannot be undone.
+      </Dialog>
+      <CardHeader className="pb-2 text-center">
         <CardTitle>{deck.name}</CardTitle>
-        <p className="text-sm text-muted-foreground">ID: {deck.id}</p>
+        <p className="text-xs text-muted-foreground font-mono">ID: {deck.id}</p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <dl className="grid gap-2 text-sm">
+      <CardContent className="space-y-4 pt-0">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
-            <dt className="font-medium text-muted-foreground">Fields</dt>
-            <dd>{deck.field.join(", ")}</dd>
+            <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Fields</dt>
+            <dd className="mt-0.5">{deck.field.join(", ")}</dd>
           </div>
           <div>
-            <dt className="font-medium text-muted-foreground">Rate</dt>
-            <dd>{deck.rate}</dd>
+            <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Rate</dt>
+            <dd className="mt-0.5">{deck.rate}</dd>
           </div>
           <div>
-            <dt className="font-medium text-muted-foreground">Sibling</dt>
-            <dd>{deck.templates.length === 2 ? "Yes" : "No"}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-muted-foreground">Stats</dt>
-            <dd className="space-y-1">
-              <span className="block">
-                {deck.stats.facts_count} facts · {deck.stats.cards_count} cards
-              </span>
-              <span className="block text-muted-foreground">
-                {deck.stats.unseen_cards} unseen · {deck.stats.reviewed_cards} reviewed ·{" "}
-                {deck.stats.due_cards} due · {deck.stats.hidden_cards} hidden
-              </span>
-              <span className="block text-muted-foreground">
-                {deck.stats.new_cards_today} new today
-                {deck.stats.last_reviewed_at != null && deck.stats.last_reviewed_at > 0
-                  ? ` · Last review ${formatLastReview(deck.stats.last_reviewed_at)}`
-                  : ""}
-              </span>
-            </dd>
+            <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Sibling</dt>
+            <dd className="mt-0.5">{deck.templates.length === 2 ? "Yes" : "No"}</dd>
           </div>
         </dl>
-        <div className="flex gap-2">
-          <Button onClick={onEdit}>Edit</Button>
-          {deleteConfirm ? (
-            <>
-              <Button variant="destructive" onClick={onDelete}>
-                Confirm delete
-              </Button>
-              <Button variant="outline" onClick={onDeleteCancel}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <Button variant="destructive" onClick={onDeleteConfirm}>
-              Delete deck
-            </Button>
-          )}
+        <div className="border-t pt-4 space-y-2">
+          <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Stats</p>
+          <ul className="text-sm space-y-1.5 list-none">
+            <li><span className="text-muted-foreground">Facts:</span> {deck.stats.facts_count}</li>
+            <li><span className="text-muted-foreground">Cards:</span> {deck.stats.cards_count}</li>
+            <li><span className="text-muted-foreground">Unseen:</span> {deck.stats.unseen_cards}</li>
+            <li><span className="text-muted-foreground">Reviewed:</span> {deck.stats.reviewed_cards}</li>
+            <li><span className="text-muted-foreground">Due:</span> {deck.stats.due_cards}</li>
+            <li><span className="text-muted-foreground">Hidden:</span> {deck.stats.hidden_cards}</li>
+            <li><span className="text-muted-foreground">New today:</span> {deck.stats.new_cards_today}</li>
+            {deck.stats.last_reviewed_at != null && deck.stats.last_reviewed_at > 0 && (
+              <li><span className="text-muted-foreground">Last review:</span> {formatLastReview(deck.stats.last_reviewed_at)}</li>
+            )}
+          </ul>
         </div>
       </CardContent>
     </Card>
