@@ -36,8 +36,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b border-border/80 bg-card/95 px-4 py-3">
+        <Link
+          to="/"
+          className="text-xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+        >
+          Retentio
+        </Link>
+      </header>
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
         </CardHeader>
@@ -74,6 +83,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
