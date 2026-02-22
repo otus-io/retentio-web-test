@@ -7,6 +7,7 @@ import LoginPage from "@/pages/LoginPage";
 import MediaPage from "@/pages/MediaPage";
 import ProfilePage from "@/pages/ProfilePage";
 import RegisterPage from "@/pages/RegisterPage";
+import ManualPage from "@/pages/ManualPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -44,5 +45,6 @@ export const routes = [
   },
   { path: "/", element: <HomePage /> },
   { path: "/research", element: <ResearchPage /> },
+  { path: "/manual", element: <ManualPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];

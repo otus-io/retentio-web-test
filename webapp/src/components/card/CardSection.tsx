@@ -50,6 +50,7 @@ interface CardSectionProps {
   cardError: string;
   cardSuccess: string;
   onUpdateCard: (intervalSeconds: number) => void;
+  onHideCard: (cardId: string) => void;
 }
 
 const SLIDER_DEFAULT = 0.5;
@@ -64,6 +65,7 @@ export function CardSection({
   cardError,
   cardSuccess,
   onUpdateCard,
+  onHideCard,
 }: CardSectionProps) {
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
@@ -95,7 +97,7 @@ export function CardSection({
       <CardContent className="space-y-4">
         {cardError && <p className="text-sm text-destructive">{cardError}</p>}
         {cardSuccess && <p className="text-sm text-green-600">{cardSuccess}</p>}
-        {loadingNextCard ? (
+        {!nextCard && loadingNextCard ? (
           <p className="text-muted-foreground">Loading next card…</p>
         ) : cardStats !== null ? (
           <p className="text-sm text-muted-foreground">
@@ -171,9 +173,20 @@ export function CardSection({
                 onChange={(e) => setSliderValue(parseFloat(e.target.value))}
                 className="w-full h-2 rounded-full bg-muted cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0"
               />
-              <Button size="sm" onClick={handleSubmit}>
-                Review
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" className="h-8 px-3 text-xs" onClick={handleSubmit} disabled={loadingNextCard}>
+                  {loadingNextCard ? "Loading…" : "Review"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => onHideCard(nextCard.card.id)}
+                  disabled={loadingNextCard}
+                >
+                  Hide
+                </Button>
+              </div>
             </div>
           </div>
         )}

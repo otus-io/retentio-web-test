@@ -12,7 +12,7 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 function readStoredLang(): HomeLang {
   const s = localStorage.getItem(LOCALE_KEY);
-  if (s === "zh" || s === "en" || s === "ja") return s;
+  if (s === "zh" || s === "en" || s === "ja" || s === "de") return s;
   return "en";
 }
 
@@ -27,7 +27,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get("lang");
-    if (q === "zh" || q === "en" || q === "ja") {
+    if (q === "zh" || q === "en" || q === "ja" || q === "de") {
       setLangState(q);
       localStorage.setItem(LOCALE_KEY, q);
     }
