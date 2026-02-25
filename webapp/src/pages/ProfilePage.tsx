@@ -78,7 +78,6 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!token) return;
     const fields = createFieldNames.map((s) => s.trim()).filter(Boolean);
-    const templates: number[][] = createSibling ? [[0, 1], [1, 0]] : [[0, 1]];
     if (fields.length < 2) {
       setCreateError("At least two fields required");
       return;
@@ -90,7 +89,7 @@ export default function ProfilePage() {
     setCreateError("");
     setCreating(true);
     try {
-      const body: CreateDeckReq = { name: createName.trim(), fields, templates, rate: createRate };
+      const body: CreateDeckReq = { name: createName.trim(), fields, rate: createRate };
       await request<CreateDeckRes>("/api/decks", { method: "POST", token, body: JSON.stringify(body) });
       setCreateOpen(false);
       setCreateName("");

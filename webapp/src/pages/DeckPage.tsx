@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
+  uploadMultipart,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -18,6 +19,7 @@ import {
   type UpdateCardReq,
   type UpdateCardRes,
   type UpdateFactReq,
+  type UploadMediaRes,
 } from "@/lib/api";
 import {
   DeckHeader,
@@ -25,7 +27,7 @@ import {
   DeckInfoCard,
 } from "@/components/deck";
 import { CardSection } from "@/components/card";
-import { AddFactsForm, FactsList } from "@/components/facts";
+import { AddFactsForm, FactsList, type FactMediaEntry } from "@/components/facts";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,6 +47,7 @@ export default function DeckPage() {
   const [addFactOp, setAddFactOp] = useState<AddFactOperation>("append");
   const [addingFacts, setAddingFacts] = useState(false);
   const [addFactsError, setAddFactsError] = useState("");
+  const [mediaFiles, setMediaFiles] = useState<FactMediaEntry[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [factsList, setFactsList] = useState<FactItem[]>([]);
   const [loadingFacts, setLoadingFacts] = useState(false);
@@ -70,7 +73,6 @@ export default function DeckPage() {
       setDeck(res.data);
       setName(res.data.name);
       setFieldNames([...res.data.field]);
-      setSibling(res.data.templates.length === 2);
       setRate(res.data.rate);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deck");
@@ -162,7 +164,6 @@ export default function DeckPage() {
     e.preventDefault();
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
-    const templates: number[][] = sibling ? [[0, 1], [1, 0]] : [[0, 1]];
     if (fields.length < 2) {
       setError("At least two fields required");
       return;
@@ -175,7 +176,7 @@ export default function DeckPage() {
     setSuccessMessage("");
     setSaving(true);
     try {
-      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, templates, rate };
+      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, rate };
       await request<UpdateDeckRes>(`/api/decks/${id}`, {
         method: "PATCH",
         token,
@@ -223,15 +224,37 @@ export default function DeckPage() {
     setSuccessMessage("");
     setAddingFacts(true);
     try {
+      const uploadedMarkers: { id: string; type: "image" | "audio" }[] = [];
+      if (mediaFiles.length > 0 && token) {
+        for (const entry of mediaFiles) {
+          const formData = new FormData();
+          formData.append("file", entry.file);
+          const res = await uploadMultipart("/api/media", formData, token) as UploadMediaRes;
+          const id = res?.data?.id != null ? String(res.data.id).trim() : "";
+          if (!id) throw new Error("Upload response missing media id");
+          uploadedMarkers.push({ id, type: entry.type });
+        }
+      }
       const facts = rows.map((row) => row.map((s) => s.trim()));
-      const body: AddFactReq = { facts };
+      if (uploadedMarkers.length > 0 && facts.length > 0) {
+        const markersStr = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`).join(" ");
+        for (const fact of facts) {
+          const frontIdx = 0;
+          const frontField = (fact[frontIdx] ?? "").trim();
+          fact[frontIdx] = frontField ? `${frontField} ${markersStr}` : markersStr;
+        }
+      }
+      const body: AddFactReq = {
+        facts: facts.map((fields) => ({ fields, split: 1, sibling })),
+      };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
         token,
         body: JSON.stringify(body),
       });
       setFactsRows(deck ? [deck.field.map(() => "")] : []);
-      setSuccessMessage("Facts added.");
+      setMediaFiles([]);
+      setSuccessMessage(mediaFiles.length > 0 ? "Facts and media added." : "Facts added.");
       await fetchDeck();
       await fetchFacts();
     } catch (e) {
@@ -253,7 +276,7 @@ export default function DeckPage() {
     setFactError("");
     setFactSuccess("");
     try {
-      const body: UpdateFactReq = values;
+      const body: UpdateFactReq = { fields: values };
       await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
         method: "PATCH",
         token,
@@ -274,7 +297,7 @@ export default function DeckPage() {
     if (values.length !== deck.field.length) {
       throw new Error(`Must have ${deck.field.length} values`);
     }
-    const body: UpdateFactReq = values;
+    const body: UpdateFactReq = { fields: values };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {
       method: "PATCH",
       token,
@@ -406,6 +429,7 @@ export default function DeckPage() {
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
               onSaveFact={handleSaveFactFromCard}
+              authToken={token}
             />
             <DeckInfoCard
               deck={deck}
@@ -427,6 +451,8 @@ export default function DeckPage() {
               addingFacts={addingFacts}
               addFactsError={addFactsError}
               onSubmit={handleAddFacts}
+              mediaFiles={mediaFiles}
+              setMediaFiles={setMediaFiles}
             />
             <FactsList
               deck={deck}

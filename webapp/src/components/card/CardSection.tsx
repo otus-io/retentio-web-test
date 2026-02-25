@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
@@ -43,6 +44,199 @@ function formatInterval(seconds: number): string {
   return `${sec}s`;
 }
 
+// Marker format: [audio:id] or [image:id] (design doc). Id is [a-z0-9]+.
+const MEDIA_MARKER_RE = /\[(audio|image):([a-z0-9]+)\]/g;
+
+type FieldSegment =
+  | { kind: "text"; value: string }
+  | { kind: "image"; id: string }
+  | { kind: "audio"; id: string };
+
+function parseFieldWithMedia(text: string): FieldSegment[] {
+  const segments: FieldSegment[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  MEDIA_MARKER_RE.lastIndex = 0;
+  while ((m = MEDIA_MARKER_RE.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      segments.push({ kind: "text", value: text.slice(lastIndex, m.index) });
+    }
+    const type = m[1] as "image" | "audio";
+    const id = m[2];
+    segments.push(type === "image" ? { kind: "image", id } : { kind: "audio", id });
+    lastIndex = MEDIA_MARKER_RE.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ kind: "text", value: text.slice(lastIndex) });
+  }
+  return segments.length > 0 ? segments : [{ kind: "text", value: text }];
+}
+
+function AudioPlayButton({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  return (
+    <>
+      <audio ref={audioRef} src={src} className="hidden" />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          audioRef.current?.play();
+        }}
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-input bg-muted/50 hover:bg-muted text-foreground"
+        aria-label="Play audio"
+      >
+        <span className="text-sm" aria-hidden>▶</span>
+      </button>
+    </>
+  );
+}
+
+function MediaBlock({
+  kind,
+  id,
+  token,
+}: {
+  kind: "image" | "audio";
+  id: string;
+  token: string;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const baseUrl = getApiBaseUrl();
+
+  useEffect(() => {
+    let revoked = false;
+    let createdUrl: string | null = null;
+    fetch(`${baseUrl}/api/media/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("Failed to load"))))
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        if (!revoked) {
+          createdUrl = url;
+          setBlobUrl(url);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(() => {
+        if (!revoked) setError(true);
+      });
+    return () => {
+      revoked = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [id, token, baseUrl]);
+
+  if (error) return <span className="text-muted-foreground text-sm">[media unavailable]</span>;
+  if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
+  if (kind === "image") {
+    return <img src={blobUrl} alt="" className="max-h-32 max-w-full rounded object-contain" />;
+  }
+  return (
+    <AudioPlayButton src={blobUrl} />
+  );
+}
+
+function stripMediaMarkers(text: string): string {
+  return text.replace(MEDIA_MARKER_RE, "").replace(/\s+/g, " ").trim() || " ";
+}
+
+function FieldWithMedia({
+  text,
+  token,
+  imageRevealed = false,
+  onRevealImage,
+  hideImages = false,
+  textOnly = false,
+  mediaOnly = false,
+}: {
+  text: string;
+  token: string | null;
+  imageRevealed?: boolean;
+  onRevealImage?: () => void;
+  hideImages?: boolean;
+  textOnly?: boolean;
+  mediaOnly?: boolean;
+}) {
+  if (textOnly) {
+    return <>{stripMediaMarkers(text)}</>;
+  }
+  const segments = useMemo(() => parseFieldWithMedia(text), [text]);
+  const hasMedia = segments.some((s) => s.kind !== "text");
+  if (!token || !hasMedia) {
+    return <>{mediaOnly ? null : (text || " ")}</>;
+  }
+  const imageSegments = segments.filter((s): s is Extract<FieldSegment, { kind: "image" }> => s.kind === "image");
+  const otherSegments = segments.filter((s) => s.kind !== "image");
+  const hasImage = imageSegments.length > 0 && !hideImages;
+
+  const textAndAudio = (
+    <>
+      {otherSegments.map((seg, i) =>
+        seg.kind === "text" ? (
+          mediaOnly ? null : <span key={i}>{seg.value}</span>
+        ) : (
+          <MediaBlock key={`${seg.kind}-${seg.id}-${i}`} kind={seg.kind} id={seg.id} token={token} />
+        )
+      )}
+    </>
+  );
+
+  const showImageHint = hasImage && onRevealImage != null && !imageRevealed;
+  const showImages = hasImage && (imageRevealed || onRevealImage == null);
+
+  const images = showImages
+    ? imageSegments.map((seg, i) => (
+        <MediaBlock key={`image-${seg.id}-${i}`} kind="image" id={seg.id} token={token} />
+      ))
+    : null;
+
+  if (mediaOnly) {
+    return (
+      <span className="inline-flex flex-wrap items-center justify-center gap-3">
+        {textAndAudio}
+        {showImageHint && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRevealImage?.();
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            img
+          </button>
+        )}
+        {images}
+      </span>
+    );
+  }
+  if (hasImage) {
+    return (
+      <span className="inline-flex flex-wrap items-center justify-center gap-3">
+        <span className="min-w-0">{textAndAudio}</span>
+        {showImageHint && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRevealImage?.();
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            img
+          </button>
+        )}
+        {images}
+      </span>
+    );
+  }
+  return <>{textAndAudio}</>;
+}
+
 interface CardSectionProps {
   deck: DeckItem | null;
   cardStats: GetCardsRes["data"] | null;
@@ -55,6 +249,7 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, values: string[]) => Promise<void>;
+  authToken?: string | null;
 }
 
 const SLIDER_DEFAULT = 0.5;
@@ -71,6 +266,7 @@ export function CardSection({
   onUpdateCard,
   onHideCard,
   onSaveFact,
+  authToken,
 }: CardSectionProps) {
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
@@ -80,6 +276,8 @@ export function CardSection({
   const [editFactValues, setEditFactValues] = useState<string[]>([]);
   const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [imageRevealed, setImageRevealed] = useState(false);
+  const [examplesRevealed, setExamplesRevealed] = useState(false);
 
   useEffect(() => {
     if (nextCard) setSliderValue(SLIDER_DEFAULT);
@@ -89,6 +287,8 @@ export function CardSection({
     if (nextCard) {
       setFlipped(false);
       setHasFlippedOnce(false);
+      setImageRevealed(false);
+      setExamplesRevealed(false);
     }
   }, [nextCard?.card.id]);
 
@@ -171,8 +371,14 @@ export function CardSection({
               Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
             </p>
             {(() => {
-              const frontText = nextCardFact.fields[0] ?? "";
-              const backFields = nextCardFact.fields.slice(1);
+              const fields = nextCardFact.fields ?? [];
+              const split = nextCardFact.split ?? 1;
+              const primaryFront = fields.slice(0, split);
+              const primaryBack = fields.slice(split);
+              const frontFields = nextCard.card.is_sibling ? primaryBack : primaryFront;
+              const backFields = nextCard.card.is_sibling ? primaryFront : primaryBack;
+              const frontText = frontFields[0] ?? "";
+              const backFieldsList = backFields.map((f) => f ?? "");
               return (
                 <div
                   className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
@@ -195,18 +401,49 @@ export function CardSection({
                       className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border bg-card p-4 text-center [backface-visibility:hidden]"
                       style={{ transform: "rotateY(0deg)" }}
                     >
-                      <p className="text-lg">{frontText || " "}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
+                        <FieldWithMedia
+                          text={frontText}
+                          token={authToken}
+                          imageRevealed={imageRevealed}
+                          onRevealImage={() => setImageRevealed(true)}
+                        />
+                      </div>
                     </div>
                     <div
                       className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center [backface-visibility:hidden]"
                       style={{ transform: "rotateY(180deg)" }}
                     >
-                      {backFields.length > 0 ? (
-                        backFields.map((text, i) => (
-                          <p key={i} className="text-lg">
-                            {text}
+                      {backFieldsList.length > 0 ? (
+                        <>
+                          <p className="text-lg">
+                            <FieldWithMedia text={backFieldsList[0]} token={authToken} textOnly />
                           </p>
-                        ))
+                          {backFieldsList.length > 1 && (
+                            <>
+                              {examplesRevealed ? (
+                                <div className="mt-3 space-y-2 text-left">
+                                  {backFieldsList.slice(1).map((text, i) => (
+                                    <p key={i} className="text-base">
+                                      <FieldWithMedia text={text} token={authToken} textOnly />
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExamplesRevealed(true);
+                                  }}
+                                  className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                                >
+                                  Click to show example sentences
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
                       ) : (
                         <p className="text-lg text-muted-foreground">—</p>
                       )}

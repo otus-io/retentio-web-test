@@ -1,9 +1,16 @@
+import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
+
+export type FactMediaEntry = { file: File; type: "image" | "audio" };
+
+function getMediaType(file: File): "image" | "audio" {
+  return file.type.startsWith("image/") ? "image" : "audio";
+}
 
 interface AddFactsFormProps {
   deck: DeckItem;
@@ -14,6 +21,8 @@ interface AddFactsFormProps {
   addingFacts: boolean;
   addFactsError: string;
   onSubmit: (e: React.FormEvent) => void;
+  mediaFiles: FactMediaEntry[];
+  setMediaFiles: (v: FactMediaEntry[]) => void;
 }
 
 export function AddFactsForm({
@@ -25,13 +34,34 @@ export function AddFactsForm({
   addingFacts,
   addFactsError,
   onSubmit,
+  mediaFiles,
+  setMediaFiles,
 }: AddFactsFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const row = factsRows[0] ?? deck.field.map(() => "");
   const setCell = (colIndex: number, value: string) => {
     const next = [...row];
     next[colIndex] = value;
     setFactsRows([next]);
   };
+
+  function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const chosen = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const valid = chosen.filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("audio/")
+    );
+    const toAdd = valid.slice(0, Math.max(0, 2 - mediaFiles.length)).map((file) => ({
+      file,
+      type: getMediaType(file),
+    }));
+    if (toAdd.length) setMediaFiles([...mediaFiles, ...toAdd]);
+  }
+
+  function removeMedia(index: number) {
+    setMediaFiles(mediaFiles.filter((_, i) => i !== index));
+  }
 
   return (
     <Card>
@@ -56,6 +86,57 @@ export function AddFactsForm({
                 />
               </div>
             ))}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">Media (optional)</Label>
+            <p className="text-xs text-muted-foreground">Up to 2 files, image or audio.</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,audio/*"
+              multiple
+              onChange={handleMediaSelect}
+              className="hidden"
+              aria-hidden
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={addingFacts || mediaFiles.length >= 2}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Add media
+              </Button>
+              {mediaFiles.map((entry, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-sm"
+                >
+                  <span
+                    className={
+                      entry.type === "image"
+                        ? "text-amber-600"
+                        : "text-blue-600"
+                    }
+                  >
+                    {entry.type === "image" ? "Image" : "Audio"}
+                  </span>
+                  <span className="max-w-[120px] truncate text-muted-foreground">
+                    {entry.file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(i)}
+                    className="rounded p-0.5 hover:bg-muted"
+                    aria-label="Remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor="op" className="sr-only">Operation</Label>

@@ -71,7 +71,7 @@ export function DeckInfoCard({
           </div>
           <div>
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Sibling</dt>
-            <dd className="mt-0.5">{deck.templates.length === 2 ? "Yes" : "No"}</dd>
+            <dd className="mt-0.5">Per fact</dd>
           </div>
         </dl>
         <div className="border-t pt-4 space-y-2">
