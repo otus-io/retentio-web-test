@@ -1,5 +1,9 @@
 const baseUrl = (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "http://localhost:8080";
 
+export function getApiBaseUrl(): string {
+  return baseUrl;
+}
+
 export interface ApiError {
   msg?: string;
 }
@@ -93,7 +97,6 @@ export interface DeckItem {
   field: string[];
   rate: number;
   stats: DeckStats;
-  templates: number[][];
   created_at: string;
   updated_at: string;
 }
@@ -106,14 +109,12 @@ export interface GetDecksRes {
 export interface CreateDeckReq {
   name: string;
   fields: string[];
-  templates: number[][];
   rate?: number;
 }
 
 export interface UpdateDeckReq {
   name?: string;
   fields?: string[];
-  templates?: number[][];
   rate?: number;
 }
 
@@ -137,8 +138,14 @@ export interface DeleteDeckRes {
   meta: { msg: string };
 }
 
+export interface AddFactItemReq {
+  fields: string[];
+  split: number;
+  sibling: boolean;
+}
+
 export interface AddFactReq {
-  facts: string[][];
+  facts: AddFactItemReq[];
 }
 
 export interface AddFactRes {
@@ -152,6 +159,8 @@ export type AddFactOperation = "append" | "prepend" | "shuffle" | "spread";
 export interface FactItem {
   id: string;
   fields: string[];
+  split: number;
+  sibling: boolean;
 }
 
 export interface GetFactsRes {
@@ -163,7 +172,11 @@ export interface GetFactRes {
   data: { fact: FactItem };
 }
 
-export type UpdateFactReq = string[];
+export interface UpdateFactReq {
+  fields?: string[];
+  split?: number;
+  sibling?: boolean;
+}
 
 export interface UpdateFactRes {
   data: { fact_id: string };
@@ -179,7 +192,7 @@ export interface DeleteFactRes {
 export interface NextCardItem {
   id: string;
   fact_id: string;
-  template_index: number;
+  is_sibling: boolean;
   last_review: number;
   due_date: number;
   hidden: boolean;

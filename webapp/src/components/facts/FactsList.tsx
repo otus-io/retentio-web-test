@@ -17,8 +17,12 @@ interface FactsListProps {
   factSuccess: string;
   editingFactId: string | null;
   editingFactValues: string[];
+  editingFactSplit: number;
+  editingFactSibling: boolean;
   setEditingFactId: (id: string | null) => void;
   setEditingFactValues: (v: string[]) => void;
+  setEditingFactSplit: (v: number) => void;
+  setEditingFactSibling: (v: boolean) => void;
   setFactError: (v: string) => void;
   onUpdateFact: (e: React.FormEvent) => void;
   onDeleteFact: (factId: string) => void;
@@ -34,8 +38,12 @@ export function FactsList({
   factSuccess,
   editingFactId,
   editingFactValues,
+  editingFactSplit,
+  editingFactSibling,
   setEditingFactId,
   setEditingFactValues,
+  setEditingFactSplit,
+  setEditingFactSibling,
   setFactError,
   onUpdateFact,
   onDeleteFact,
@@ -78,9 +86,11 @@ export function FactsList({
               <li key={f.id} className="px-3 py-2 first:pt-2 hover:bg-muted/50">
                 {editingFactId === f.id ? (
                   <form onSubmit={onUpdateFact} className="w-full space-y-3">
-                    {deck.field.map((fieldName, i) => (
+                    {editingFactValues.map((_, i) => (
                       <div key={i} className="space-y-1">
-                        <Label className="text-xs font-medium text-muted-foreground">{fieldName}</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          {i < deck.field.length ? deck.field[i] : `Field ${i + 1}`}
+                        </Label>
                         <Input
                           value={editingFactValues[i] ?? ""}
                           onChange={(e) => {
@@ -91,6 +101,35 @@ export function FactsList({
                         />
                       </div>
                     ))}
+                    {editingFactValues.length > 1 && (
+                      <div className="space-y-1">
+                        <Label htmlFor={`fact-split-${f.id}`} className="text-xs font-medium text-muted-foreground">
+                          Split (fields on front)
+                        </Label>
+                        <select
+                          id={`fact-split-${f.id}`}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={editingFactSplit}
+                          onChange={(e) => setEditingFactSplit(parseInt(e.target.value, 10) || 1)}
+                        >
+                          {Array.from({ length: editingFactValues.length }, (_, i) => i + 1).map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`fact-sibling-${f.id}`}
+                        type="checkbox"
+                        checked={editingFactSibling}
+                        onChange={(e) => setEditingFactSibling(e.target.checked)}
+                        className="h-4 w-4 rounded border-input"
+                      />
+                      <Label htmlFor={`fact-sibling-${f.id}`} className="font-normal cursor-pointer text-sm">
+                        Sibling
+                      </Label>
+                    </div>
                     <div className="flex gap-2">
                       <Button type="submit">Save</Button>
                       <Button
@@ -114,6 +153,8 @@ export function FactsList({
                         onClick={() => {
                           setEditingFactId(f.id);
                           setEditingFactValues([...f.fields]);
+                          setEditingFactSplit(f.split ?? 1);
+                          setEditingFactSibling(f.sibling ?? false);
                           setFactError("");
                         }}
                       >

@@ -15,7 +15,6 @@ export default function DeckEditPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [fieldNames, setFieldNames] = useState<string[]>([]);
-  const [sibling, setSibling] = useState(false);
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -29,7 +28,6 @@ export default function DeckEditPage() {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       setName(res.data.name);
       setFieldNames([...res.data.field]);
-      setSibling(res.data.templates.length === 2);
       setRate(res.data.rate);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deck");
@@ -46,7 +44,6 @@ export default function DeckEditPage() {
     e.preventDefault();
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
-    const templates: number[][] = sibling ? [[0, 1], [1, 0]] : [[0, 1]];
     if (fields.length < 2) {
       setError("At least two fields required");
       return;
@@ -58,7 +55,7 @@ export default function DeckEditPage() {
     setError("");
     setSaving(true);
     try {
-      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, templates, rate };
+      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, rate };
       await request<UpdateDeckRes>(`/api/decks/${id}`, {
         method: "PATCH",
         token,
@@ -94,8 +91,6 @@ export default function DeckEditPage() {
           setName={setName}
           fieldNames={fieldNames}
           setFieldNames={setFieldNames}
-          sibling={sibling}
-          setSibling={setSibling}
           rate={rate}
           setRate={setRate}
           saving={saving}
