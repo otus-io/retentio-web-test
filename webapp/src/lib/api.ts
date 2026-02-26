@@ -139,13 +139,26 @@ export interface DeleteDeckRes {
 }
 
 export interface AddFactItemReq {
-  fields: string[];
-  split: number;
-  sibling: boolean;
+  entries: string[];
+  scheme: number; // tens=split (1-9), ones=sibling (0 or 1); e.g. 20 = split at 2, no sibling
 }
 
 export interface AddFactReq {
   facts: AddFactItemReq[];
+}
+
+/** Parses backend scheme (10-91) into split and sibling. */
+export function parseScheme(scheme: number): { split: number; sibling: boolean } {
+  if (scheme < 10 || scheme > 99) return { split: 1, sibling: false };
+  const split = Math.floor(scheme / 10);
+  const sibling = scheme % 10 === 1;
+  return { split: split >= 1 && split <= 9 ? split : 1, sibling };
+}
+
+/** Encodes split and sibling into backend scheme (split*10 + 0|1). */
+export function schemeFromSplitSibling(split: number, sibling: boolean): number {
+  const s = Math.max(1, Math.min(9, split));
+  return sibling ? s * 10 + 1 : s * 10;
 }
 
 export interface AddFactRes {
@@ -155,12 +168,11 @@ export interface AddFactRes {
 
 export type AddFactOperation = "append" | "prepend" | "shuffle" | "spread";
 
-// Facts
+// Facts (backend: entries + scheme; scheme = tens=split, ones=sibling)
 export interface FactItem {
   id: string;
-  fields: string[];
-  split: number;
-  sibling: boolean;
+  entries: string[];
+  scheme: number;
 }
 
 export interface GetFactsRes {
@@ -173,9 +185,8 @@ export interface GetFactRes {
 }
 
 export interface UpdateFactReq {
-  fields?: string[];
-  split?: number;
-  sibling?: boolean;
+  entries?: string[];
+  scheme?: number;
 }
 
 export interface UpdateFactRes {

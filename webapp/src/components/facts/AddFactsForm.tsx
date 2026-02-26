@@ -184,7 +184,7 @@ export function AddFactsForm({
                             const from = parseInt(e.dataTransfer.getData(DRAG_TYPE_FIELD), 10);
                             if (!Number.isNaN(from) && from !== colIndex) moveSlot(from, colIndex);
                           }}
-                          className={`flex items-center gap-2 flex-wrap rounded-md border p-1 -m-1 transition-colors group ${dropTargetRow === colIndex ? "border-transparent border-b-4 border-b-primary" : "border-transparent hover:border-input/50 bg-transparent hover:bg-muted/30"}`}
+                          className={`flex items-center gap-2 flex-nowrap rounded-md border p-1 -m-1 transition-colors group ${dropTargetRow === colIndex ? "border-transparent border-b-4 border-b-primary" : "border-transparent hover:border-input/50 bg-transparent hover:bg-muted/30"}`}
                         >
                           <span
                             draggable
@@ -203,7 +203,7 @@ export function AddFactsForm({
                             {getDisplayLabel(colIndex)}
                           </Label>
                           {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                            <span className="flex h-10 w-28 shrink-0 items-center text-sm font-medium">
+                            <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
                               {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
                             </span>
                           ) : (
@@ -213,7 +213,7 @@ export function AddFactsForm({
                               value={customLabels[colIndex] ?? ""}
                               onChange={(e) => setCustomLabel(colIndex, e.target.value)}
                               disabled={addingFacts}
-                              className="h-10 w-28 shrink-0 text-sm font-medium"
+                              className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
                             />
                           )}
                           <Input
@@ -222,7 +222,7 @@ export function AddFactsForm({
                             value={value ?? ""}
                             onChange={(e) => setCell(colIndex, e.target.value)}
                             disabled={addingFacts}
-                            className="min-w-0 flex-1"
+                            className="!w-auto min-w-0 flex-1"
                           />
                           <Button
                             type="button"
@@ -257,14 +257,14 @@ export function AddFactsForm({
                   return (
                     <div
                       key={colIndex}
-                      className="flex items-center gap-2 flex-wrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
+                      className="flex items-center gap-2 flex-nowrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
                     >
                       <span className="flex h-10 w-8 shrink-0" aria-hidden />
                       <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
                         {getDisplayLabel(colIndex)}
                       </Label>
                       {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                        <span className="flex h-10 w-28 shrink-0 items-center text-sm font-medium">
+                        <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
                           {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
                         </span>
                       ) : (
@@ -274,7 +274,7 @@ export function AddFactsForm({
                           value={customLabels[colIndex] ?? ""}
                           onChange={(e) => setCustomLabel(colIndex, e.target.value)}
                           disabled={addingFacts}
-                          className="h-10 w-28 shrink-0 text-sm font-medium"
+                          className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
                         />
                       )}
                       <Input
@@ -283,7 +283,7 @@ export function AddFactsForm({
                         value={value ?? ""}
                         onChange={(e) => setCell(colIndex, e.target.value)}
                         disabled={addingFacts}
-                        className="min-w-0 flex-1"
+                        className="!w-auto min-w-0 flex-1"
                       />
                     </div>
                   );
@@ -298,14 +298,14 @@ export function AddFactsForm({
                   return (
                     <div
                       key={colIndex}
-                      className="flex items-center gap-2 flex-wrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
+                      className="flex items-center gap-2 flex-nowrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
                     >
                       <span className="flex h-10 w-8 shrink-0" aria-hidden />
                       <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
                         {getDisplayLabel(colIndex)}
                       </Label>
                       {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                        <span className="flex h-10 w-28 shrink-0 items-center text-sm font-medium">
+                        <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
                           {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
                         </span>
                       ) : (
@@ -315,7 +315,7 @@ export function AddFactsForm({
                           value={customLabels[colIndex] ?? ""}
                           onChange={(e) => setCustomLabel(colIndex, e.target.value)}
                           disabled={addingFacts}
-                          className="h-10 w-28 shrink-0 text-sm font-medium"
+                          className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
                         />
                       )}
                       <Input
@@ -324,7 +324,7 @@ export function AddFactsForm({
                         value={value ?? ""}
                         onChange={(e) => setCell(colIndex, e.target.value)}
                         disabled={addingFacts}
-                        className="min-w-0 flex-1"
+                        className="!w-auto min-w-0 flex-1"
                       />
                     </div>
                   );
@@ -377,7 +377,7 @@ export function AddFactsForm({
                             const from = parseInt(e.dataTransfer.getData(DRAG_TYPE_FIELD), 10);
                             if (!Number.isNaN(from) && from !== colIndex) moveSlot(from, colIndex);
                           }}
-                          className={`flex items-center gap-2 flex-wrap rounded-md border p-1 -m-1 transition-colors group ${dropTargetRow === colIndex ? "border-transparent border-b-4 border-b-primary" : "border-transparent hover:border-input/50 bg-transparent hover:bg-muted/30"}`}
+                          className={`flex items-center gap-2 flex-nowrap rounded-md border p-1 -m-1 transition-colors group ${dropTargetRow === colIndex ? "border-transparent border-b-4 border-b-primary" : "border-transparent hover:border-input/50 bg-transparent hover:bg-muted/30"}`}
                         >
                           <span
                             draggable
@@ -396,7 +396,7 @@ export function AddFactsForm({
                             {getDisplayLabel(colIndex)}
                           </Label>
                           {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                            <span className="flex h-10 w-28 shrink-0 items-center text-sm font-medium">
+                            <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
                               {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
                             </span>
                           ) : (
@@ -406,7 +406,7 @@ export function AddFactsForm({
                               value={customLabels[colIndex] ?? ""}
                               onChange={(e) => setCustomLabel(colIndex, e.target.value)}
                               disabled={addingFacts}
-                              className="h-10 w-28 shrink-0 text-sm font-medium"
+                              className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
                             />
                           )}
                           <Input
@@ -415,7 +415,7 @@ export function AddFactsForm({
                             value={value ?? ""}
                             onChange={(e) => setCell(colIndex, e.target.value)}
                             disabled={addingFacts}
-                            className="min-w-0 flex-1"
+                            className="!w-auto min-w-0 flex-1"
                           />
                           <Button
                             type="button"

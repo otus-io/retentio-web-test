@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
   uploadMultipart,
+  schemeFromSplitSibling,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -97,6 +98,9 @@ export default function DeckPage() {
     setLoadingFacts(true);
     try {
       const res = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:fetchFacts',message:'Facts loaded',data:{factsCount:res.data.facts?.length,factIds:res.data.facts?.map((f: FactItem)=>f.id)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setFactsList(res.data.facts);
     } catch {
       setFactsList([]);
@@ -110,6 +114,9 @@ export default function DeckPage() {
     setLoadingCards(true);
     try {
       const res = await request<GetCardsRes>(`/api/decks/${id}/cards`, { token });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:fetchCards',message:'Cards stats loaded',data:{totalCards:res.data.total_cards,hiddenCount:res.data.hidden_count},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setCardStats(res.data);
     } catch {
       setCardStats(null);
@@ -121,7 +128,6 @@ export default function DeckPage() {
   const handleGetNextCard = useCallback(async (keepCurrentCard?: boolean) => {
     if (!token || !id) return;
     setCardError("");
-    if (!keepCurrentCard) setCardSuccess("");
     setLoadingNextCard(true);
     if (!keepCurrentCard) {
       setNextCard(null);
@@ -129,6 +135,9 @@ export default function DeckPage() {
     }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleGetNextCard:gotCard',message:'GET next card response',data:{cardId:res?.data?.card?.id,factId:res?.data?.card?.fact_id,dueDate:res?.data?.card?.due_date,lastReview:res?.data?.card?.last_review,urgency:res?.data?.urgency},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setNextCard(res.data);
       const factRes = await request<{ data: { fact: FactItem } }>(
         `/api/decks/${id}/facts/${res.data.card.fact_id}`,
@@ -136,6 +145,9 @@ export default function DeckPage() {
       );
       setNextCardFact(factRes.data.fact);
     } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleGetNextCard:catch',message:'GET next card failed',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
       setNextCard(null);
       setNextCardFact(null);
@@ -259,8 +271,9 @@ export default function DeckPage() {
           fact[frontIdx] = frontField ? `${frontField} ${markersStr}` : markersStr;
         }
       }
+      const scheme = schemeFromSplitSibling(Math.min(splitClamp, normalized[0]?.length ?? 1), sibling);
       const body: AddFactReq = {
-        facts: facts.map((fields) => ({ fields, split: Math.min(splitClamp, fields.length), sibling })),
+        facts: facts.map((entries) => ({ entries, scheme })),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
@@ -296,7 +309,8 @@ export default function DeckPage() {
     setFactError("");
     setFactSuccess("");
     try {
-      const body: UpdateFactReq = { fields: values, split: editingFactSplit, sibling: editingFactSibling };
+      const scheme = schemeFromSplitSibling(editingFactSplit, editingFactSibling);
+      const body: UpdateFactReq = { entries: values, scheme };
       await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
         method: "PATCH",
         token,
@@ -317,7 +331,7 @@ export default function DeckPage() {
     if (values.length === 0 || values.some((v) => !v)) {
       throw new Error("All fields required");
     }
-    const body: UpdateFactReq = { fields: values };
+    const body: UpdateFactReq = { entries: values };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {
       method: "PATCH",
       token,
@@ -345,20 +359,32 @@ export default function DeckPage() {
   }
 
   async function handleUpdateCard(intervalSeconds: number) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:entry',message:'handleUpdateCard called',data:{intervalSeconds,hasToken:!!token,deckId:id,hasNextCard:!!nextCard,cardId:nextCard?.card?.id,cardDueDate:nextCard?.card?.due_date,cardLastReview:nextCard?.card?.last_review},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!token || !id || !nextCard) return;
     setCardError("");
     try {
       const lastReview = Math.floor(Date.now() / 1000);
       const body: UpdateCardReq = { card_id: nextCard.card.id, last_review: lastReview, interval: intervalSeconds };
-      await request<UpdateCardRes>(`/api/decks/${id}/card`, {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:prePatch',message:'PATCH request body',data:{body,url:`/api/decks/${id}/card`},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      const patchRes = await request<UpdateCardRes>(`/api/decks/${id}/card`, {
         method: "PATCH",
         token,
         body: JSON.stringify(body),
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:postPatch',message:'PATCH succeeded',data:{patchRes},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setCardSuccess("Card reviewed.");
       await fetchCards();
-      await handleGetNextCard(true);
+      await handleGetNextCard(false);
     } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:catch',message:'PATCH or follow-up failed',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setCardError(e instanceof Error ? e.message : "Update failed");
     }
   }

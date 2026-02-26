@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem, FactItem } from "@/lib/api";
+import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
 
@@ -279,9 +279,11 @@ export function CardSection({
   const [imageRevealed, setImageRevealed] = useState(false);
   const [examplesRevealed, setExamplesRevealed] = useState(false);
 
+  const cardResetKey = nextCard ? `${nextCard.card.id}-${nextCard.card.due_date}` : null;
+
   useEffect(() => {
     if (nextCard) setSliderValue(SLIDER_DEFAULT);
-  }, [nextCard?.card.id]);
+  }, [cardResetKey]);
 
   useEffect(() => {
     if (nextCard) {
@@ -290,7 +292,7 @@ export function CardSection({
       setImageRevealed(false);
       setExamplesRevealed(false);
     }
-  }, [nextCard?.card.id]);
+  }, [cardResetKey]);
 
   const handleFlip = () => {
     setFlipped((f) => !f);
@@ -358,7 +360,7 @@ export function CardSection({
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
                 {onSaveFact && (
-                  <DropdownMenuItem onClick={() => openEditPopup(nextCardFact.id, nextCardFact.fields)} disabled={loadingNextCard}>
+                  <DropdownMenuItem onClick={() => openEditPopup(nextCardFact.id, nextCardFact.entries)} disabled={loadingNextCard}>
                     Edit fact
                   </DropdownMenuItem>
                 )}
@@ -371,10 +373,10 @@ export function CardSection({
               Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
             </p>
             {(() => {
-              const fields = nextCardFact.fields ?? [];
-              const split = nextCardFact.split ?? 1;
-              const primaryFront = fields.slice(0, split);
-              const primaryBack = fields.slice(split);
+              const entries = nextCardFact.entries ?? [];
+              const { split } = parseScheme(nextCardFact.scheme);
+              const primaryFront = entries.slice(0, split);
+              const primaryBack = entries.slice(split);
               const frontFields = nextCard.card.is_sibling ? primaryBack : primaryFront;
               const backFields = nextCard.card.is_sibling ? primaryFront : primaryBack;
               const frontText = frontFields[0] ?? "";
