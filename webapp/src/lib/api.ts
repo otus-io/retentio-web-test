@@ -138,27 +138,31 @@ export interface DeleteDeckRes {
   meta: { msg: string };
 }
 
+/** Scheme is [split, sibling]; split >= 1, sibling 0 or 1. */
+export type Scheme = [number, number];
+
 export interface AddFactItemReq {
   entries: string[];
-  scheme: number; // tens=split (1-9), ones=sibling (0 or 1); e.g. 20 = split at 2, no sibling
+  scheme: Scheme;
 }
 
 export interface AddFactReq {
   facts: AddFactItemReq[];
 }
 
-/** Parses backend scheme (10-91) into split and sibling. */
-export function parseScheme(scheme: number): { split: number; sibling: boolean } {
-  if (scheme < 10 || scheme > 99) return { split: 1, sibling: false };
-  const split = Math.floor(scheme / 10);
-  const sibling = scheme % 10 === 1;
-  return { split: split >= 1 && split <= 9 ? split : 1, sibling };
+/** Parses backend scheme [split, sibling] into split and sibling. */
+export function parseScheme(scheme: Scheme): { split: number; sibling: boolean } {
+  const [split, sib] = Array.isArray(scheme) ? scheme : [1, 0];
+  return {
+    split: typeof split === "number" && split >= 1 ? split : 1,
+    sibling: sib === 1,
+  };
 }
 
-/** Encodes split and sibling into backend scheme (split*10 + 0|1). */
-export function schemeFromSplitSibling(split: number, sibling: boolean): number {
-  const s = Math.max(1, Math.min(9, split));
-  return sibling ? s * 10 + 1 : s * 10;
+/** Encodes split and sibling into backend scheme [split, sibling]. */
+export function schemeFromSplitSibling(split: number, sibling: boolean): Scheme {
+  const s = Math.max(1, split);
+  return [s, sibling ? 1 : 0];
 }
 
 export interface AddFactRes {
@@ -168,11 +172,11 @@ export interface AddFactRes {
 
 export type AddFactOperation = "append" | "prepend" | "shuffle" | "spread";
 
-// Facts (backend: entries + scheme; scheme = tens=split, ones=sibling)
+// Facts (backend: entries + scheme; scheme = [split, sibling])
 export interface FactItem {
   id: string;
   entries: string[];
-  scheme: number;
+  scheme: Scheme;
 }
 
 export interface GetFactsRes {
@@ -186,7 +190,7 @@ export interface GetFactRes {
 
 export interface UpdateFactReq {
   entries?: string[];
-  scheme?: number;
+  scheme?: Scheme;
 }
 
 export interface UpdateFactRes {
