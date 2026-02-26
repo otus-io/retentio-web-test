@@ -15,7 +15,6 @@ export default function DeckEditPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [fieldNames, setFieldNames] = useState<string[]>([]);
-  const [sibling, setSibling] = useState(false);
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -92,8 +91,6 @@ export default function DeckEditPage() {
           setName={setName}
           fieldNames={fieldNames}
           setFieldNames={setFieldNames}
-          sibling={sibling}
-          setSibling={setSibling}
           rate={rate}
           setRate={setRate}
           saving={saving}

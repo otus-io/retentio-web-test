@@ -319,8 +319,8 @@ export function CardSection({
     e.preventDefault();
     if (!onSaveFact || !editFactId || !deck) return;
     const values = editFactValues.map((s) => s.trim());
-    if (values.length !== deck.field.length || values.some((v) => !v)) {
-      setEditError(`Each field is required. Expected ${deck.field.length} values.`);
+    if (values.length !== editFactValues.length || values.some((v) => !v)) {
+      setEditError("Each field is required.");
       return;
     }
     setEditError("");
@@ -488,9 +488,11 @@ export function CardSection({
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
               {editError && <p className="text-sm text-destructive">{editError}</p>}
               <div className="space-y-3">
-                {deck.field.map((fieldName, i) => (
+                {editFactValues.map((_, i) => (
                   <div key={i} className="space-y-1">
-                    <Label htmlFor={`card-edit-field-${i}`}>{fieldName}</Label>
+                    <Label htmlFor={`card-edit-field-${i}`}>
+                      {i < deck.field.length ? deck.field[i] : `Field ${i + 1}`}
+                    </Label>
                     <Input
                       id={`card-edit-field-${i}`}
                       value={editFactValues[i] ?? ""}

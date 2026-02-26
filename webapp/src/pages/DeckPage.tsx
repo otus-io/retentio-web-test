@@ -45,6 +45,7 @@ export default function DeckPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [factsRows, setFactsRows] = useState<string[][]>([]);
   const [addFactOp, setAddFactOp] = useState<AddFactOperation>("append");
+  const [addFactSplit, setAddFactSplit] = useState(1);
   const [addingFacts, setAddingFacts] = useState(false);
   const [addFactsError, setAddFactsError] = useState("");
   const [mediaFiles, setMediaFiles] = useState<FactMediaEntry[]>([]);
@@ -53,6 +54,8 @@ export default function DeckPage() {
   const [loadingFacts, setLoadingFacts] = useState(false);
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
   const [editingFactValues, setEditingFactValues] = useState<string[]>([]);
+  const [editingFactSplit, setEditingFactSplit] = useState(1);
+  const [editingFactSibling, setEditingFactSibling] = useState(false);
   const [factError, setFactError] = useState("");
   const [factSuccess, setFactSuccess] = useState("");
   const [deleteFactId, setDeleteFactId] = useState<string | null>(null);
@@ -70,10 +73,13 @@ export default function DeckPage() {
     setError("");
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
-      setDeck(res.data);
-      setName(res.data.name);
-      setFieldNames([...res.data.field]);
-      setRate(res.data.rate);
+      const data = res.data;
+      setDeck(data);
+      setName(data.name);
+      setFieldNames([...data.field]);
+      setRate(data.rate);
+      setFactsRows([(data.field ?? []).map(() => "")]);
+      setAddFactSplit(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deck");
       setDeck(null);
@@ -152,7 +158,10 @@ export default function DeckPage() {
   }, [deck, editing, token, id, handleGetNextCard]);
 
   useEffect(() => {
-    if (deck) setFactsRows([deck.field.map(() => "")]);
+    if (deck) {
+      setFactsRows([(deck.field ?? []).map(() => "")]);
+      setAddFactSplit(1);
+    }
   }, [deck?.id]);
 
   async function handleLogout() {
@@ -213,13 +222,19 @@ export default function DeckPage() {
       setAddFactsError("Add at least one fact.");
       return;
     }
-    const bad = rows.find((r) => r.length !== deck!.field.length || r.some((s) => !s.trim()));
-    if (bad) {
-      setAddFactsError(
-        `Each row must have ${deck.field.length} non-empty values (${deck.field.join(", ")}).`
-      );
+    const normalized: string[][] = [];
+    for (const r of rows) {
+      let fields = r.map((s) => s.trim());
+      while (fields.length && !fields[fields.length - 1]) fields = fields.slice(0, -1);
+      if (fields.length === 0) continue;
+      normalized.push(fields);
+    }
+    if (normalized.length === 0) {
+      setAddFactsError("At least one field is required.");
       return;
     }
+    const len = normalized[0].length;
+    const splitClamp = len <= 1 ? 1 : Math.min(Math.max(1, addFactSplit), len - 1);
     setAddFactsError("");
     setSuccessMessage("");
     setAddingFacts(true);
@@ -235,7 +250,7 @@ export default function DeckPage() {
           uploadedMarkers.push({ id, type: entry.type });
         }
       }
-      const facts = rows.map((row) => row.map((s) => s.trim()));
+      const facts = normalized.map((fields) => [...fields]);
       if (uploadedMarkers.length > 0 && facts.length > 0) {
         const markersStr = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`).join(" ");
         for (const fact of facts) {
@@ -245,7 +260,7 @@ export default function DeckPage() {
         }
       }
       const body: AddFactReq = {
-        facts: facts.map((fields) => ({ fields, split: 1, sibling })),
+        facts: facts.map((fields) => ({ fields, split: Math.min(splitClamp, fields.length), sibling })),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
@@ -253,6 +268,7 @@ export default function DeckPage() {
         body: JSON.stringify(body),
       });
       setFactsRows(deck ? [deck.field.map(() => "")] : []);
+      setAddFactSplit(1);
       setMediaFiles([]);
       setSuccessMessage(mediaFiles.length > 0 ? "Facts and media added." : "Facts added.");
       await fetchDeck();
@@ -269,14 +285,18 @@ export default function DeckPage() {
     e.preventDefault();
     if (!token || !id || !editingFactId || !deck) return;
     const values = editingFactValues.map((s) => s.trim());
-    if (values.length !== deck.field.length || values.some((v) => !v)) {
-      setFactError(`Each field is required. Expected ${deck.field.length} values.`);
+    if (values.length === 0 || values.some((v) => !v)) {
+      setFactError("Each field is required.");
+      return;
+    }
+    if (editingFactSplit < 1 || editingFactSplit > values.length) {
+      setFactError(`Split must be between 1 and ${values.length}.`);
       return;
     }
     setFactError("");
     setFactSuccess("");
     try {
-      const body: UpdateFactReq = { fields: values };
+      const body: UpdateFactReq = { fields: values, split: editingFactSplit, sibling: editingFactSibling };
       await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
         method: "PATCH",
         token,
@@ -294,8 +314,8 @@ export default function DeckPage() {
 
   async function handleSaveFactFromCard(factId: string, values: string[]) {
     if (!token || !id || !deck) return;
-    if (values.length !== deck.field.length) {
-      throw new Error(`Must have ${deck.field.length} values`);
+    if (values.length === 0 || values.some((v) => !v)) {
+      throw new Error("All fields required");
     }
     const body: UpdateFactReq = { fields: values };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {
@@ -403,8 +423,6 @@ export default function DeckPage() {
             setName={setName}
             fieldNames={fieldNames}
             setFieldNames={setFieldNames}
-            sibling={sibling}
-            setSibling={setSibling}
             rate={rate}
             setRate={setRate}
             saving={saving}
@@ -448,6 +466,10 @@ export default function DeckPage() {
               setFactsRows={setFactsRows}
               addFactOp={addFactOp}
               setAddFactOp={setAddFactOp}
+              addFactSplit={addFactSplit}
+              setAddFactSplit={setAddFactSplit}
+              sibling={sibling}
+              setSibling={setSibling}
               addingFacts={addingFacts}
               addFactsError={addFactsError}
               onSubmit={handleAddFacts}
@@ -462,8 +484,12 @@ export default function DeckPage() {
               factSuccess={factSuccess}
               editingFactId={editingFactId}
               editingFactValues={editingFactValues}
+              editingFactSplit={editingFactSplit}
+              editingFactSibling={editingFactSibling}
               setEditingFactId={setEditingFactId}
               setEditingFactValues={setEditingFactValues}
+              setEditingFactSplit={setEditingFactSplit}
+              setEditingFactSibling={setEditingFactSibling}
               setFactError={setFactError}
               onUpdateFact={handleUpdateFact}
               onDeleteFact={handleDeleteFact}

@@ -8,8 +8,6 @@ interface DeckEditFormProps {
   setName: (v: string) => void;
   fieldNames: string[];
   setFieldNames: (v: string[]) => void;
-  sibling: boolean;
-  setSibling: (v: boolean) => void;
   rate: number;
   setRate: (v: number) => void;
   saving: boolean;
@@ -22,8 +20,6 @@ export function DeckEditForm({
   setName,
   fieldNames,
   setFieldNames,
-  sibling,
-  setSibling,
   rate,
   setRate,
   saving,
@@ -72,18 +68,6 @@ export function DeckEditForm({
             <Button type="button" variant="outline" onClick={() => setFieldNames([...fieldNames, ""])}>
               Add field
             </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              id="edit-sibling"
-              type="checkbox"
-              checked={sibling}
-              onChange={(e) => setSibling(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <Label htmlFor="edit-sibling" className="font-normal cursor-pointer">
-              Sibling
-            </Label>
           </div>
           <div className="space-y-2">
             <Label htmlFor="rate">Rate (1–1000)</Label>

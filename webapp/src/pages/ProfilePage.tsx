@@ -26,7 +26,6 @@ export default function ProfilePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createFieldNames, setCreateFieldNames] = useState<string[]>(["English", "Chinese"]);
-  const [createSibling, setCreateSibling] = useState(false);
   const [createRate, setCreateRate] = useState(20);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -94,7 +93,6 @@ export default function ProfilePage() {
       setCreateOpen(false);
       setCreateName("");
       setCreateFieldNames(["English", "Chinese"]);
-      setCreateSibling(false);
       setCreateRate(20);
       setCreateSuccess("Deck created.");
       setDeleteSuccess("");
@@ -240,16 +238,6 @@ export default function ProfilePage() {
                   <Button type="button" variant="outline" onClick={() => setCreateFieldNames([...createFieldNames, ""])}>
                     Add field
                   </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="create-sibling"
-                    type="checkbox"
-                    checked={createSibling}
-                    onChange={(e) => setCreateSibling(e.target.checked)}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  <Label htmlFor="create-sibling" className="font-normal cursor-pointer">Sibling</Label>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="create-rate">Rate (1–1000)</Label>
