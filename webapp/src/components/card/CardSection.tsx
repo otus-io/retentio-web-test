@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
+import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
@@ -162,7 +163,7 @@ function FieldWithMedia({
   mediaOnly?: boolean;
 }) {
   if (textOnly) {
-    return <>{stripMediaMarkers(text)}</>;
+    return <>{formatMediaMarkersForDisplay(text)}</>;
   }
   const segments = useMemo(() => parseFieldWithMedia(text), [text]);
   const hasMedia = segments.some((s) => s.kind !== "text");
@@ -379,7 +380,6 @@ export function CardSection({
               const primaryBack = entries.slice(split);
               const frontFields = nextCard.card.is_sibling ? primaryBack : primaryFront;
               const backFields = nextCard.card.is_sibling ? primaryFront : primaryBack;
-              const frontText = frontFields[0] ?? "";
               const backFieldsList = backFields.map((f) => f ?? "");
               return (
                 <div
@@ -404,12 +404,15 @@ export function CardSection({
                       style={{ transform: "rotateY(0deg)" }}
                     >
                       <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
-                        <FieldWithMedia
-                          text={frontText}
-                          token={authToken}
-                          imageRevealed={imageRevealed}
-                          onRevealImage={() => setImageRevealed(true)}
-                        />
+                        {frontFields.map((fieldText, i) => (
+                          <FieldWithMedia
+                            key={i}
+                            text={fieldText ?? ""}
+                            token={authToken}
+                            imageRevealed={imageRevealed}
+                            onRevealImage={() => setImageRevealed(true)}
+                          />
+                        ))}
                       </div>
                     </div>
                     <div

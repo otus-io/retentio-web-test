@@ -6,8 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
+import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 5;
+
+function getFieldLabel(deck: DeckItem, entryIndex: number, entriesLength: number): string {
+  const fieldNames = deck.field ?? [];
+  if (entryIndex < fieldNames.length) return fieldNames[entryIndex];
+  const extra = entriesLength - fieldNames.length;
+  if (extra === 2 && entryIndex === fieldNames.length) return "Audio";
+  if (extra === 2 && entryIndex === fieldNames.length + 1) return "Image";
+  if (extra === 1 && entryIndex === fieldNames.length) return "Audio";
+  return `Field ${entryIndex + 1}`;
+}
 
 interface FactsListProps {
   deck: DeckItem;
@@ -89,7 +100,7 @@ export function FactsList({
                     {editingFactValues.map((_, i) => (
                       <div key={i} className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">
-                          {i < deck.field?.length ? deck.field[i] : `Field ${i + 1}`}
+                          {getFieldLabel(deck, i, editingFactValues.length)}
                         </Label>
                         <Input
                           value={editingFactValues[i] ?? ""}
@@ -147,7 +158,9 @@ export function FactsList({
                   </form>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm min-w-0 flex-1">{f.entries.join(" · ")}</span>
+                    <span className="text-sm min-w-0 flex-1">
+                      {f.entries.map(formatMediaMarkersForDisplay).join(" · ")}
+                    </span>
                     <DropdownMenu>
                       <DropdownMenuItem
                         onClick={() => {
@@ -214,7 +227,7 @@ export function FactsList({
       >
         {deleteFactId && (() => {
           const fact = factsList.find((x) => x.id === deleteFactId);
-          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.entries.join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
+          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.entries.map(formatMediaMarkersForDisplay).join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
         })()}
       </Dialog>
     </Card>
