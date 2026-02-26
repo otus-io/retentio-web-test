@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem, FactItem } from "@/lib/api";
+import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
 
 const DEFAULT_PAGE_SIZE = 5;
 
@@ -89,7 +89,7 @@ export function FactsList({
                     {editingFactValues.map((_, i) => (
                       <div key={i} className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">
-                          {i < deck.field.length ? deck.field[i] : `Field ${i + 1}`}
+                          {i < deck.field?.length ? deck.field[i] : `Field ${i + 1}`}
                         </Label>
                         <Input
                           value={editingFactValues[i] ?? ""}
@@ -147,14 +147,15 @@ export function FactsList({
                   </form>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm min-w-0 flex-1">{f.fields.join(" · ")}</span>
+                    <span className="text-sm min-w-0 flex-1">{f.entries.join(" · ")}</span>
                     <DropdownMenu>
                       <DropdownMenuItem
                         onClick={() => {
+                          const { split, sibling } = parseScheme(f.scheme);
                           setEditingFactId(f.id);
-                          setEditingFactValues([...f.fields]);
-                          setEditingFactSplit(f.split ?? 1);
-                          setEditingFactSibling(f.sibling ?? false);
+                          setEditingFactValues([...f.entries]);
+                          setEditingFactSplit(split);
+                          setEditingFactSibling(sibling);
                           setFactError("");
                         }}
                       >
@@ -213,7 +214,7 @@ export function FactsList({
       >
         {deleteFactId && (() => {
           const fact = factsList.find((x) => x.id === deleteFactId);
-          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.fields.join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
+          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.entries.join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
         })()}
       </Dialog>
     </Card>

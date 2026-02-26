@@ -140,12 +140,12 @@ export default function ProfilePage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">Retentio</h1>
           <nav className="flex items-center gap-2">
-            <Button variant="ghost" asChild>
-              <Link to="/profile">Profile</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/media">Media</Link>
-            </Button>
+            <Link to="/profile" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+              Profile
+            </Link>
+            <Link to="/media" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+              Media
+            </Link>
             <Button variant="outline" onClick={handleLogout}>
               Logout
             </Button>
