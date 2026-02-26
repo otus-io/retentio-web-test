@@ -263,15 +263,15 @@ export default function DeckPage() {
         }
       }
       const facts = normalized.map((fields) => [...fields]);
+      let effectiveSplit = Math.min(splitClamp, normalized[0]?.length ?? 1);
       if (uploadedMarkers.length > 0 && facts.length > 0) {
-        const markersStr = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`).join(" ");
+        const mediaEntries = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`);
         for (const fact of facts) {
-          const frontIdx = 0;
-          const frontField = (fact[frontIdx] ?? "").trim();
-          fact[frontIdx] = frontField ? `${frontField} ${markersStr}` : markersStr;
+          fact.splice(1, 0, ...mediaEntries);
         }
+        effectiveSplit = 1 + uploadedMarkers.length;
       }
-      const scheme = schemeFromSplitSibling(Math.min(splitClamp, normalized[0]?.length ?? 1), sibling);
+      const scheme = schemeFromSplitSibling(effectiveSplit, sibling);
       const body: AddFactReq = {
         facts: facts.map((entries) => ({ entries, scheme })),
       };
