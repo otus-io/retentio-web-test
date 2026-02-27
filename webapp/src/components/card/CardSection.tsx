@@ -51,9 +51,12 @@ const MEDIA_MARKER_RE = /\[(audio|image):([a-z0-9]+)\]/g;
 const BARE_MEDIA_MARKER_RE = /\b(audio|image):([a-z0-9]+)/g;
 
 function normalizeMediaMarkers(text: string): string {
+function normalizeMediaMarkers(text: string): string {
   return text.replace(BARE_MEDIA_MARKER_RE, (match, type, id, offset) => {
-    if (offset >= 1 && text[offset - 1] === "[") return match;
+    if (offset > 0 && text[offset - 1] === "[") return match;
     return `[${type}:${id}]`;
+  });
+}
   });
 }
 
