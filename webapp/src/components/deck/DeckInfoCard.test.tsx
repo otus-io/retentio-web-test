@@ -56,9 +56,10 @@ describe("DeckInfoCard", () => {
 
   it("renders stats correctly", () => {
     renderCard();
-    expect(screen.getByText("10")).toBeInTheDocument(); // facts
-    expect(screen.getByText("20")).toBeInTheDocument(); // cards
-    expect(screen.getByText("15")).toBeInTheDocument(); // unseen
+    // facts_count: 10 and rate: 10 both render "10" — assert at least two occurrences
+    expect(screen.getAllByText("10").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("20")).toBeInTheDocument(); // cards_count
+    expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
   });
 
   it("calls onEdit when Edit menu item is clicked", async () => {
@@ -81,7 +82,7 @@ describe("DeckInfoCard", () => {
     renderCard({ deleteConfirm: true });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/delete deck\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/my vocab/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent(/My Vocab/);
   });
 
   it("does not show dialog when deleteConfirm is false", () => {

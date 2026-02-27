@@ -238,8 +238,6 @@ export default function DeckPage() {
       setAddFactsError("At least one field is required.");
       return;
     }
-    const len = normalized[0].length;
-    const splitClamp = len <= 1 ? 1 : Math.min(Math.max(1, addFactSplit), len - 1);
     setAddFactsError("");
     setSuccessMessage("");
     setAddingFacts(true);
@@ -256,13 +254,11 @@ export default function DeckPage() {
         }
       }
       const facts = normalized.map((fields) => [...fields]);
-      let effectiveSplit = Math.min(splitClamp, normalized[0]?.length ?? 1);
       if (uploadedMarkers.length > 0 && facts.length > 0) {
         const mediaEntries = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`);
         for (const fact of facts) {
           fact.splice(1, 0, ...mediaEntries);
         }
-        effectiveSplit = 1 + uploadedMarkers.length;
       }
       const body: AddFactReq = {
         facts: facts.map((entries) => ({ entries })),
@@ -352,7 +348,7 @@ export default function DeckPage() {
     try {
       const lastReview = Math.floor(Date.now() / 1000);
       const body: UpdateCardReq = { card_id: nextCard.card.id, last_review: lastReview, interval: intervalSeconds };
-      const patchRes = await request<UpdateCardRes>(`/api/decks/${id}/card`, {
+      await request<UpdateCardRes>(`/api/decks/${id}/card`, {
         method: "PATCH",
         token,
         body: JSON.stringify(body),

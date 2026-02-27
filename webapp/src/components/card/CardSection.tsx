@@ -151,10 +151,6 @@ function MediaBlock({
   );
 }
 
-function stripMediaMarkers(text: string): string {
-  return normalizeMediaMarkers(text).replace(MEDIA_MARKER_RE, "").replace(/\s+/g, " ").trim() || " ";
-}
-
 export function FieldWithMedia({
   text,
   token,
@@ -271,7 +267,7 @@ const SLIDER_DEFAULT = 0.5;
 export function CardSection({
   deck,
   cardStats,
-  loadingCards,
+  loadingCards: _loadingCards,
   nextCard,
   nextCardFact,
   loadingNextCard,
@@ -316,7 +312,7 @@ export function CardSection({
     setHasFlippedOnce(true);
   };
 
-  const { minIntervalSec, maxIntervalSec, intervalSec } = useMemo(() => {
+  const { intervalSec } = useMemo(() => {
     if (!nextCard) return { minIntervalSec: 60, maxIntervalSec: 86400, intervalSec: 43200 };
     const { minIntervalSec: min, maxIntervalSec: max } = getMinMaxIntervalSeconds(nextCard.card);
     const interval = min + (max - min) * sliderValue;
@@ -435,7 +431,7 @@ export function CardSection({
                           <FieldWithMedia
                             key={i}
                             text={fieldText ?? ""}
-                            token={authToken}
+                            token={authToken ?? null}
                             imageRevealed={imageRevealed}
                             onRevealImage={() => setImageRevealed(true)}
                           />
@@ -449,7 +445,7 @@ export function CardSection({
                       {backFieldsList.length > 0 ? (
                         <>
                           <p className="text-lg">
-                            <FieldWithMedia text={backFieldsList[0]} token={authToken} />
+                            <FieldWithMedia text={backFieldsList[0] ?? ""} token={authToken ?? null} />
                           </p>
                           {backFieldsList.length > 1 && (
                             <>
@@ -457,7 +453,7 @@ export function CardSection({
                                 <div className="mt-3 space-y-2 text-left">
                                   {backFieldsList.slice(1).map((text, i) => (
                                     <p key={i} className="text-base">
-                                      <FieldWithMedia text={text} token={authToken} />
+                                      <FieldWithMedia text={text ?? ""} token={authToken ?? null} />
                                     </p>
                                   ))}
                                 </div>

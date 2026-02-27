@@ -39,7 +39,7 @@ describe("LoginPage", () => {
 
   it("renders the sign in form", () => {
     renderLogin();
-    expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByText("Sign in", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
@@ -83,10 +83,10 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Invalid credentials")).toBeInTheDocument();
   });
 
-  it("redirects immediately if already logged in", () => {
+  it("redirects immediately if already logged in", async () => {
     localStorage.setItem("wordupx_token", "existing-token");
     renderLogin();
-    expect(screen.getByText("Profile page")).toBeInTheDocument();
+    expect(await screen.findByText("Profile page")).toBeInTheDocument();
   });
 
   it("redirects to the original 'from' location after login", async () => {

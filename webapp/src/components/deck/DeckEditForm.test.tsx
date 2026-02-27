@@ -49,8 +49,10 @@ describe("DeckEditForm", () => {
   it("calls setFieldNames when a field input changes", async () => {
     const user = userEvent.setup();
     const { setFieldNames } = renderForm();
-    await user.clear(screen.getByDisplayValue("English"));
-    await user.type(screen.getByDisplayValue(""), "E");
+    // Keep a reference before clearing — the controlled input keeps its value
+    // since setFieldNames is mocked and won't propagate back as a prop update.
+    const englishInput = screen.getByDisplayValue("English");
+    await user.clear(englishInput);
     expect(setFieldNames).toHaveBeenCalled();
   });
 

@@ -32,7 +32,7 @@ describe("RegisterPage", () => {
 
   it("renders the register form", () => {
     renderRegister();
-    expect(screen.getByRole("heading", { name: /register/i })).toBeInTheDocument();
+    expect(screen.getByText("Register", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
