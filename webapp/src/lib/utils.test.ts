@@ -24,4 +24,8 @@ describe("formatMediaMarkersForDisplay", () => {
   it("returns unchanged string when no markers", () => {
     expect(formatMediaMarkersForDisplay("no markers")).toBe("no markers");
   });
+
+  it("leaves bare audio:id and image:id unchanged", () => {
+    expect(formatMediaMarkersForDisplay("audio:63ekundzy9 · image:qoiie6hldh")).toBe("audio:63ekundzy9 · image:qoiie6hldh");
+  });
 });

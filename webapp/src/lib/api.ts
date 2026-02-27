@@ -200,7 +200,13 @@ export interface NextCardItem {
 
 export interface GetNextCardRes {
   data: { card: NextCardItem; urgency: number };
-  meta?: { earliest_overdue_due_date?: number };
+  meta?: {
+    msg?: string;
+    reschedule_suggested?: boolean;
+    suggested_reschedule_days?: number;
+    earliest_overdue_due_date?: number;
+    overdue_cards?: number;
+  };
 }
 
 export interface GetCardsRes {
@@ -222,5 +228,26 @@ export interface UpdateCardReq {
 
 export interface UpdateCardRes {
   data: { due_date?: number; hidden_status?: boolean; last_review?: number; new_interval?: number };
+  meta: { msg: string };
+}
+export interface RescheduleReq {
+  days: number;
+}
+export interface RescheduleRes {
+  data?: { msg?: string };
+  meta?: { msg: string };
+}
+export interface ForgotPasswordReq {
+  email: string;
+}
+export interface ResetPasswordReq {
+  token: string;
+  new_password: string;
+}
+export interface AddCardForFactReq {
+  template_index: number;
+}
+export interface AddCardForFactRes {
+  data: { card_id: string };
   meta: { msg: string };
 }

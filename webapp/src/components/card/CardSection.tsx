@@ -45,8 +45,17 @@ function formatInterval(seconds: number): string {
   return `${sec}s`;
 }
 
-// Marker format: [audio:id] or [image:id] (design doc). Id is [a-z0-9]+.
+// Marker format: [audio:id] or [image:id] (design doc). Also accept bare "audio:id" / "image:id". Id is [a-z0-9]+.
 const MEDIA_MARKER_RE = /\[(audio|image):([a-z0-9]+)\]/g;
+// Bare "audio:id" / "image:id" — do not match when already inside brackets (e.g. "[image:id]").
+const BARE_MEDIA_MARKER_RE = /\b(audio|image):([a-z0-9]+)/g;
+
+function normalizeMediaMarkers(text: string): string {
+  return text.replace(BARE_MEDIA_MARKER_RE, (match, type, id, offset) => {
+    if (offset >= 1 && text[offset - 1] === "[") return match;
+    return `[${type}:${id}]`;
+  });
+}
 
 type FieldSegment =
   | { kind: "text"; value: string }
@@ -54,21 +63,22 @@ type FieldSegment =
   | { kind: "audio"; id: string };
 
 function parseFieldWithMedia(text: string): FieldSegment[] {
+  const normalized = normalizeMediaMarkers(text);
   const segments: FieldSegment[] = [];
   let lastIndex = 0;
   let m: RegExpExecArray | null;
   MEDIA_MARKER_RE.lastIndex = 0;
-  while ((m = MEDIA_MARKER_RE.exec(text)) !== null) {
+  while ((m = MEDIA_MARKER_RE.exec(normalized)) !== null) {
     if (m.index > lastIndex) {
-      segments.push({ kind: "text", value: text.slice(lastIndex, m.index) });
+      segments.push({ kind: "text", value: normalized.slice(lastIndex, m.index) });
     }
     const type = m[1] as "image" | "audio";
     const id = m[2];
     segments.push(type === "image" ? { kind: "image", id } : { kind: "audio", id });
     lastIndex = MEDIA_MARKER_RE.lastIndex;
   }
-  if (lastIndex < text.length) {
-    segments.push({ kind: "text", value: text.slice(lastIndex) });
+  if (lastIndex < normalized.length) {
+    segments.push({ kind: "text", value: normalized.slice(lastIndex) });
   }
   return segments.length > 0 ? segments : [{ kind: "text", value: text }];
 }
@@ -142,10 +152,10 @@ function MediaBlock({
 }
 
 function stripMediaMarkers(text: string): string {
-  return text.replace(MEDIA_MARKER_RE, "").replace(/\s+/g, " ").trim() || " ";
+  return normalizeMediaMarkers(text).replace(MEDIA_MARKER_RE, "").replace(/\s+/g, " ").trim() || " ";
 }
 
-function FieldWithMedia({
+export function FieldWithMedia({
   text,
   token,
   imageRevealed = false,
@@ -251,6 +261,9 @@ interface CardSectionProps {
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, values: string[]) => Promise<void>;
   authToken?: string | null;
+  rescheduleSuggested?: boolean;
+  suggestedRescheduleDays?: number;
+  onReschedule?: (days: number) => void;
 }
 
 const SLIDER_DEFAULT = 0.5;
@@ -268,6 +281,9 @@ export function CardSection({
   onHideCard,
   onSaveFact,
   authToken,
+  rescheduleSuggested,
+  suggestedRescheduleDays,
+  onReschedule,
 }: CardSectionProps) {
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
@@ -346,6 +362,18 @@ export function CardSection({
       <CardContent className="space-y-4 text-center">
         {cardError && <p className="text-sm text-destructive">{cardError}</p>}
         {cardSuccess && <p className="text-sm text-green-600">{cardSuccess}</p>}
+        {rescheduleSuggested && suggestedRescheduleDays != null && suggestedRescheduleDays > 0 && onReschedule && (
+          <p className="text-sm text-muted-foreground">
+            Been away?{" "}
+            <button
+              type="button"
+              onClick={() => onReschedule(suggestedRescheduleDays)}
+              className="text-primary hover:underline font-medium"
+            >
+              Shift schedule by {suggestedRescheduleDays} days
+            </button>
+          </p>
+        )}
         {!nextCard && loadingNextCard ? (
           <p className="text-muted-foreground">Loading next card…</p>
         ) : cardStats !== null ? (
@@ -421,7 +449,7 @@ export function CardSection({
                       {backFieldsList.length > 0 ? (
                         <>
                           <p className="text-lg">
-                            <FieldWithMedia text={backFieldsList[0]} token={authToken} textOnly />
+                            <FieldWithMedia text={backFieldsList[0]} token={authToken} />
                           </p>
                           {backFieldsList.length > 1 && (
                             <>
@@ -429,7 +457,7 @@ export function CardSection({
                                 <div className="mt-3 space-y-2 text-left">
                                   {backFieldsList.slice(1).map((text, i) => (
                                     <p key={i} className="text-base">
-                                      <FieldWithMedia text={text} token={authToken} textOnly />
+                                      <FieldWithMedia text={text} token={authToken} />
                                     </p>
                                   ))}
                                 </div>

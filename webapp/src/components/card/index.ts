@@ -1,1 +1,1 @@
-export { CardSection } from "./CardSection";
+export { CardSection, FieldWithMedia } from "./CardSection";

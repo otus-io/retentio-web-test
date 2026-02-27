@@ -1,0 +1,33 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { DeckHeader } from "./DeckHeader";
+
+function renderHeader(onLogout = vi.fn()) {
+  return render(
+    <MemoryRouter>
+      <DeckHeader onLogout={onLogout} />
+    </MemoryRouter>
+  );
+}
+
+describe("DeckHeader", () => {
+  it("renders a link to /profile", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "/profile");
+  });
+
+  it("renders a link to /media", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /media/i })).toHaveAttribute("href", "/media");
+  });
+
+  it("calls onLogout when the Logout button is clicked", async () => {
+    const user = userEvent.setup();
+    const onLogout = vi.fn();
+    renderHeader(onLogout);
+    await user.click(screen.getByRole("button", { name: /logout/i }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+});

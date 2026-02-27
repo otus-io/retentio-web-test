@@ -15,6 +15,8 @@ import {
   type GetFactsRes,
   type GetNextCardRes,
   type GetCardsRes,
+  type RescheduleReq,
+  type RescheduleRes,
   type UpdateDeckReq,
   type UpdateDeckRes,
   type UpdateCardReq,
@@ -63,6 +65,7 @@ export default function DeckPage() {
   const [cardStats, setCardStats] = useState<GetCardsRes["data"] | null>(null);
   const [loadingCards, setLoadingCards] = useState(false);
   const [nextCard, setNextCard] = useState<GetNextCardRes["data"] | null>(null);
+  const [nextCardMeta, setNextCardMeta] = useState<GetNextCardRes["meta"] | null>(null);
   const [nextCardFact, setNextCardFact] = useState<FactItem | null>(null);
   const [loadingNextCard, setLoadingNextCard] = useState(false);
   const [cardError, setCardError] = useState("");
@@ -98,9 +101,6 @@ export default function DeckPage() {
     setLoadingFacts(true);
     try {
       const res = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:fetchFacts',message:'Facts loaded',data:{factsCount:res.data.facts?.length,factIds:res.data.facts?.map((f: FactItem)=>f.id)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setFactsList(res.data.facts);
     } catch {
       setFactsList([]);
@@ -114,9 +114,6 @@ export default function DeckPage() {
     setLoadingCards(true);
     try {
       const res = await request<GetCardsRes>(`/api/decks/${id}/cards`, { token });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:fetchCards',message:'Cards stats loaded',data:{totalCards:res.data.total_cards,hiddenCount:res.data.hidden_count},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setCardStats(res.data);
     } catch {
       setCardStats(null);
@@ -135,22 +132,18 @@ export default function DeckPage() {
     }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleGetNextCard:gotCard',message:'GET next card response',data:{cardId:res?.data?.card?.id,factId:res?.data?.card?.fact_id,dueDate:res?.data?.card?.due_date,lastReview:res?.data?.card?.last_review,urgency:res?.data?.urgency},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setNextCard(res.data);
+      setNextCardMeta(res.meta ?? null);
       const factRes = await request<{ data: { fact: FactItem } }>(
         `/api/decks/${id}/facts/${res.data.card.fact_id}`,
         { token }
       );
       setNextCardFact(factRes.data.fact);
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleGetNextCard:catch',message:'GET next card failed',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
       setNextCard(null);
       setNextCardFact(null);
+      setNextCardMeta(null);
     } finally {
       setLoadingNextCard(false);
     }
@@ -354,32 +347,20 @@ export default function DeckPage() {
   }
 
   async function handleUpdateCard(intervalSeconds: number) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:entry',message:'handleUpdateCard called',data:{intervalSeconds,hasToken:!!token,deckId:id,hasNextCard:!!nextCard,cardId:nextCard?.card?.id,cardDueDate:nextCard?.card?.due_date,cardLastReview:nextCard?.card?.last_review},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!token || !id || !nextCard) return;
     setCardError("");
     try {
       const lastReview = Math.floor(Date.now() / 1000);
       const body: UpdateCardReq = { card_id: nextCard.card.id, last_review: lastReview, interval: intervalSeconds };
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:prePatch',message:'PATCH request body',data:{body,url:`/api/decks/${id}/card`},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const patchRes = await request<UpdateCardRes>(`/api/decks/${id}/card`, {
         method: "PATCH",
         token,
         body: JSON.stringify(body),
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:postPatch',message:'PATCH succeeded',data:{patchRes},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setCardSuccess("Card reviewed.");
       await fetchCards();
       await handleGetNextCard(false);
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3a71b2cc-75df-492b-90df-34a1c0337224',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a05a0d'},body:JSON.stringify({sessionId:'a05a0d',location:'DeckPage.tsx:handleUpdateCard:catch',message:'PATCH or follow-up failed',data:{error:e instanceof Error?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setCardError(e instanceof Error ? e.message : "Update failed");
     }
   }
@@ -399,6 +380,25 @@ export default function DeckPage() {
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Hide failed");
+    }
+  }
+
+  async function handleReschedule(days: number) {
+    if (!token || !id) return;
+    setCardError("");
+    try {
+      await request<RescheduleRes>(`/api/decks/${id}/reschedule`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ days } as RescheduleReq),
+      });
+      setCardSuccess(`Schedule shifted by ${days} days.`);
+      setNextCardMeta(null);
+      await fetchDeck();
+      await fetchCards();
+      await handleGetNextCard(false);
+    } catch (e) {
+      setCardError(e instanceof Error ? e.message : "Reschedule failed");
     }
   }
 
@@ -469,6 +469,9 @@ export default function DeckPage() {
               onHideCard={handleHideCard}
               onSaveFact={handleSaveFactFromCard}
               authToken={token}
+              rescheduleSuggested={nextCardMeta?.reschedule_suggested}
+              suggestedRescheduleDays={nextCardMeta?.suggested_reschedule_days}
+              onReschedule={handleReschedule}
             />
             <DeckInfoCard
               deck={deck}
