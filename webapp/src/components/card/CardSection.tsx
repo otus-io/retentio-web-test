@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
+import type { DeckItem, FactItem } from "@/lib/api";
 import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
@@ -375,12 +375,11 @@ export function CardSection({
             </p>
             {(() => {
               const entries = nextCardFact.entries ?? [];
-              const { split } = parseScheme(nextCardFact.scheme);
-              const primaryFront = entries.slice(0, split);
-              const primaryBack = entries.slice(split);
-              const frontFields = nextCard.card.is_sibling ? primaryBack : primaryFront;
-              const backFields = nextCard.card.is_sibling ? primaryFront : primaryBack;
-              const backFieldsList = backFields.map((f) => f ?? "");
+              const t = nextCard.card.template;
+              const frontIndices = Array.isArray(t?.[0]) ? t[0] : [0];
+              const backIndices = Array.isArray(t?.[1]) ? t[1] : [];
+              const frontFields = frontIndices.map((i) => entries[i] ?? "");
+              const backFieldsList = backIndices.map((i) => entries[i] ?? "");
               return (
                 <div
                   className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"

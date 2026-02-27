@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { parseScheme, type DeckItem, type FactItem } from "@/lib/api";
+import type { DeckItem, FactItem } from "@/lib/api";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 5;
@@ -164,11 +164,10 @@ export function FactsList({
                     <DropdownMenu>
                       <DropdownMenuItem
                         onClick={() => {
-                          const { split, sibling } = parseScheme(f.scheme);
                           setEditingFactId(f.id);
                           setEditingFactValues([...f.entries]);
-                          setEditingFactSplit(split);
-                          setEditingFactSibling(sibling);
+                          setEditingFactSplit(1);
+                          setEditingFactSibling(false);
                           setFactError("");
                         }}
                       >
