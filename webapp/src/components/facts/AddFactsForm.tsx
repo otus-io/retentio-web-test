@@ -22,7 +22,7 @@ interface AddFactsFormProps {
   addFactOp: AddFactOperation;
   setAddFactOp: (v: AddFactOperation) => void;
   addFactSplit: number;
-  setAddFactSplit: (v: number) => void;
+  setAddFactSplit: React.Dispatch<React.SetStateAction<number>>;
   sibling: boolean;
   setSibling: (v: boolean) => void;
   addingFacts: boolean;

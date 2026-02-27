@@ -8,13 +8,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
   uploadMultipart,
+  getApiBaseUrl,
   type ListMediaRes,
   type MediaItem,
   type UploadMediaRes,
 } from "@/lib/api";
-
-const getBaseUrl = () =>
-  (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "http://localhost:8080";
 
 export default function MediaPage() {
   const { token, logout } = useAuth();
@@ -73,7 +71,7 @@ export default function MediaPage() {
 
   async function handleDownload(m: MediaItem) {
     if (!token) return;
-    const res = await fetch(`${getBaseUrl()}/api/media/${m.id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/media/${m.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return;

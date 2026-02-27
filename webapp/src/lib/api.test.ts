@@ -1,0 +1,133 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { request, uploadMultipart, templateIndicesFromSibling } from "./api";
+
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
+function makeResponse(body: unknown, ok = true, statusText = "OK") {
+  const json = JSON.stringify(body);
+  return {
+    ok,
+    statusText,
+    text: () => Promise.resolve(json),
+    json: () => Promise.resolve(body),
+  };
+}
+
+describe("templateIndicesFromSibling", () => {
+  it("returns [0] when sibling is false", () => {
+    expect(templateIndicesFromSibling(false)).toEqual([0]);
+  });
+
+  it("returns [0, 1] when sibling is true", () => {
+    expect(templateIndicesFromSibling(true)).toEqual([0, 1]);
+  });
+});
+
+describe("request", () => {
+  beforeEach(() => mockFetch.mockReset());
+
+  it("returns parsed JSON on success", async () => {
+    const payload = { data: { token: "abc" }, meta: { expires: "2099" } };
+    mockFetch.mockResolvedValueOnce(makeResponse(payload));
+    const res = await request("/auth/login", { method: "POST", body: JSON.stringify({}) });
+    expect(res).toEqual(payload);
+  });
+
+  it("sets Content-Type: application/json when body is present", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}));
+    await request("/test", { body: JSON.stringify({ x: 1 }) });
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("does not set Content-Type when no body", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}));
+    await request("/test");
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Content-Type")).toBeNull();
+  });
+
+  it("sets Authorization header when token is provided", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}));
+    await request("/test", { token: "mytoken" });
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Authorization")).toBe("Bearer mytoken");
+  });
+
+  it("does not set Authorization when token is null", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}));
+    await request("/test", { token: null });
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Authorization")).toBeNull();
+  });
+
+  it("returns empty object for blank response body", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      text: () => Promise.resolve("   "),
+      json: () => Promise.resolve({}),
+    });
+    const res = await request<object>("/test");
+    expect(res).toEqual({});
+  });
+
+  it("throws error with msg from JSON on failure", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ msg: "Invalid credentials" }, false, "Unauthorized"));
+    await expect(request("/auth/login", { method: "POST" })).rejects.toThrow("Invalid credentials");
+  });
+
+  it("falls back to statusText when error body has no msg", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, false, "Internal Server Error"));
+    await expect(request("/test")).rejects.toThrow("Internal Server Error");
+  });
+
+  it("uses the correct URL", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}));
+    await request("/api/decks");
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toMatch(/\/api\/decks$/);
+  });
+});
+
+describe("uploadMultipart", () => {
+  beforeEach(() => mockFetch.mockReset());
+
+  it("sends POST with FormData", async () => {
+    const payload = { data: { id: "m1" }, meta: { msg: "ok" } };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      json: () => Promise.resolve(payload),
+    });
+    const form = new FormData();
+    form.append("file", new Blob(["data"]), "test.png");
+    const res = await uploadMultipart("/api/media", form, "tok");
+    expect(res).toEqual(payload);
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(form);
+  });
+
+  it("sets Authorization when token provided", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      json: () => Promise.resolve({}),
+    });
+    const form = new FormData();
+    await uploadMultipart("/api/media", form, "mytoken");
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Authorization")).toBe("Bearer mytoken");
+  });
+
+  it("throws on non-ok response", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      statusText: "Forbidden",
+      json: () => Promise.resolve({ msg: "Forbidden" }),
+    });
+    await expect(uploadMultipart("/api/media", new FormData())).rejects.toThrow("Forbidden");
+  });
+});
