@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
   uploadMultipart,
-  schemeFromSplitSibling,
+  templateIndicesFromSibling,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -271,9 +271,9 @@ export default function DeckPage() {
         }
         effectiveSplit = 1 + uploadedMarkers.length;
       }
-      const scheme = schemeFromSplitSibling(effectiveSplit, sibling);
       const body: AddFactReq = {
-        facts: facts.map((entries) => ({ entries, scheme })),
+        facts: facts.map((entries) => ({ entries })),
+        template_indices: templateIndicesFromSibling(sibling),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
@@ -302,15 +302,10 @@ export default function DeckPage() {
       setFactError("Each field is required.");
       return;
     }
-    if (editingFactSplit < 1 || editingFactSplit > values.length) {
-      setFactError(`Split must be between 1 and ${values.length}.`);
-      return;
-    }
     setFactError("");
     setFactSuccess("");
     try {
-      const scheme = schemeFromSplitSibling(editingFactSplit, editingFactSibling);
-      const body: UpdateFactReq = { entries: values, scheme };
+      const body: UpdateFactReq = { entries: values };
       await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
         method: "PATCH",
         token,
