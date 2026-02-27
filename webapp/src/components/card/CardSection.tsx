@@ -83,7 +83,7 @@ function parseFieldWithMedia(text: string): FieldSegment[] {
   if (lastIndex < normalized.length) {
     segments.push({ kind: "text", value: normalized.slice(lastIndex) });
   }
-  return segments.length > 0 ? segments : [{ kind: "text", value: text }];
+    return segments.length > 0 ? segments : [{ kind: "text", value: normalized }];
 }
 
 function AudioPlayButton({ src }: { src: string }) {
