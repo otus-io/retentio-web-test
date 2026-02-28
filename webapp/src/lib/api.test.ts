@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { request, uploadMultipart, buildSiblingTemplate, buildTemplateWithSplit, buildTemplateForRequest } from "./api";
+import {
+  request,
+  uploadMultipart,
+  buildSiblingTemplate,
+  buildTemplateWithSplit,
+  buildTemplateForRequest,
+  type GetNextCardRes,
+  type FrontBackSegment,
+} from "./api";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -195,5 +203,78 @@ describe("uploadMultipart", () => {
       json: () => Promise.resolve({ msg: "Forbidden" }),
     });
     await expect(uploadMultipart("/api/media", new FormData())).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("GetNextCard response shape (front/back segments)", () => {
+  it("accepts response with front and back segment arrays", () => {
+    const res: GetNextCardRes = {
+      data: {
+        card: {
+          id: "c1",
+          fact_id: "f1",
+          template: [[0], [1]],
+          last_review: 1704067200,
+          due_date: 1704153600,
+          hidden: false,
+          created_at: 1704067200,
+          front: [{ field: "Word", text: "Apple" }],
+          back: [{ field: "Translation", text: "苹果" }],
+        },
+        urgency: 2.598,
+      },
+      meta: { msg: "Next urgent card retrieved successfully" },
+    };
+    expect(res.data.card.front).toHaveLength(1);
+    expect(res.data.card.back).toHaveLength(1);
+    expect((res.data.card.front as FrontBackSegment[])[0].text).toBe("Apple");
+    expect((res.data.card.back as FrontBackSegment[])[0].text).toBe("苹果");
+  });
+
+  it("accepts front-only response with empty back array", () => {
+    const res: GetNextCardRes = {
+      data: {
+        card: {
+          id: "c1",
+          fact_id: "f1",
+          template: [[0], []],
+          last_review: 1704067200,
+          due_date: 1704153600,
+          hidden: false,
+          created_at: 1704067200,
+          front: [{ field: "Question", text: "Only front" }],
+          back: [],
+        },
+        urgency: 1.0,
+      },
+      meta: { msg: "Next urgent card retrieved successfully" },
+    };
+    expect(res.data.card.front).toHaveLength(1);
+    expect(res.data.card.back).toHaveLength(0);
+  });
+
+  it("accepts segments with audio and image", () => {
+    const res: GetNextCardRes = {
+      data: {
+        card: {
+          id: "c1",
+          fact_id: "f1",
+          template: [[0, 1], [2]],
+          last_review: 1704067200,
+          due_date: 1704153600,
+          hidden: false,
+          created_at: 1704067200,
+          front: [
+            { field: "Front", text: "Word" },
+            { field: "Pronunciation", audio: "abc123" },
+          ],
+          back: [{ field: "Picture", image: "img456" }],
+        },
+        urgency: 1.2,
+      },
+      meta: {},
+    };
+    expect((res.data.card.front as FrontBackSegment[])[1].audio).toBe("abc123");
+    expect((res.data.card.back as FrontBackSegment[])[0].image).toBe("img456");
   });
 });

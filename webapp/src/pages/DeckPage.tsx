@@ -134,11 +134,20 @@ export default function DeckPage() {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
       setNextCard(res.data);
       setNextCardMeta(res.meta ?? null);
-      const factRes = await request<{ data: { fact: FactItem } }>(
-        `/api/decks/${id}/facts/${res.data.card.fact_id}`,
-        { token }
-      );
-      setNextCardFact(factRes.data.fact);
+      const hasSegments =
+        Array.isArray(res.data.card.front) &&
+        Array.isArray(res.data.card.back) &&
+        res.data.card.front.length >= 0 &&
+        res.data.card.back.length >= 0;
+      if (hasSegments) {
+        setNextCardFact(null);
+      } else {
+        const factRes = await request<{ data: { fact: FactItem } }>(
+          `/api/decks/${id}/facts/${res.data.card.fact_id}`,
+          { token }
+        );
+        setNextCardFact(factRes.data.fact);
+      }
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
       setNextCard(null);
@@ -148,6 +157,24 @@ export default function DeckPage() {
       setLoadingNextCard(false);
     }
   }, [token, id]);
+
+  const fetchFactForEdit = useCallback(
+    async (factId: string): Promise<FactItem | null> => {
+      if (!token || !id) return null;
+      try {
+        const factRes = await request<{ data: { fact: FactItem } }>(
+          `/api/decks/${id}/facts/${factId}`,
+          { token }
+        );
+        const fact = factRes.data.fact;
+        setNextCardFact(fact);
+        return fact;
+      } catch {
+        return null;
+      }
+    },
+    [token, id]
+  );
 
   useEffect(() => {
     if (deck && !editing) {
@@ -478,6 +505,7 @@ export default function DeckPage() {
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
               onSaveFact={handleSaveFactFromCard}
+              onRequestFactForEdit={fetchFactForEdit}
               authToken={token}
               rescheduleSuggested={nextCardMeta?.reschedule_suggested}
               suggestedRescheduleDays={nextCardMeta?.suggested_reschedule_days}
