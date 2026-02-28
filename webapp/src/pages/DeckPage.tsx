@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
   uploadMultipart,
-  templateIndicesFromSibling,
+  buildTemplateForRequest,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -262,7 +262,7 @@ export default function DeckPage() {
       }
       const body: AddFactReq = {
         facts: facts.map((entries) => ({ entries })),
-        template_indices: templateIndicesFromSibling(sibling),
+        ...(buildTemplateForRequest(facts[0]?.length ?? 0, addFactSplit, sibling)),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
