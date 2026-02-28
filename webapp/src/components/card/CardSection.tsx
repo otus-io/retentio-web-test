@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
-import type { GetCardsRes, GetNextCardRes } from "@/lib/api";
+import type { FrontBackSegment, GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
@@ -256,6 +256,7 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, values: string[]) => Promise<void>;
+  onRequestFactForEdit?: (factId: string) => Promise<FactItem | null>;
   authToken?: string | null;
   rescheduleSuggested?: boolean;
   suggestedRescheduleDays?: number;
@@ -276,6 +277,7 @@ export function CardSection({
   onUpdateCard,
   onHideCard,
   onSaveFact,
+  onRequestFactForEdit,
   authToken,
   rescheduleSuggested,
   suggestedRescheduleDays,
@@ -380,12 +382,22 @@ export function CardSection({
               ` · Orphaned: ${cardStats.orphaned_hidden_cards}`}
           </p>
         ) : null}
-        {nextCard && nextCardFact && deck && (
+        {nextCard && deck && (nextCardFact || (Array.isArray(nextCard.card.front) && Array.isArray(nextCard.card.back))) && (
           <div className="relative rounded-lg border p-4 space-y-3">
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
                 {onSaveFact && (
-                  <DropdownMenuItem onClick={() => openEditPopup(nextCardFact.id, nextCardFact.entries)} disabled={loadingNextCard}>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      if (nextCardFact) {
+                        openEditPopup(nextCardFact.id, nextCardFact.entries);
+                      } else if (onRequestFactForEdit && nextCard) {
+                        const fact = await onRequestFactForEdit(nextCard.card.fact_id);
+                        if (fact) openEditPopup(fact.id, fact.entries);
+                      }
+                    }}
+                    disabled={loadingNextCard}
+                  >
                     Edit fact
                   </DropdownMenuItem>
                 )}
@@ -398,7 +410,94 @@ export function CardSection({
               Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
             </p>
             {(() => {
-              const entries = nextCardFact.entries ?? [];
+              const frontSegments = Array.isArray(nextCard.card.front) ? nextCard.card.front : null;
+              const backSegments = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
+              const useSegments = frontSegments && backSegments;
+
+              const renderSegment = (seg: FrontBackSegment, key: number) => {
+                const label = seg.field ? <span className="text-xs text-muted-foreground block">{seg.field}</span> : null;
+                let content: ReactNode = null;
+                if (seg.text != null) content = <FieldWithMedia text={seg.text} token={authToken ?? null} />;
+                else if (seg.audio != null && authToken)
+                  content = <MediaBlock kind="audio" id={seg.audio} token={authToken} />;
+                else if (seg.image != null && authToken)
+                  content = <MediaBlock kind="image" id={seg.image} token={authToken} />;
+                return (
+                  <span key={key} className="inline-flex flex-col items-center gap-0.5">
+                    {label}
+                    {content ?? "—"}
+                  </span>
+                );
+              };
+
+              if (useSegments) {
+                return (
+                  <div
+                    className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
+                    onClick={handleFlip}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleFlip();
+                      }
+                    }}
+                    aria-label={flipped ? "Flip to front" : "Flip to back"}
+                  >
+                    <div
+                      className="relative min-h-[10rem] w-full transition-transform duration-300 [transform-style:preserve-3d]"
+                      style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+                    >
+                      <div
+                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center text-lg [backface-visibility:hidden]"
+                        style={{ transform: "rotateY(0deg)" }}
+                      >
+                        {frontSegments.map((seg, i) => renderSegment(seg, i))}
+                      </div>
+                      <div
+                        className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center [backface-visibility:hidden]"
+                        style={{ transform: "rotateY(180deg)" }}
+                      >
+                        {backSegments.length > 0 ? (
+                          <>
+                            <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
+                              {backSegments.slice(0, 1).map((seg, i) => renderSegment(seg, i))}
+                            </div>
+                            {backSegments.length > 1 && (
+                              examplesRevealed ? (
+                                <div className="mt-3 space-y-2 text-left">
+                                  {backSegments.slice(1).map((seg, i) => (
+                                    <p key={i} className="text-base">
+                                      {renderSegment(seg, i + 1)}
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExamplesRevealed(true);
+                                  }}
+                                  className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                                >
+                                  Click to show example sentences
+                                </button>
+                              )
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-lg text-muted-foreground">—</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Click to flip</p>
+                  </div>
+                );
+              }
+
+              const entries = nextCardFact?.entries ?? [];
               const t = nextCard.card.template;
               const frontIndices = Array.isArray(t?.[0]) ? t[0] : [0];
               const backIndices = Array.isArray(t?.[1]) ? t[1] : [];

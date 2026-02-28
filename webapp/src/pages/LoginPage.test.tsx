@@ -19,7 +19,7 @@ function makeResponse(body: unknown, ok = true) {
 
 function renderLogin(initialPath = "/login") {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
+    <MemoryRouter initialEntries={[initialPath]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -95,7 +95,7 @@ describe("LoginPage", () => {
       makeResponse({ data: { token: "tok" }, meta: { expires: "2099" } })
     );
     render(
-      <MemoryRouter initialEntries={[{ pathname: "/login", state: { from: { pathname: "/decks/abc" } } }]}>
+      <MemoryRouter initialEntries={[{ pathname: "/login", state: { from: { pathname: "/decks/abc" } } }]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />

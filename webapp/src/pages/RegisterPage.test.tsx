@@ -18,7 +18,7 @@ function makeResponse(body: unknown, ok = true) {
 
 function renderRegister() {
   return render(
-    <MemoryRouter initialEntries={["/register"]}>
+    <MemoryRouter initialEntries={["/register"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/login" element={<p>Login page</p>} />
