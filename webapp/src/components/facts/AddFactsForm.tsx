@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
+import { buildSiblingTemplate, buildTemplateWithSplit } from "@/lib/api";
 
 export type FactMediaEntry = { file: File; type: "image" | "audio" };
 
@@ -100,7 +101,7 @@ export function AddFactsForm({
     setFactsRows([[...row, ""]]);
     setSlotLabelIndex(Array.from({ length: newLen }, (_, i) => i));
     setCustomLabels((prev) => [...prev, ""]);
-    setAddFactSplit((prev) => Math.min(prev, newLen <= 1 ? 1 : newLen - 1));
+    setAddFactSplit((prev) => Math.min(prev, newLen <= 1 ? 1 : newLen));
   };
   const removeField = (colIndex: number) => {
     if (row.length <= 1) return;
@@ -110,7 +111,7 @@ export function AddFactsForm({
     setFactsRows([next]);
     setSlotLabelIndex(nextLabels);
     setCustomLabels(nextCustom);
-    setAddFactSplit((prev) => Math.min(prev, next.length <= 1 ? 1 : next.length - 1));
+    setAddFactSplit((prev) => Math.min(prev, next.length <= 1 ? 1 : next.length));
   };
   const setCustomLabel = (colIndex: number, value: string) => {
     setCustomLabels((prev) => {
@@ -120,7 +121,7 @@ export function AddFactsForm({
     });
   };
   const fieldCount = row.length;
-  const maxSplit = fieldCount <= 1 ? 1 : fieldCount - 1;
+  const maxSplit = fieldCount <= 1 ? 1 : fieldCount;
   const split = Math.min(Math.max(1, addFactSplit), maxSplit);
   const getDisplayLabel = (colIndex: number) => {
     const idx = slotLabelIndex[colIndex] ?? colIndex;
@@ -431,6 +432,27 @@ export function AddFactsForm({
                         </div>
                       );
                     })}
+                  {/* Drop cut line at very bottom for front only */}
+                  {!backCollapsed && split < fieldCount && (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDropTargetRow(fieldCount);
+                      }}
+                      onDragLeave={() => setDropTargetRow(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDropTargetRow(null);
+                        if (e.dataTransfer.getData(DRAG_TYPE_SPLIT)) {
+                          setAddFactSplit(fieldCount);
+                        }
+                      }}
+                      className={`rounded-md border border-dashed py-2 text-center text-xs text-muted-foreground transition-colors ${dropTargetRow === fieldCount ? "border-primary bg-primary/10" : "border-input hover:bg-muted/30"}`}
+                    >
+                      Drop cut line here for front only
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -523,6 +545,14 @@ export function AddFactsForm({
                 Sibling
               </Label>
             </div>
+            <p className="text-xs text-muted-foreground font-mono" data-testid="add-facts-template">
+              Template:{" "}
+              {sibling
+                ? JSON.stringify(buildSiblingTemplate(row.length, split))
+                : split !== 1
+                  ? JSON.stringify([buildTemplateWithSplit(row.length, split)])
+                  : "default (0 front, rest back)"}
+            </p>
             <Button type="submit" disabled={addingFacts || row.every((s) => !s.trim())}>
               {addingFacts ? "Adding…" : "Add facts"}
             </Button>

@@ -191,4 +191,87 @@ describe("AddFactsForm", () => {
     expect(screen.getByRole("button", { name: /collapse front/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /collapse back/i })).toBeInTheDocument();
   });
+
+  describe("template display (cut line)", () => {
+    it("shows default template when split is 1 and sibling unchecked", () => {
+      renderForm({ factsRows: [["a", "b"]], addFactSplit: 1, sibling: false });
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "default (0 front, rest back)"
+      );
+    });
+
+    it("shows two templates when sibling checked and split 1", () => {
+      renderForm({ factsRows: [["a", "b"]], addFactSplit: 1, sibling: true });
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "[[[0],[1]],[[1],[0]]]"
+      );
+    });
+
+    it("shows single template with custom split when sibling unchecked", () => {
+      renderForm({ factsRows: [["a", "b", "c"]], addFactSplit: 2, sibling: false });
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "[[[0,1],[2]]]"
+      );
+    });
+
+    it("shows two templates with custom split when sibling checked", () => {
+      renderForm({ factsRows: [["a", "b", "c"]], addFactSplit: 2, sibling: true });
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "[[[0,1],[2]],[[2],[0,1]]]"
+      );
+    });
+
+    it("shows front-only template when split equals field count", () => {
+      renderForm({ factsRows: [["a", "b", "c"]], addFactSplit: 3, sibling: false });
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "[[[0,1,2],[]]]"
+      );
+    });
+
+    it("updates template when addFactSplit (cut line) changes", () => {
+      const { rerender } = render(
+        <AddFactsForm
+          deck={mockDeck}
+          factsRows={[["a", "b", "c"]]}
+          setFactsRows={vi.fn()}
+          addFactOp="append"
+          setAddFactOp={vi.fn()}
+          addFactSplit={1}
+          setAddFactSplit={vi.fn()}
+          sibling={false}
+          setSibling={vi.fn()}
+          addingFacts={false}
+          addFactsError=""
+          onSubmit={vi.fn((e: React.FormEvent) => e.preventDefault())}
+          mediaFiles={[]}
+          setMediaFiles={vi.fn()}
+        />
+      );
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "default (0 front, rest back)"
+      );
+
+      rerender(
+        <AddFactsForm
+          deck={mockDeck}
+          factsRows={[["a", "b", "c"]]}
+          setFactsRows={vi.fn()}
+          addFactOp="append"
+          setAddFactOp={vi.fn()}
+          addFactSplit={2}
+          setAddFactSplit={vi.fn()}
+          sibling={false}
+          setSibling={vi.fn()}
+          addingFacts={false}
+          addFactsError=""
+          onSubmit={vi.fn((e: React.FormEvent) => e.preventDefault())}
+          mediaFiles={[]}
+          setMediaFiles={vi.fn()}
+        />
+      );
+      expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
+        "[[[0,1],[2]]]"
+      );
+    });
+  });
 });

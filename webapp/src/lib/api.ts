@@ -144,12 +144,44 @@ export interface AddFactItemReq {
 
 export interface AddFactReq {
   facts: AddFactItemReq[];
-  template_indices?: number[];
+  /** When sibling is true, send two templates: [[front, back], [back, front]]. Omit for one card per fact. */
+  template?: number[][][];
 }
 
-/** Template indices for default 2-field: [0] = primary only, [0, 1] = primary + sibling. */
-export function templateIndicesFromSibling(sibling: boolean): number[] {
-  return sibling ? [0, 1] : [0];
+/** Returns { template } for AddFactReq when needed; otherwise {}. */
+export function buildTemplateForRequest(
+  fieldCount: number,
+  split: number,
+  sibling: boolean
+): { template?: number[][][] } {
+  if (fieldCount < 1) return {};
+  if (sibling) return { template: buildSiblingTemplate(fieldCount, split) };
+  if (split !== 1) return { template: [buildTemplateWithSplit(fieldCount, split)] };
+  return {};
+}
+export function buildTemplateWithSplit(fieldCount: number, split: number): number[][] {
+  if (fieldCount < 1 || split < 1) {
+    const front = [0];
+    const back = Array.from({ length: fieldCount - 1 }, (_, i) => i + 1);
+    return [front, back];
+  }
+  if (split >= fieldCount) {
+    const front = Array.from({ length: fieldCount }, (_, i) => i);
+    return [front, []];
+  }
+  const front = Array.from({ length: split }, (_, i) => i);
+  const back = Array.from({ length: fieldCount - split }, (_, i) => i + split);
+  return [front, back];
+}
+
+/** Returns two templates for n fields with given split: primary [front, back] and reversed [back, front]. */
+export function buildSiblingTemplate(fieldCount: number, split = 1): number[][][] {
+  if (fieldCount < 1) return [];
+  const [front, back] = buildTemplateWithSplit(fieldCount, split);
+  return [
+    [front, back],
+    [back.slice(), front.slice()],
+  ];
 }
 
 export interface AddFactRes {

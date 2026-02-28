@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { request, uploadMultipart, templateIndicesFromSibling } from "./api";
+import { request, uploadMultipart, buildSiblingTemplate, buildTemplateWithSplit, buildTemplateForRequest } from "./api";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -14,13 +14,79 @@ function makeResponse(body: unknown, ok = true, statusText = "OK") {
   };
 }
 
-describe("templateIndicesFromSibling", () => {
-  it("returns [0] when sibling is false", () => {
-    expect(templateIndicesFromSibling(false)).toEqual([0]);
+describe("buildSiblingTemplate", () => {
+  it("returns empty array for fieldCount < 1", () => {
+    expect(buildSiblingTemplate(0)).toEqual([]);
   });
 
-  it("returns [0, 1] when sibling is true", () => {
-    expect(templateIndicesFromSibling(true)).toEqual([0, 1]);
+  it("returns two templates for 1 field", () => {
+    expect(buildSiblingTemplate(1)).toEqual([[[0], []], [[], [0]]]);
+  });
+
+  it("returns [[[0],[1]], [[1],[0]]] for 2 fields", () => {
+    expect(buildSiblingTemplate(2)).toEqual([
+      [[0], [1]],
+      [[1], [0]],
+    ]);
+  });
+
+  it("returns primary + reversed for 3 fields", () => {
+    expect(buildSiblingTemplate(3)).toEqual([
+      [[0], [1, 2]],
+      [
+        [1, 2],
+        [0],
+      ],
+    ]);
+  });
+
+  it("respects split: 3 fields with split 2 gives front [0,1] back [2]", () => {
+    expect(buildSiblingTemplate(3, 2)).toEqual([
+      [
+        [0, 1],
+        [2],
+      ],
+      [[2], [0, 1]],
+    ]);
+  });
+});
+
+describe("buildTemplateWithSplit", () => {
+  it("returns [[0],[1,2]] for 3 fields split 1", () => {
+    expect(buildTemplateWithSplit(3, 1)).toEqual([[0], [1, 2]]);
+  });
+  it("returns [[0,1],[2]] for 3 fields split 2", () => {
+    expect(buildTemplateWithSplit(3, 2)).toEqual([[0, 1], [2]]);
+  });
+  it("returns all front for 3 fields split 3", () => {
+    expect(buildTemplateWithSplit(3, 3)).toEqual([[0, 1, 2], []]);
+  });
+});
+
+describe("buildTemplateForRequest", () => {
+  it("returns {} for fieldCount < 1", () => {
+    expect(buildTemplateForRequest(0, 1, false)).toEqual({});
+  });
+  it("returns sibling template when sibling true", () => {
+    expect(buildTemplateForRequest(2, 1, true)).toEqual({
+      template: [
+        [[0], [1]],
+        [[1], [0]],
+      ],
+    });
+  });
+  it("returns one template when split > 1 and not sibling", () => {
+    expect(buildTemplateForRequest(3, 2, false)).toEqual({
+      template: [[[0, 1], [2]]],
+    });
+  });
+  it("returns {} when split 1 and not sibling", () => {
+    expect(buildTemplateForRequest(2, 1, false)).toEqual({});
+  });
+  it("returns front-only template when split equals fieldCount", () => {
+    expect(buildTemplateForRequest(3, 3, false)).toEqual({
+      template: [[[0, 1, 2], []]],
+    });
   });
 });
 
