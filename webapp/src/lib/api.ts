@@ -140,12 +140,29 @@ export interface DeleteDeckRes {
 
 export interface AddFactItemReq {
   entries: string[];
+  /** Optional column names; length must equal entries. When omitted, deck default fields are used. */
+  fields?: string[];
 }
 
+/**
+ * Add-fact API accepts exactly one of these body shapes:
+ * (1) facts only, (2) facts + template, (3) fact_id + template.
+ */
 export interface AddFactReq {
   facts: AddFactItemReq[];
   /** When sibling is true, send two templates: [[front, back], [back, front]]. Omit for one card per fact. */
   template?: number[][][];
+}
+
+/** Validates add-fact body shape. Returns error message or null if valid. */
+export function validateAddFactBody(p: { hasFactId: boolean; hasFacts: boolean }): string | null {
+  if (p.hasFactId && p.hasFacts) {
+    return "Invalid request: use exactly one of (1) facts only, (2) facts + template, (3) fact_id + template — not both fact_id and facts.";
+  }
+  if (!p.hasFactId && !p.hasFacts) {
+    return "Invalid request: use one of (1) facts only, (2) facts + template, (3) fact_id + template.";
+  }
+  return null;
 }
 
 /** Returns { template } for AddFactReq when needed; otherwise {}. */
@@ -277,7 +294,9 @@ export interface ResetPasswordReq {
   new_password: string;
 }
 export interface AddCardForFactReq {
-  template_index: number;
+  fact_id: string;
+  /** [[front indices], [back indices]], e.g. [[0],[1]] or [[1],[0]] for reversed. */
+  template: number[][];
 }
 export interface AddCardForFactRes {
   data: { card_id: string };

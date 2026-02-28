@@ -49,7 +49,7 @@ export function FactsList({
   factSuccess,
   editingFactId,
   editingFactValues,
-  editingFactSplit,
+  editingFactSplit: _editingFactSplit,
   editingFactSibling,
   setEditingFactId,
   setEditingFactValues,
@@ -112,23 +112,6 @@ export function FactsList({
                         />
                       </div>
                     ))}
-                    {editingFactValues.length > 1 && (
-                      <div className="space-y-1">
-                        <Label htmlFor={`fact-split-${f.id}`} className="text-xs font-medium text-muted-foreground">
-                          Split (fields on front)
-                        </Label>
-                        <select
-                          id={`fact-split-${f.id}`}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={editingFactSplit}
-                          onChange={(e) => setEditingFactSplit(parseInt(e.target.value, 10) || 1)}
-                        >
-                          {Array.from({ length: editingFactValues.length }, (_, i) => i + 1).map((n) => (
-                            <option key={n} value={n}>{n}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
                     <div className="flex items-center gap-2">
                       <input
                         id={`fact-sibling-${f.id}`}
