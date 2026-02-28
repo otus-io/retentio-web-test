@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,17 @@ import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
 import { buildSiblingTemplate, buildTemplateWithSplit } from "@/lib/api";
 
-export type FactMediaEntry = { file: File; type: "image" | "audio" };
+export type FactMediaEntry = { file: File; type: "image" | "audio"; fieldName: string };
+
+export type FactCell =
+  | { type: "text"; value: string; label: string }
+  | { type: "media"; entry: FactMediaEntry };
+
+export function makeInitialFactRow(deck: DeckItem): FactCell[] {
+  const fields = deck.field ?? [];
+  if (fields.length === 0) return [{ type: "text", value: "", label: "Field 1" }];
+  return fields.map((label) => ({ type: "text" as const, value: "", label }));
+}
 
 const DRAG_TYPE_FIELD = "text/plain";
 const DRAG_TYPE_SPLIT = "application/x-wordupx-split";
@@ -16,10 +26,15 @@ function getMediaType(file: File): "image" | "audio" {
   return file.type.startsWith("image/") ? "image" : "audio";
 }
 
+/** Field name suffix for media: "audio" or "img" (matches backend convention). */
+function getMediaFieldNameSuffix(type: "image" | "audio"): "audio" | "img" {
+  return type === "audio" ? "audio" : "img";
+}
+
 interface AddFactsFormProps {
   deck: DeckItem;
-  factsRows: string[][];
-  setFactsRows: (v: string[][]) => void;
+  factRow: FactCell[];
+  setFactRow: (v: FactCell[]) => void;
   addFactOp: AddFactOperation;
   setAddFactOp: (v: AddFactOperation) => void;
   addFactSplit: number;
@@ -29,14 +44,12 @@ interface AddFactsFormProps {
   addingFacts: boolean;
   addFactsError: string;
   onSubmit: (e: React.FormEvent) => void;
-  mediaFiles: FactMediaEntry[];
-  setMediaFiles: (v: FactMediaEntry[]) => void;
 }
 
 export function AddFactsForm({
   deck,
-  factsRows,
-  setFactsRows,
+  factRow,
+  setFactRow,
   addFactOp,
   setAddFactOp,
   addFactSplit,
@@ -46,105 +59,78 @@ export function AddFactsForm({
   addingFacts,
   addFactsError,
   onSubmit,
-  mediaFiles,
-  setMediaFiles,
 }: AddFactsFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const row = factsRows[0] ?? [""];
-  const N = (deck.field ?? []).length;
-  const [slotLabelIndex, setSlotLabelIndex] = useState<number[]>(() =>
-    row.map((_, i) => i)
-  );
-  const [customLabels, setCustomLabels] = useState<string[]>(() =>
-    Array(row.length).fill("")
-  );
+  const row = factRow;
   const [frontCollapsed, setFrontCollapsed] = useState(false);
   const [backCollapsed, setBackCollapsed] = useState(false);
   const [dropTargetRow, setDropTargetRow] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (slotLabelIndex.length !== row.length) {
-      setSlotLabelIndex(Array.from({ length: row.length }, (_, i) => i));
-    }
-    if (customLabels.length !== row.length) {
-      if (row.length > customLabels.length) {
-        setCustomLabels((prev) => [...prev, ...Array(row.length - customLabels.length).fill("")]);
-      } else {
-        setCustomLabels((prev) => prev.slice(0, row.length));
-      }
-    }
-  }, [row.length]);
-
   const setCell = (colIndex: number, value: string) => {
-    const next = [...row];
-    next[colIndex] = value;
-    setFactsRows([next]);
+    const next = row.map((c, i) =>
+      i === colIndex && c.type === "text" ? { ...c, value } : c
+    );
+    setFactRow(next);
   };
   const moveSlot = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
-    const nextRow = [...row];
-    const nextLabels = [...slotLabelIndex];
-    const nextCustom = [...customLabels];
-    const [removedRow] = nextRow.splice(fromIndex, 1);
-    const [removedLabel] = nextLabels.splice(fromIndex, 1);
-    const [removedCustom] = nextCustom.splice(fromIndex, 1);
-    nextRow.splice(toIndex, 0, removedRow);
-    nextLabels.splice(toIndex, 0, removedLabel);
-    nextCustom.splice(toIndex, 0, removedCustom);
-    setFactsRows([nextRow]);
-    setSlotLabelIndex(nextLabels);
-    setCustomLabels(nextCustom);
+    const next = [...row];
+    const [removed] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, removed);
+    setFactRow(next);
   };
   const addField = () => {
-    const newLen = row.length + 1;
-    setFactsRows([[...row, ""]]);
-    setSlotLabelIndex(Array.from({ length: newLen }, (_, i) => i));
-    setCustomLabels((prev) => [...prev, ""]);
-    setAddFactSplit((prev) => Math.min(prev, newLen <= 1 ? 1 : newLen));
+    const textCount = row.filter((c): c is FactCell & { type: "text" } => c.type === "text").length;
+    const label = (deck.field ?? [])[textCount] ?? `Field ${textCount + 1}`;
+    setFactRow([...row, { type: "text", value: "", label }]);
+    setAddFactSplit((prev) => Math.min(prev, row.length + 1));
   };
-  const removeField = (colIndex: number) => {
+  const removeCell = (colIndex: number) => {
     if (row.length <= 1) return;
     const next = row.filter((_, i) => i !== colIndex);
-    const nextLabels = slotLabelIndex.filter((_, i) => i !== colIndex);
-    const nextCustom = customLabels.filter((_, i) => i !== colIndex);
-    setFactsRows([next]);
-    setSlotLabelIndex(nextLabels);
-    setCustomLabels(nextCustom);
+    setFactRow(next);
     setAddFactSplit((prev) => Math.min(prev, next.length <= 1 ? 1 : next.length));
   };
-  const setCustomLabel = (colIndex: number, value: string) => {
-    setCustomLabels((prev) => {
-      const next = [...prev];
-      next[colIndex] = value;
-      return next;
-    });
+  const setTextLabel = (colIndex: number, value: string) => {
+    setFactRow(
+      row.map((c, i) =>
+        i === colIndex && c.type === "text" ? { ...c, label: value } : c
+      )
+    );
   };
   const fieldCount = row.length;
   const maxSplit = fieldCount <= 1 ? 1 : fieldCount;
   const split = Math.min(Math.max(1, addFactSplit), maxSplit);
   const getDisplayLabel = (colIndex: number) => {
-    const idx = slotLabelIndex[colIndex] ?? colIndex;
-    if (idx < N) return deck.field[idx];
-    const custom = customLabels[colIndex];
-    return custom.trim() || `Field ${idx + 1}`;
+    const c = row[colIndex];
+    if (!c) return "";
+    return c.type === "text" ? c.label : c.entry.fieldName;
   };
 
   function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const chosen = Array.from(e.target.files ?? []);
     e.target.value = "";
+    const mediaCount = row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length;
     const valid = chosen.filter(
       (f) => f.type.startsWith("image/") || f.type.startsWith("audio/")
     );
-    const toAdd = valid.slice(0, Math.max(0, 2 - mediaFiles.length)).map((file) => ({
+    const toAdd = valid.slice(0, Math.max(0, 2 - mediaCount)).map((file) => ({
       file,
       type: getMediaType(file),
+      fieldName: getMediaFieldNameSuffix(getMediaType(file)),
     }));
-    if (toAdd.length) setMediaFiles([...mediaFiles, ...toAdd]);
+    if (toAdd.length) setFactRow([...row, ...toAdd.map((entry) => ({ type: "media" as const, entry }))]);
   }
 
-  function removeMedia(index: number) {
-    setMediaFiles(mediaFiles.filter((_, i) => i !== index));
+  function setMediaFieldName(cellIndex: number, value: string) {
+    setFactRow(
+      row.map((c, i) =>
+        i === cellIndex && c.type === "media"
+          ? { ...c, entry: { ...c.entry, fieldName: value } }
+          : c
+      )
+    );
   }
 
   return (
@@ -152,7 +138,7 @@ export function AddFactsForm({
       <CardHeader className="text-center">
         <CardTitle>Add facts</CardTitle>
         <p className="text-sm font-normal text-muted-foreground">
-          Enter one fact. Add as many fields as you need.
+          Enter one fact. Add fields and media; drag the cut line to set front vs back.
         </p>
       </CardHeader>
       <CardContent>
@@ -164,7 +150,7 @@ export function AddFactsForm({
               <div className="flex items-stretch gap-2">
                 <div className="flex-1 min-w-0 space-y-2">
                   {!frontCollapsed &&
-                    row.slice(0, split).map((value, i) => {
+                    row.slice(0, split).map((cell, i) => {
                       const colIndex = i;
                       return (
                         <div
@@ -200,37 +186,65 @@ export function AddFactsForm({
                           >
                             ⋮⋮
                           </span>
-                          <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
+                          <Label htmlFor={cell.type === "text" ? `fact-0-${colIndex}` : undefined} className="sr-only">
                             {getDisplayLabel(colIndex)}
                           </Label>
-                          {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                            <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-                              {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
-                            </span>
+                          {cell.type === "text" ? (
+                            <>
+                              {(deck.field ?? []).includes(cell.label) ? (
+                                <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
+                                  {cell.label}
+                                </span>
+                              ) : (
+                                <Input
+                                  aria-label="Field name"
+                                  placeholder={`Field ${colIndex + 1}`}
+                                  value={cell.label}
+                                  onChange={(e) => setTextLabel(colIndex, e.target.value)}
+                                  disabled={addingFacts}
+                                  className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
+                                />
+                              )}
+                              <Input
+                                id={`fact-0-${colIndex}`}
+                                placeholder="Value"
+                                value={cell.value}
+                                onChange={(e) => setCell(colIndex, e.target.value)}
+                                disabled={addingFacts}
+                                className="!w-auto min-w-0 flex-1"
+                              />
+                            </>
                           ) : (
-                            <Input
-                              aria-label="Field name"
-                              placeholder={`Field ${(slotLabelIndex[colIndex] ?? colIndex) + 1}`}
-                              value={customLabels[colIndex] ?? ""}
-                              onChange={(e) => setCustomLabel(colIndex, e.target.value)}
-                              disabled={addingFacts}
-                              className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
-                            />
+                            <>
+                              <span
+                                className={
+                                  cell.entry.type === "image"
+                                    ? "text-amber-600 text-sm font-medium w-20 shrink-0"
+                                    : "text-blue-600 text-sm font-medium w-20 shrink-0"
+                                }
+                              >
+                                {cell.entry.type === "image" ? "Image" : "Audio"}
+                              </span>
+                              <Input
+                                type="text"
+                                value={cell.entry.fieldName}
+                                onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
+                                placeholder={cell.entry.type === "image" ? "img" : "audio"}
+                                className="h-9 w-24 text-xs flex-1 min-w-0"
+                                disabled={addingFacts}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="max-w-[100px] truncate text-muted-foreground text-xs shrink-0">
+                                {cell.entry.file.name}
+                              </span>
+                            </>
                           )}
-                          <Input
-                            id={`fact-0-${colIndex}`}
-                            placeholder="Value"
-                            value={value ?? ""}
-                            onChange={(e) => setCell(colIndex, e.target.value)}
-                            disabled={addingFacts}
-                            className="!w-auto min-w-0 flex-1"
-                          />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => removeField(colIndex)}
+                            onClick={() => removeCell(colIndex)}
                             disabled={addingFacts}
                             aria-label="Remove field"
                           >
@@ -251,9 +265,9 @@ export function AddFactsForm({
               </div>
             )}
 
-            {fieldCount === 1 && (
-              <>
-                {row.slice(0, split).map((value, i) => {
+            {fieldCount === 1 && row.length > 0 && (
+              <div className="space-y-2">
+                {row.map((cell, i) => {
                   const colIndex = i;
                   return (
                     <div
@@ -261,79 +275,46 @@ export function AddFactsForm({
                       className="flex items-center gap-2 flex-nowrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
                     >
                       <span className="flex h-10 w-8 shrink-0" aria-hidden />
-                      <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
-                        {getDisplayLabel(colIndex)}
-                      </Label>
-                      {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                        <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-                          {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
-                        </span>
+                      {cell.type === "text" ? (
+                        <>
+                          <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
+                            {cell.label}
+                          </Label>
+                          <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
+                            {cell.label}
+                          </span>
+                          <Input
+                            id={`fact-0-${colIndex}`}
+                            placeholder="Value"
+                            value={cell.value}
+                            onChange={(e) => setCell(colIndex, e.target.value)}
+                            disabled={addingFacts}
+                            className="!w-auto min-w-0 flex-1"
+                          />
+                        </>
                       ) : (
-                        <Input
-                          aria-label="Field name"
-                          placeholder={`Field ${(slotLabelIndex[colIndex] ?? colIndex) + 1}`}
-                          value={customLabels[colIndex] ?? ""}
-                          onChange={(e) => setCustomLabel(colIndex, e.target.value)}
-                          disabled={addingFacts}
-                          className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
-                        />
+                        <>
+                          <span className={cell.entry.type === "image" ? "text-amber-600 text-sm w-20" : "text-blue-600 text-sm w-20"}>
+                            {cell.entry.type === "image" ? "Image" : "Audio"}
+                          </span>
+                          <Input
+                            type="text"
+                            value={cell.entry.fieldName}
+                            onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
+                            className="h-9 w-24 text-xs"
+                            disabled={addingFacts}
+                          />
+                          <span className="truncate text-muted-foreground text-xs">{cell.entry.file.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeCell(colIndex)} aria-label="Remove">×</Button>
+                        </>
                       )}
-                      <Input
-                        id={`fact-0-${colIndex}`}
-                        placeholder="Value"
-                        value={value ?? ""}
-                        onChange={(e) => setCell(colIndex, e.target.value)}
-                        disabled={addingFacts}
-                        className="!w-auto min-w-0 flex-1"
-                      />
                     </div>
                   );
                 })}
-              </>
+              </div>
             )}
 
-            {fieldCount === 1 && (
-              <>
-                {row.slice(0, split).map((value, i) => {
-                  const colIndex = i;
-                  return (
-                    <div
-                      key={colIndex}
-                      className="flex items-center gap-2 flex-nowrap rounded-md border border-transparent hover:border-input/50 bg-transparent p-1 -m-1"
-                    >
-                      <span className="flex h-10 w-8 shrink-0" aria-hidden />
-                      <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
-                        {getDisplayLabel(colIndex)}
-                      </Label>
-                      {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                        <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-                          {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
-                        </span>
-                      ) : (
-                        <Input
-                          aria-label="Field name"
-                          placeholder={`Field ${(slotLabelIndex[colIndex] ?? colIndex) + 1}`}
-                          value={customLabels[colIndex] ?? ""}
-                          onChange={(e) => setCustomLabel(colIndex, e.target.value)}
-                          disabled={addingFacts}
-                          className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
-                        />
-                      )}
-                      <Input
-                        id={`fact-0-${colIndex}`}
-                        placeholder="Value"
-                        value={value ?? ""}
-                        onChange={(e) => setCell(colIndex, e.target.value)}
-                        disabled={addingFacts}
-                        className="!w-auto min-w-0 flex-1"
-                      />
-                    </div>
-                  );
-                })}
-              </>
-            )}
-
-            {/* Draggable cut line: drag and drop on a row to set front/back split */}
+            {/* Draggable cut line */}
             {fieldCount > 1 && (
               <div
                 draggable
@@ -357,7 +338,7 @@ export function AddFactsForm({
               <div className="flex items-stretch gap-2">
                 <div className="flex-1 min-w-0 space-y-2">
                   {!backCollapsed &&
-                    row.slice(split).map((value, i) => {
+                    row.slice(split).map((cell, i) => {
                       const colIndex = split + i;
                       return (
                         <div
@@ -393,37 +374,65 @@ export function AddFactsForm({
                           >
                             ⋮⋮
                           </span>
-                          <Label htmlFor={`fact-0-${colIndex}`} className="sr-only">
+                          <Label htmlFor={cell.type === "text" ? `fact-0-${colIndex}` : undefined} className="sr-only">
                             {getDisplayLabel(colIndex)}
                           </Label>
-                          {(slotLabelIndex[colIndex] ?? colIndex) < N ? (
-                            <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-                              {deck.field[slotLabelIndex[colIndex] ?? colIndex]}
-                            </span>
+                          {cell.type === "text" ? (
+                            <>
+                              {(deck.field ?? []).includes(cell.label) ? (
+                                <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
+                                  {cell.label}
+                                </span>
+                              ) : (
+                                <Input
+                                  aria-label="Field name"
+                                  placeholder={`Field ${colIndex + 1}`}
+                                  value={cell.label}
+                                  onChange={(e) => setTextLabel(colIndex, e.target.value)}
+                                  disabled={addingFacts}
+                                  className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
+                                />
+                              )}
+                              <Input
+                                id={`fact-0-${colIndex}`}
+                                placeholder="Value"
+                                value={cell.value}
+                                onChange={(e) => setCell(colIndex, e.target.value)}
+                                disabled={addingFacts}
+                                className="!w-auto min-w-0 flex-1"
+                              />
+                            </>
                           ) : (
-                            <Input
-                              aria-label="Field name"
-                              placeholder={`Field ${(slotLabelIndex[colIndex] ?? colIndex) + 1}`}
-                              value={customLabels[colIndex] ?? ""}
-                              onChange={(e) => setCustomLabel(colIndex, e.target.value)}
-                              disabled={addingFacts}
-                              className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
-                            />
+                            <>
+                              <span
+                                className={
+                                  cell.entry.type === "image"
+                                    ? "text-amber-600 text-sm font-medium w-20 shrink-0"
+                                    : "text-blue-600 text-sm font-medium w-20 shrink-0"
+                                }
+                              >
+                                {cell.entry.type === "image" ? "Image" : "Audio"}
+                              </span>
+                              <Input
+                                type="text"
+                                value={cell.entry.fieldName}
+                                onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
+                                placeholder={cell.entry.type === "image" ? "img" : "audio"}
+                                className="h-9 w-24 text-xs flex-1 min-w-0"
+                                disabled={addingFacts}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="max-w-[100px] truncate text-muted-foreground text-xs shrink-0">
+                                {cell.entry.file.name}
+                              </span>
+                            </>
                           )}
-                          <Input
-                            id={`fact-0-${colIndex}`}
-                            placeholder="Value"
-                            value={value ?? ""}
-                            onChange={(e) => setCell(colIndex, e.target.value)}
-                            disabled={addingFacts}
-                            className="!w-auto min-w-0 flex-1"
-                          />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => removeField(colIndex)}
+                            onClick={() => removeCell(colIndex)}
                             disabled={addingFacts}
                             aria-label="Remove field"
                           >
@@ -467,10 +476,6 @@ export function AddFactsForm({
             <Button type="button" variant="outline" size="sm" onClick={addField} disabled={addingFacts}>
               Add field
             </Button>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground">Media (optional)</Label>
-            <p className="text-xs text-muted-foreground">Up to 2 files, image or audio.</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -480,44 +485,15 @@ export function AddFactsForm({
               className="hidden"
               aria-hidden
             />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={addingFacts || mediaFiles.length >= 2}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Add media
-              </Button>
-              {mediaFiles.map((entry, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-sm"
-                >
-                  <span
-                    className={
-                      entry.type === "image"
-                        ? "text-amber-600"
-                        : "text-blue-600"
-                    }
-                  >
-                    {entry.type === "image" ? "Image" : "Audio"}
-                  </span>
-                  <span className="max-w-[120px] truncate text-muted-foreground">
-                    {entry.file.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeMedia(i)}
-                    className="rounded p-0.5 hover:bg-muted"
-                    aria-label="Remove"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={addingFacts || row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length >= 2}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Add media
+            </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor="op" className="sr-only">Operation</Label>
@@ -553,7 +529,13 @@ export function AddFactsForm({
                   ? JSON.stringify([buildTemplateWithSplit(row.length, split)])
                   : "default (0 front, rest back)"}
             </p>
-            <Button type="submit" disabled={addingFacts || row.every((s) => !s.trim())}>
+            <Button
+              type="submit"
+              disabled={
+                addingFacts ||
+                !row.some((c) => (c.type === "text" ? c.value.trim() !== "" : true))
+              }
+            >
               {addingFacts ? "Adding…" : "Add facts"}
             </Button>
           </div>

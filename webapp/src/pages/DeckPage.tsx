@@ -6,6 +6,7 @@ import {
   request,
   uploadMultipart,
   buildTemplateForRequest,
+  validateAddFactBody,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -30,7 +31,7 @@ import {
   DeckInfoCard,
 } from "@/components/deck";
 import { CardSection } from "@/components/card";
-import { AddFactsForm, FactsList, type FactMediaEntry } from "@/components/facts";
+import { AddFactsForm, FactsList, type FactCell, makeInitialFactRow } from "@/components/facts";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,12 +47,11 @@ export default function DeckPage() {
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [factsRows, setFactsRows] = useState<string[][]>([]);
+  const [factRow, setFactRow] = useState<FactCell[]>([]);
   const [addFactOp, setAddFactOp] = useState<AddFactOperation>("append");
   const [addFactSplit, setAddFactSplit] = useState(1);
   const [addingFacts, setAddingFacts] = useState(false);
   const [addFactsError, setAddFactsError] = useState("");
-  const [mediaFiles, setMediaFiles] = useState<FactMediaEntry[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [factsList, setFactsList] = useState<FactItem[]>([]);
   const [loadingFacts, setLoadingFacts] = useState(false);
@@ -82,7 +82,7 @@ export default function DeckPage() {
       setName(data.name);
       setFieldNames([...data.field]);
       setRate(data.rate);
-      setFactsRows([(data.field ?? []).map(() => "")]);
+      setFactRow(makeInitialFactRow(data));
       setAddFactSplit(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load deck");
@@ -164,7 +164,7 @@ export default function DeckPage() {
 
   useEffect(() => {
     if (deck) {
-      setFactsRows([(deck.field ?? []).map(() => "")]);
+      setFactRow(makeInitialFactRow(deck));
       setAddFactSplit(1);
     }
   }, [deck?.id]);
@@ -222,57 +222,71 @@ export default function DeckPage() {
   async function handleAddFacts(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !id || !deck) return;
-    const rows = factsRows.filter((row) => row.some((s) => s.trim() !== ""));
-    if (rows.length === 0) {
-      setAddFactsError("Add at least one fact.");
+    const row = factRow;
+    const hasContent = row.some(
+      (c) => (c.type === "text" ? c.value.trim() !== "" : true)
+    );
+    if (!hasContent) {
+      setAddFactsError("Add at least one field or media.");
       return;
     }
-    const normalized: string[][] = [];
-    for (const r of rows) {
-      let fields = r.map((s) => s.trim());
-      while (fields.length && !fields[fields.length - 1]) fields = fields.slice(0, -1);
-      if (fields.length === 0) continue;
-      normalized.push(fields);
-    }
-    if (normalized.length === 0) {
-      setAddFactsError("At least one field is required.");
+    const textValues = row.map((c) => (c.type === "text" ? c.value.trim() : ""));
+    const allEmpty = textValues.every((s) => s === "") && row.every((c) => c.type !== "media");
+    if (allEmpty) {
+      setAddFactsError("At least one field or media is required.");
       return;
     }
     setAddFactsError("");
     setSuccessMessage("");
     setAddingFacts(true);
     try {
-      const uploadedMarkers: { id: string; type: "image" | "audio" }[] = [];
-      if (mediaFiles.length > 0 && token) {
-        for (const entry of mediaFiles) {
+      const uploadedMarkers: { id: string; type: "image" | "audio"; fieldName: string }[] = [];
+      const mediaCells = row.filter(
+        (c): c is FactCell & { type: "media" } => c.type === "media"
+      );
+      if (mediaCells.length > 0 && token) {
+        for (const { entry } of mediaCells) {
           const formData = new FormData();
           formData.append("file", entry.file);
-          const res = await uploadMultipart("/api/media", formData, token) as UploadMediaRes;
+          const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
           const id = res?.data?.id != null ? String(res.data.id).trim() : "";
           if (!id) throw new Error("Upload response missing media id");
-          uploadedMarkers.push({ id, type: entry.type });
+          uploadedMarkers.push({
+            id,
+            type: entry.type,
+            fieldName: entry.fieldName || (entry.type === "audio" ? "audio" : "img"),
+          });
         }
       }
-      const facts = normalized.map((fields) => [...fields]);
-      if (uploadedMarkers.length > 0 && facts.length > 0) {
-        const mediaEntries = uploadedMarkers.map((m) => `[${m.type}:${m.id}]`);
-        for (const fact of facts) {
-          fact.splice(1, 0, ...mediaEntries);
-        }
+      let mi = 0;
+      const entries = row.map((c) =>
+        c.type === "text" ? c.value.trim() : `[${uploadedMarkers[mi].type}:${uploadedMarkers[mi++].id}]`
+      );
+      const fields = row.map((c) =>
+        c.type === "text" ? c.label : (c as FactCell & { type: "media" }).entry.fieldName
+      );
+      const facts = [entries];
+      const err = validateAddFactBody({ hasFactId: false, hasFacts: true });
+      if (err) {
+        setAddFactsError(err);
+        setAddingFacts(false);
+        return;
       }
       const body: AddFactReq = {
-        facts: facts.map((entries) => ({ entries })),
-        ...(buildTemplateForRequest(facts[0]?.length ?? 0, addFactSplit, sibling)),
+        facts: facts.map((entries) => {
+          const item: { entries: string[]; fields?: string[] } = { entries };
+          if (uploadedMarkers.length > 0) item.fields = fields;
+          return item;
+        }),        ...buildTemplateForRequest(row.length, addFactSplit, sibling),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
         token,
         body: JSON.stringify(body),
       });
-      setFactsRows(deck ? [deck.field.map(() => "")] : []);
+      setFactRow(makeInitialFactRow(deck));
       setAddFactSplit(1);
-      setMediaFiles([]);
-      setSuccessMessage(mediaFiles.length > 0 ? "Facts and media added." : "Facts added.");
+      setSuccessMessage(mediaCells.length > 0 ? "Facts and media added." : "Facts added.");
       await fetchDeck();
       await fetchFacts();
     } catch (e) {
@@ -482,8 +496,8 @@ export default function DeckPage() {
             />
             <AddFactsForm
               deck={deck}
-              factsRows={factsRows}
-              setFactsRows={setFactsRows}
+              factRow={factRow}
+              setFactRow={setFactRow}
               addFactOp={addFactOp}
               setAddFactOp={setAddFactOp}
               addFactSplit={addFactSplit}
@@ -493,8 +507,6 @@ export default function DeckPage() {
               addingFacts={addingFacts}
               addFactsError={addFactsError}
               onSubmit={handleAddFacts}
-              mediaFiles={mediaFiles}
-              setMediaFiles={setMediaFiles}
             />
             <FactsList
               deck={deck}
