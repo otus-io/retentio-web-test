@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, FactItem } from "@/lib/api";
 import type { FrontBackSegment, GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
+import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
@@ -256,11 +258,14 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, values: string[]) => Promise<void>;
-  onRequestFactForEdit?: (factId: string) => Promise<FactItem | null>;
+  /** When next card has precomputed front/back, fact is not loaded. Pass this to fetch fact by id when opening Duplicate or Edit. */
+  onRequestFact?: (factId: string) => Promise<FactItem | null>;
   authToken?: string | null;
   rescheduleSuggested?: boolean;
   suggestedRescheduleDays?: number;
   onReschedule?: (days: number) => void;
+  onAddCardSuccess?: () => void;
+  onDeleteCard?: (cardId: string) => Promise<void>;
 }
 
 const SLIDER_DEFAULT = 0.5;
@@ -277,12 +282,17 @@ export function CardSection({
   onUpdateCard,
   onHideCard,
   onSaveFact,
-  onRequestFactForEdit,
+  onRequestFact,
   authToken,
   rescheduleSuggested,
   suggestedRescheduleDays,
   onReschedule,
+  onAddCardSuccess,
+  onDeleteCard,
 }: CardSectionProps) {
+  const [addCardModalOpen, setAddCardModalOpen] = useState(false);
+  const [duplicateFact, setDuplicateFact] = useState<FactItem | null>(null);
+  const [deleteConfirmCardId, setDeleteConfirmCardId] = useState<string | null>(null);
   const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
@@ -325,11 +335,40 @@ export function CardSection({
     onUpdateCard(Math.round(intervalSec));
   };
 
-  const openEditPopup = (factId: string, fields: string[]) => {
-    setEditFactId(factId);
-    setEditFactValues([...fields]);
-    setEditError("");
-    setEditPopupOpen(true);
+  const openDuplicateModal = async () => {
+    if (!nextCard || !onAddCardSuccess) return;
+    if (nextCardFact) {
+      setDuplicateFact(nextCardFact);
+      setAddCardModalOpen(true);
+      return;
+    }
+    if (onRequestFact) {
+      const fact = await onRequestFact(nextCard.card.fact_id);
+      if (fact) {
+        setDuplicateFact(fact);
+        setAddCardModalOpen(true);
+      }
+    }
+  };
+
+  const openEditPopup = async () => {
+    if (!nextCard) return;
+    if (nextCardFact) {
+      setEditFactId(nextCardFact.id);
+      setEditFactValues([...nextCardFact.entries]);
+      setEditError("");
+      setEditPopupOpen(true);
+      return;
+    }
+    if (onRequestFact) {
+      const fact = await onRequestFact(nextCard.card.fact_id);
+      if (fact) {
+        setEditFactId(fact.id);
+        setEditFactValues([...fact.entries]);
+        setEditError("");
+        setEditPopupOpen(true);
+      }
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -386,24 +425,34 @@ export function CardSection({
           <div className="relative rounded-lg border p-4 space-y-3">
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
-                {onSaveFact && (
+                {nextCard && onSaveFact && (nextCardFact || onRequestFact) && (
                   <DropdownMenuItem
-                    onClick={async () => {
-                      if (nextCardFact) {
-                        openEditPopup(nextCardFact.id, nextCardFact.entries);
-                      } else if (onRequestFactForEdit && nextCard) {
-                        const fact = await onRequestFactForEdit(nextCard.card.fact_id);
-                        if (fact) openEditPopup(fact.id, fact.entries);
-                      }
-                    }}
+                    onClick={openEditPopup}
                     disabled={loadingNextCard}
                   >
-                    Edit fact
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {nextCard && onAddCardSuccess && (nextCardFact || onRequestFact) && (
+                  <DropdownMenuItem
+                    onClick={openDuplicateModal}
+                    disabled={loadingNextCard}
+                  >
+                    Duplicate
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => onHideCard(nextCard.card.id)} disabled={loadingNextCard}>
                   Hide card
                 </DropdownMenuItem>
+                {onDeleteCard && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setDeleteConfirmCardId(nextCard.card.id)}
+                    disabled={loadingNextCard}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                )}
               </DropdownMenu>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -415,7 +464,7 @@ export function CardSection({
               const useSegments = frontSegments && backSegments;
 
               const renderSegment = (seg: FrontBackSegment, key: number) => {
-                const label = seg.field ? <span className="text-xs text-muted-foreground block">{seg.field}</span> : null;
+                const label = null; // Field names hidden by default on card
                 let content: ReactNode = null;
                 if (seg.text != null) content = <FieldWithMedia text={seg.text} token={authToken ?? null} />;
                 else if (seg.audio != null && authToken)
@@ -480,9 +529,10 @@ export function CardSection({
                                     e.stopPropagation();
                                     setExamplesRevealed(true);
                                   }}
-                                  className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                                  className="mt-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                  aria-label="Show more"
                                 >
-                                  Click to show example sentences
+                                  <span aria-hidden>▼</span>
                                 </button>
                               )
                             )}
@@ -563,9 +613,10 @@ export function CardSection({
                                     e.stopPropagation();
                                     setExamplesRevealed(true);
                                   }}
-                                  className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                                  className="mt-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                  aria-label="Show more"
                                 >
-                                  Click to show example sentences
+                                  <span aria-hidden>▼</span>
                                 </button>
                               )}
                             </>
@@ -607,7 +658,7 @@ export function CardSection({
         )}
       </CardContent>
 
-      {editPopupOpen && deck && (
+      {editPopupOpen && deck && editFactId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="fixed inset-0 bg-black/50" onClick={() => setEditPopupOpen(false)} aria-hidden="true" />
           <div className="relative z-50 w-full max-w-md rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4">
@@ -618,7 +669,7 @@ export function CardSection({
                 {editFactValues.map((_, i) => (
                   <div key={i} className="space-y-1">
                     <Label htmlFor={`card-edit-field-${i}`}>
-                      {i < deck.field.length ? deck.field[i] : `Field ${i + 1}`}
+                      {i < (deck.field?.length ?? 0) ? deck.field![i] : `Field ${i + 1}`}
                     </Label>
                     <Input
                       id={`card-edit-field-${i}`}
@@ -645,6 +696,38 @@ export function CardSection({
           </div>
         </div>
       )}
+      {addCardModalOpen &&
+        deck &&
+        duplicateFact &&
+        authToken &&
+        onAddCardSuccess && (
+          <AddCardFromFactModal
+            open={addCardModalOpen}
+            onOpenChange={(open) => {
+              setAddCardModalOpen(open);
+              if (!open) setDuplicateFact(null);
+            }}
+            deck={deck}
+            fact={duplicateFact}
+            token={authToken}
+            onSuccess={onAddCardSuccess}
+          />
+        )}
+      <Dialog
+        open={deleteConfirmCardId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmCardId(null);
+        }}
+        title="Delete card?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          if (deleteConfirmCardId && onDeleteCard) onDeleteCard(deleteConfirmCardId);
+        }}
+      >
+        This will remove the card from the deck. The fact is kept.
+      </Dialog>
     </Card>
   );
 }

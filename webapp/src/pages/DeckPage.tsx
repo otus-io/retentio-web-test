@@ -70,6 +70,16 @@ export default function DeckPage() {
   const [loadingNextCard, setLoadingNextCard] = useState(false);
   const [cardError, setCardError] = useState("");
   const [cardSuccess, setCardSuccess] = useState("");
+  const [addFactsOpen, setAddFactsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!addFactsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAddFactsOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [addFactsOpen]);
 
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
@@ -158,17 +168,15 @@ export default function DeckPage() {
     }
   }, [token, id]);
 
-  const fetchFactForEdit = useCallback(
+  const fetchFactById = useCallback(
     async (factId: string): Promise<FactItem | null> => {
       if (!token || !id) return null;
       try {
-        const factRes = await request<{ data: { fact: FactItem } }>(
+        const res = await request<{ data: { fact: FactItem } }>(
           `/api/decks/${id}/facts/${factId}`,
           { token }
         );
-        const fact = factRes.data.fact;
-        setNextCardFact(fact);
-        return fact;
+        return res.data.fact;
       } catch {
         return null;
       }
@@ -293,7 +301,7 @@ export default function DeckPage() {
         c.type === "text" ? c.label : (c as FactCell & { type: "media" }).entry.fieldName
       );
       const facts = [entries];
-      const err = validateAddFactBody({ hasFactId: false, hasFacts: true });
+      const err = validateAddFactBody({ hasFacts: true });
       if (err) {
         setAddFactsError(err);
         setAddingFacts(false);
@@ -314,6 +322,7 @@ export default function DeckPage() {
       setFactRow(makeInitialFactRow(deck));
       setAddFactSplit(1);
       setSuccessMessage(mediaCells.length > 0 ? "Facts and media added." : "Facts added.");
+      setAddFactsOpen(false);
       await fetchDeck();
       await fetchFacts();
     } catch (e) {
@@ -420,6 +429,26 @@ export default function DeckPage() {
     }
   }
 
+  async function handleDeleteCard(cardId: string) {
+    if (!token || !id) return;
+    setCardError("");
+    try {
+      await request(`/api/decks/${id}/cards/${cardId}`, { method: "DELETE", token });
+      setCardSuccess("Card deleted.");
+      await fetchCards();
+      await handleGetNextCard(false);
+    } catch (e) {
+      setCardError(e instanceof Error ? e.message : "Delete failed");
+    }
+  }
+
+  async function handleAddCardSuccess() {
+    setCardSuccess("Card added.");
+    await fetchFacts();
+    await fetchCards();
+    await handleGetNextCard(false);
+  }
+
   async function handleReschedule(days: number) {
     if (!token || !id) return;
     setCardError("");
@@ -505,11 +534,13 @@ export default function DeckPage() {
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
               onSaveFact={handleSaveFactFromCard}
-              onRequestFactForEdit={fetchFactForEdit}
+              onRequestFact={fetchFactById}
               authToken={token}
               rescheduleSuggested={nextCardMeta?.reschedule_suggested}
               suggestedRescheduleDays={nextCardMeta?.suggested_reschedule_days}
               onReschedule={handleReschedule}
+              onAddCardSuccess={handleAddCardSuccess}
+              onDeleteCard={handleDeleteCard}
             />
             <DeckInfoCard
               deck={deck}
@@ -522,20 +553,40 @@ export default function DeckPage() {
               onDeleteCancel={() => setDeleteConfirm(false)}
               onDelete={handleDelete}
             />
-            <AddFactsForm
-              deck={deck}
-              factRow={factRow}
-              setFactRow={setFactRow}
-              addFactOp={addFactOp}
-              setAddFactOp={setAddFactOp}
-              addFactSplit={addFactSplit}
-              setAddFactSplit={setAddFactSplit}
-              sibling={sibling}
-              setSibling={setSibling}
-              addingFacts={addingFacts}
-              addFactsError={addFactsError}
-              onSubmit={handleAddFacts}
-            />
+            {addFactsOpen && deck && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-facts-modal-title"
+              >
+                <div
+                  className="fixed inset-0 bg-black/50"
+                  onClick={() => setAddFactsOpen(false)}
+                  aria-hidden="true"
+                />
+                <div className="relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg">
+                  <h2 id="add-facts-modal-title" className="text-lg font-semibold mb-4">
+                    Add facts
+                  </h2>
+                  <AddFactsForm
+                    deck={deck}
+                    factRow={factRow}
+                    setFactRow={setFactRow}
+                    addFactOp={addFactOp}
+                    setAddFactOp={setAddFactOp}
+                    addFactSplit={addFactSplit}
+                    setAddFactSplit={setAddFactSplit}
+                    sibling={sibling}
+                    setSibling={setSibling}
+                    addingFacts={addingFacts}
+                    addFactsError={addFactsError}
+                    onSubmit={handleAddFacts}
+                    onCancel={() => setAddFactsOpen(false)}
+                  />
+                </div>
+              </div>
+            )}
             <FactsList
               deck={deck}
               factsList={factsList}
@@ -555,6 +606,7 @@ export default function DeckPage() {
               onDeleteFact={handleDeleteFact}
               deleteFactId={deleteFactId}
               setDeleteFactId={setDeleteFactId}
+              onOpenAddFacts={() => setAddFactsOpen(true)}
             />
           </div>
         )}

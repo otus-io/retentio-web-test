@@ -145,8 +145,8 @@ export interface AddFactItemReq {
 }
 
 /**
- * Add-fact API accepts exactly one of these body shapes:
- * (1) facts only, (2) facts + template, (3) fact_id + template.
+ * Add-fact API (POST /api/decks/{id}/facts/{operation}): body is facts and optional template.
+ * To add a card from an existing fact, use POST /api/decks/{id}/card with AddCardForFactReq.
  */
 export interface AddFactReq {
   facts: AddFactItemReq[];
@@ -154,14 +154,15 @@ export interface AddFactReq {
   template?: number[][][];
 }
 
-/** Validates add-fact body shape. Returns error message or null if valid. */
-export function validateAddFactBody(p: { hasFactId: boolean; hasFacts: boolean }): string | null {
-  if (p.hasFactId && p.hasFacts) {
-    return "Invalid request: use exactly one of (1) facts only, (2) facts + template, (3) fact_id + template — not both fact_id and facts.";
-  }
-  if (!p.hasFactId && !p.hasFacts) {
-    return "Invalid request: use one of (1) facts only, (2) facts + template, (3) fact_id + template.";
-  }
+/** Body for POST /api/decks/{id}/card (add one card from an existing fact). fact_id and template required; optional operation (default append). */
+export interface AddCardForFactReq {
+  fact_id: string;
+  template: number[][];
+}
+
+/** Validates add-fact body: facts array is required. Returns error message or null if valid. */
+export function validateAddFactBody(p: { hasFacts: boolean }): string | null {
+  if (!p.hasFacts) return "Facts array is required.";
   return null;
 }
 
