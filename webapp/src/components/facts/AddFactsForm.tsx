@@ -15,7 +15,7 @@ export type FactCell =
 
 export function makeInitialFactRow(deck: DeckItem): FactCell[] {
   const fields = deck.field ?? [];
-  if (fields.length === 0) return [{ type: "text", value: "", label: "Field 1" }];
+  if (fields.length === 0) return [{ type: "text", value: "", label: "" }];
   return fields.map((label) => ({ type: "text" as const, value: "", label }));
 }
 
@@ -44,6 +44,8 @@ interface AddFactsFormProps {
   addingFacts: boolean;
   addFactsError: string;
   onSubmit: (e: React.FormEvent) => void;
+  /** When set, form is in modal: no Card wrapper, and a Cancel button is shown that calls this. */
+  onCancel?: () => void;
 }
 
 export function AddFactsForm({
@@ -59,6 +61,7 @@ export function AddFactsForm({
   addingFacts,
   addFactsError,
   onSubmit,
+  onCancel,
 }: AddFactsFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,7 +85,7 @@ export function AddFactsForm({
   };
   const addField = () => {
     const textCount = row.filter((c): c is FactCell & { type: "text" } => c.type === "text").length;
-    const label = (deck.field ?? [])[textCount] ?? `Field ${textCount + 1}`;
+    const label = (deck.field ?? [])[textCount] ?? "";
     setFactRow([...row, { type: "text", value: "", label }]);
     setAddFactSplit((prev) => Math.min(prev, row.length + 1));
   };
@@ -123,26 +126,8 @@ export function AddFactsForm({
     if (toAdd.length) setFactRow([...row, ...toAdd.map((entry) => ({ type: "media" as const, entry }))]);
   }
 
-  function setMediaFieldName(cellIndex: number, value: string) {
-    setFactRow(
-      row.map((c, i) =>
-        i === cellIndex && c.type === "media"
-          ? { ...c, entry: { ...c.entry, fieldName: value } }
-          : c
-      )
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle>Add facts</CardTitle>
-        <p className="text-sm font-normal text-muted-foreground">
-          Enter one fact. Add fields and media; drag the cut line to set front vs back.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
+  const formContent = (
+    <form onSubmit={onSubmit} className="space-y-4">
           {addFactsError && <p className="text-sm text-destructive">{addFactsError}</p>}
           <div className="space-y-2">
             {/* Front section: fields + Front label */}
@@ -226,13 +211,19 @@ export function AddFactsForm({
                                 {cell.entry.type === "image" ? "Image" : "Audio"}
                               </span>
                               <Input
-                                type="text"
+                                aria-label="Field name"
                                 value={cell.entry.fieldName}
-                                onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
-                                placeholder={cell.entry.type === "image" ? "img" : "audio"}
-                                className="h-9 w-24 text-xs flex-1 min-w-0"
+                                onChange={(e) =>
+                                  setFactRow(
+                                    row.map((c, i) =>
+                                      i === colIndex && c.type === "media"
+                                        ? { ...c, entry: { ...c.entry, fieldName: e.target.value } }
+                                        : c
+                                    )
+                                  )
+                                }
                                 disabled={addingFacts}
-                                onClick={(e) => e.stopPropagation()}
+                                className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none"
                               />
                               <span className="max-w-[100px] truncate text-muted-foreground text-xs shrink-0">
                                 {cell.entry.file.name}
@@ -298,11 +289,19 @@ export function AddFactsForm({
                             {cell.entry.type === "image" ? "Image" : "Audio"}
                           </span>
                           <Input
-                            type="text"
+                            aria-label="Field name"
                             value={cell.entry.fieldName}
-                            onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
-                            className="h-9 w-24 text-xs"
+                            onChange={(e) =>
+                              setFactRow(
+                                row.map((c, i) =>
+                                  i === colIndex && c.type === "media"
+                                    ? { ...c, entry: { ...c.entry, fieldName: e.target.value } }
+                                    : c
+                                )
+                              )
+                            }
                             disabled={addingFacts}
+                            className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none"
                           />
                           <span className="truncate text-muted-foreground text-xs">{cell.entry.file.name}</span>
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeCell(colIndex)} aria-label="Remove">×</Button>
@@ -414,13 +413,19 @@ export function AddFactsForm({
                                 {cell.entry.type === "image" ? "Image" : "Audio"}
                               </span>
                               <Input
-                                type="text"
+                                aria-label="Field name"
                                 value={cell.entry.fieldName}
-                                onChange={(e) => setMediaFieldName(colIndex, e.target.value)}
-                                placeholder={cell.entry.type === "image" ? "img" : "audio"}
-                                className="h-9 w-24 text-xs flex-1 min-w-0"
+                                onChange={(e) =>
+                                  setFactRow(
+                                    row.map((c, i) =>
+                                      i === colIndex && c.type === "media"
+                                        ? { ...c, entry: { ...c.entry, fieldName: e.target.value } }
+                                        : c
+                                    )
+                                  )
+                                }
                                 disabled={addingFacts}
-                                onClick={(e) => e.stopPropagation()}
+                                className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none"
                               />
                               <span className="max-w-[100px] truncate text-muted-foreground text-xs shrink-0">
                                 {cell.entry.file.name}
@@ -529,6 +534,11 @@ export function AddFactsForm({
                   ? JSON.stringify([buildTemplateWithSplit(row.length, split)])
                   : "default (0 front, rest back)"}
             </p>
+            {onCancel && (
+              <Button type="button" variant="outline" onClick={onCancel} disabled={addingFacts}>
+                Cancel
+              </Button>
+            )}
             <Button
               type="submit"
               disabled={
@@ -539,8 +549,28 @@ export function AddFactsForm({
               {addingFacts ? "Adding…" : "Add facts"}
             </Button>
           </div>
-        </form>
-      </CardContent>
+    </form>
+  );
+
+  if (onCancel) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Enter one fact. Add fields and media; drag the cut line to set front vs back.
+        </p>
+        {formContent}
+      </div>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader className="text-center">
+        <CardTitle>Add facts</CardTitle>
+        <p className="text-sm font-normal text-muted-foreground">
+          Enter one fact. Add fields and media; drag the cut line to set front vs back.
+        </p>
+      </CardHeader>
+      <CardContent>{formContent}</CardContent>
     </Card>
   );
 }

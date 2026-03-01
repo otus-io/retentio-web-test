@@ -10,14 +10,10 @@ import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 5;
 
-function getFieldLabel(deck: DeckItem, entryIndex: number, entriesLength: number): string {
+function getFieldLabel(deck: DeckItem, entryIndex: number): string {
   const fieldNames = deck.field ?? [];
   if (entryIndex < fieldNames.length) return fieldNames[entryIndex];
-  const extra = entriesLength - fieldNames.length;
-  if (extra === 2 && entryIndex === fieldNames.length) return "Audio";
-  if (extra === 2 && entryIndex === fieldNames.length + 1) return "Image";
-  if (extra === 1 && entryIndex === fieldNames.length) return "Audio";
-  return `Field ${entryIndex + 1}`;
+  return "";
 }
 
 interface FactsListProps {
@@ -39,6 +35,8 @@ interface FactsListProps {
   onDeleteFact: (factId: string) => void;
   deleteFactId: string | null;
   setDeleteFactId: (id: string | null) => void;
+  /** Opens the Add facts form (e.g. in a modal). When provided, header shows a dropdown with "Add facts". */
+  onOpenAddFacts?: () => void;
 }
 
 export function FactsList({
@@ -60,6 +58,7 @@ export function FactsList({
   onDeleteFact,
   deleteFactId,
   setDeleteFactId,
+  onOpenAddFacts,
 }: FactsListProps) {
   const [page, setPage] = useState(1);
   const pageSize = DEFAULT_PAGE_SIZE;
@@ -77,11 +76,24 @@ export function FactsList({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>Facts</CardTitle>
-        {!loadingFacts && total > 0 && (
-          <span className="text-sm text-muted-foreground">
-            {total} fact{total !== 1 ? "s" : ""}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {!loadingFacts && total > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {total} fact{total !== 1 ? "s" : ""}
+            </span>
+          )}
+          {onOpenAddFacts && (
+            <DropdownMenu
+              trigger="⋮"
+              align="end"
+              className="shrink-0"
+            >
+              <DropdownMenuItem onClick={onOpenAddFacts}>
+                Add facts
+              </DropdownMenuItem>
+            </DropdownMenu>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {factError && <p className="text-sm text-destructive">{factError}</p>}
@@ -89,7 +101,7 @@ export function FactsList({
         {loadingFacts ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : factsList.length === 0 ? (
-          <p className="text-muted-foreground">No facts yet. Add some above.</p>
+          <p className="text-muted-foreground">No facts yet. Use the menu above to add facts.</p>
         ) : (
           <>
             <ul className="divide-y rounded-md border">
@@ -100,7 +112,7 @@ export function FactsList({
                     {editingFactValues.map((_, i) => (
                       <div key={i} className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">
-                          {getFieldLabel(deck, i, editingFactValues.length)}
+                          {getFieldLabel(deck, i)}
                         </Label>
                         <Input
                           value={editingFactValues[i] ?? ""}
