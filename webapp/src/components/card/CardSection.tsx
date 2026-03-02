@@ -110,7 +110,7 @@ function MediaBlock({
   id,
   token,
 }: {
-  kind: "image" | "audio";
+  kind: "image" | "audio" | "video";
   id: string;
   token: string;
 }) {
@@ -147,6 +147,13 @@ function MediaBlock({
   if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
   if (kind === "image") {
     return <img src={blobUrl} alt="" className="max-h-32 max-w-full rounded object-contain" />;
+  }
+  if (kind === "video") {
+    return (
+      <video src={blobUrl} controls className="max-h-32 max-w-full rounded" preload="metadata">
+        Your browser does not support video.
+      </video>
+    );
   }
   return (
     <AudioPlayButton src={blobUrl} />
@@ -466,11 +473,22 @@ export function CardSection({
               const renderSegment = (seg: FrontBackSegment, key: number) => {
                 const label = null; // Field names hidden by default on card
                 let content: ReactNode = null;
-                if (seg.text != null) content = <FieldWithMedia text={seg.text} token={authToken ?? null} />;
-                else if (seg.audio != null && authToken)
-                  content = <MediaBlock kind="audio" id={seg.audio} token={authToken} />;
-                else if (seg.image != null && authToken)
-                  content = <MediaBlock kind="image" id={seg.image} token={authToken} />;
+                switch (seg.type) {
+                  case "text":
+                    content = <FieldWithMedia text={seg.value} token={authToken ?? null} />;
+                    break;
+                  case "audio":
+                    if (authToken) content = <MediaBlock kind="audio" id={seg.value} token={authToken} />;
+                    break;
+                  case "image":
+                    if (authToken) content = <MediaBlock kind="image" id={seg.value} token={authToken} />;
+                    break;
+                  case "video":
+                    if (authToken) content = <MediaBlock kind="video" id={seg.value} token={authToken} />;
+                    break;
+                  default:
+                    content = <span className="text-muted-foreground">{seg.value || "—"}</span>;
+                }
                 return (
                   <span key={key} className="inline-flex flex-col items-center gap-0.5">
                     {label}

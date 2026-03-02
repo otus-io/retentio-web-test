@@ -237,12 +237,11 @@ export interface DeleteFactRes {
   meta: { msg: string };
 }
 
-// Segment: at most one of text, audio, image; optional field (design: next-card front/back)
+// Segment: field (label or ""), type (text|audio|image|video), value (content or media id). Next-card front/back.
 export interface FrontBackSegment {
-  field?: string;
-  text?: string;
-  audio?: string;
-  image?: string;
+  field: string;
+  type: string;
+  value: string;
 }
 
 // Cards: template = [[front indices], [back indices]]; front/back are precomputed when present
