@@ -207,7 +207,7 @@ describe("uploadMultipart", () => {
 });
 
 describe("GetNextCard response shape (front/back segments)", () => {
-  it("accepts response with front and back segment arrays", () => {
+  it("accepts response with front and back segment arrays (field, type, value)", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -218,8 +218,8 @@ describe("GetNextCard response shape (front/back segments)", () => {
           due_date: 1704153600,
           hidden: false,
           created_at: 1704067200,
-          front: [{ field: "Word", text: "Apple" }],
-          back: [{ field: "Translation", text: "苹果" }],
+          front: [{ field: "Word", type: "text", value: "Apple" }],
+          back: [{ field: "Translation", type: "text", value: "苹果" }],
         },
         urgency: 2.598,
       },
@@ -227,8 +227,9 @@ describe("GetNextCard response shape (front/back segments)", () => {
     };
     expect(res.data.card.front).toHaveLength(1);
     expect(res.data.card.back).toHaveLength(1);
-    expect((res.data.card.front as FrontBackSegment[])[0].text).toBe("Apple");
-    expect((res.data.card.back as FrontBackSegment[])[0].text).toBe("苹果");
+    expect((res.data.card.front as FrontBackSegment[])[0].type).toBe("text");
+    expect((res.data.card.front as FrontBackSegment[])[0].value).toBe("Apple");
+    expect((res.data.card.back as FrontBackSegment[])[0].value).toBe("苹果");
   });
 
   it("accepts front-only response with empty back array", () => {
@@ -242,7 +243,7 @@ describe("GetNextCard response shape (front/back segments)", () => {
           due_date: 1704153600,
           hidden: false,
           created_at: 1704067200,
-          front: [{ field: "Question", text: "Only front" }],
+          front: [{ field: "Question", type: "text", value: "Only front" }],
           back: [],
         },
         urgency: 1.0,
@@ -253,7 +254,7 @@ describe("GetNextCard response shape (front/back segments)", () => {
     expect(res.data.card.back).toHaveLength(0);
   });
 
-  it("accepts segments with audio and image", () => {
+  it("accepts segments with audio, image, and video", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -265,16 +266,42 @@ describe("GetNextCard response shape (front/back segments)", () => {
           hidden: false,
           created_at: 1704067200,
           front: [
-            { field: "Front", text: "Word" },
-            { field: "Pronunciation", audio: "abc123" },
+            { field: "Front", type: "text", value: "Word" },
+            { field: "Pronunciation", type: "audio", value: "abc123" },
           ],
-          back: [{ field: "Picture", image: "img456" }],
+          back: [{ field: "Picture", type: "image", value: "img456" }],
         },
         urgency: 1.2,
       },
       meta: {},
     };
-    expect((res.data.card.front as FrontBackSegment[])[1].audio).toBe("abc123");
-    expect((res.data.card.back as FrontBackSegment[])[0].image).toBe("img456");
+    expect((res.data.card.front as FrontBackSegment[])[1].type).toBe("audio");
+    expect((res.data.card.front as FrontBackSegment[])[1].value).toBe("abc123");
+    expect((res.data.card.back as FrontBackSegment[])[0].type).toBe("image");
+    expect((res.data.card.back as FrontBackSegment[])[0].value).toBe("img456");
+  });
+
+  it("accepts segments with empty field", () => {
+    const res: GetNextCardRes = {
+      data: {
+        card: {
+          id: "c1",
+          fact_id: "f1",
+          template: [[0], [1]],
+          last_review: 0,
+          due_date: 0,
+          hidden: false,
+          created_at: 0,
+          front: [{ field: "", type: "text", value: "No label" }],
+          back: [{ field: "", type: "image", value: "img1" }],
+        },
+        urgency: 0,
+      },
+      meta: {},
+    };
+    expect((res.data.card.front as FrontBackSegment[])[0].field).toBe("");
+    expect((res.data.card.front as FrontBackSegment[])[0].value).toBe("No label");
+    expect((res.data.card.back as FrontBackSegment[])[0].field).toBe("");
+    expect((res.data.card.back as FrontBackSegment[])[0].type).toBe("image");
   });
 });
