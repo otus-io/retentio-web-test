@@ -237,14 +237,14 @@ export interface DeleteFactRes {
   meta: { msg: string };
 }
 
-// Segment: field (label or ""), type (text|audio|image|video), value (content or media id). Next-card front/back.
+// Segment: field (label or ""), type (text|audio|image|video), value (text content, media id, or full media URL). Next-card front/back.
 export interface FrontBackSegment {
   field: string;
   type: string;
   value: string;
 }
 
-// Cards: template = [[front indices], [back indices]]; front/back are precomputed when present
+// Cards: template = [[front indices], [back indices]]; front/back are always present (back may be []).
 export interface NextCardItem {
   id: string;
   fact_id: string;
@@ -253,8 +253,8 @@ export interface NextCardItem {
   due_date: number;
   hidden: boolean;
   created_at: number;
-  front?: FrontBackSegment[];
-  back?: FrontBackSegment[];
+  front: FrontBackSegment[];
+  back: FrontBackSegment[];
 }
 
 export interface GetNextCardRes {
