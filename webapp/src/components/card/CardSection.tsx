@@ -117,10 +117,10 @@ function MediaBlock({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const baseUrl = getApiBaseUrl();
-  const fetchUrl =
-    id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
 
   useEffect(() => {
+    const fetchUrl =
+      id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
     let revoked = false;
     let createdUrl: string | null = null;
     fetch(fetchUrl, {
@@ -143,7 +143,7 @@ function MediaBlock({
       revoked = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [fetchUrl, token, baseUrl]);
+  }, [id, token, baseUrl]);
 
   if (error) return <span className="text-muted-foreground text-sm">[media unavailable]</span>;
   if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
