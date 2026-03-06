@@ -143,7 +143,7 @@ function MediaBlock({
       revoked = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [fetchUrl, token]);
+  }, [fetchUrl, token, baseUrl]);
 
   if (error) return <span className="text-muted-foreground text-sm">[media unavailable]</span>;
   if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
