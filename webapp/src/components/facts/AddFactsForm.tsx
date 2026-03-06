@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
-import { buildSiblingTemplate, buildTemplateWithSplit } from "@/lib/api";
+import { buildSiblingTemplate, buildTemplateWithSplit, debugLog } from "@/lib/api";
 
 export type FactMediaEntry = { file: File; type: "image" | "audio"; fieldName: string };
 
@@ -111,7 +111,20 @@ export function AddFactsForm({
     return c.type === "text" ? c.label : c.entry.fieldName;
   };
 
+  const addMediaDisabled = addingFacts || row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length >= 2;
+
   function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    // #region agent log
+    console.log("[debug] AddFactsForm: handleMediaSelect start (H2), files:", (e.target.files ?? []).length);
+    debugLog({
+      sessionId: "ff1dd3",
+      location: "AddFactsForm:handleMediaSelect:start",
+      message: "file input change",
+      data: { filesCount: (e.target.files ?? []).length },
+      hypothesisId: "H2",
+      timestamp: Date.now(),
+    });
+    // #endregion
     const chosen = Array.from(e.target.files ?? []);
     e.target.value = "";
     const mediaCount = row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length;
@@ -124,6 +137,17 @@ export function AddFactsForm({
       fieldName: getMediaFieldNameSuffix(getMediaType(file)),
     }));
     if (toAdd.length) setFactRow([...row, ...toAdd.map((entry) => ({ type: "media" as const, entry }))]);
+    // #region agent log
+    console.log("[debug] AddFactsForm: after setFactRow (H3), toAddLen:", toAdd.length);
+    debugLog({
+      sessionId: "ff1dd3",
+      location: "AddFactsForm:handleMediaSelect:afterSetRow",
+      message: "after setFactRow",
+      data: { toAddLen: toAdd.length },
+      hypothesisId: "H3",
+      timestamp: Date.now(),
+    });
+    // #endregion
   }
 
   const formContent = (
@@ -483,22 +507,25 @@ export function AddFactsForm({
             </Button>
             <input
               ref={fileInputRef}
+              id="add-facts-media-input"
               type="file"
               accept="image/*,audio/*"
               multiple
               onChange={handleMediaSelect}
+              disabled={addMediaDisabled}
               className="hidden"
               aria-hidden
+              tabIndex={-1}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={addingFacts || row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length >= 2}
-              onClick={() => fileInputRef.current?.click()}
+            <label
+              htmlFor="add-facts-media-input"
+              role="button"
+              onClick={(e) => addMediaDisabled && e.preventDefault()}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&:has(input:disabled)]:pointer-events-none [&:has(input:disabled)]:opacity-50"
+              style={addMediaDisabled ? { pointerEvents: "none", opacity: 0.5 } : undefined}
             >
               Add media
-            </Button>
+            </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor="op" className="sr-only">Operation</Label>
