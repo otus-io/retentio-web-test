@@ -4,6 +4,15 @@ export function getApiBaseUrl(): string {
   return baseUrl;
 }
 
+/** Send a debug log line to the backend; backend appends to logs/debug.log at repo root (see .cursor/rules/debug-logging.mdc). */
+export function debugLog(payload: Record<string, unknown>): void {
+  fetch(`${baseUrl}/api/dev/debug-log`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
 export interface ApiError {
   msg?: string;
 }
@@ -28,18 +37,36 @@ export async function request<T>(
   return JSON.parse(text) as T;
 }
 
+const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — backend may run ffmpeg/cwebp
+
+/** Optional client_id enables idempotent uploads (backend returns existing media if already uploaded). */
 export async function uploadMultipart(
   path: string,
   formData: FormData,
-  token?: string | null
+  token?: string | null,
+  clientId?: string | null
 ): Promise<unknown> {
+  if (clientId) formData.append("client_id", clientId);
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), UPLOAD_TIMEOUT_MS);
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${baseUrl}${path}`, {
-    method: "POST",
-    body: formData,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      body: formData,
+      headers,
+      signal: ac.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Upload timed out. Try a smaller file or try again.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -237,14 +264,14 @@ export interface DeleteFactRes {
   meta: { msg: string };
 }
 
-// Segment: field (label or ""), type (text|audio|image|video), value (content or media id). Next-card front/back.
+// Segment: field (label or ""), type (text|audio|image|video), value (text content, media id, or full media URL). Next-card front/back.
 export interface FrontBackSegment {
   field: string;
   type: string;
   value: string;
 }
 
-// Cards: template = [[front indices], [back indices]]; front/back are precomputed when present
+// Cards: template = [[front indices], [back indices]]; front/back are always present (back may be []).
 export interface NextCardItem {
   id: string;
   fact_id: string;
@@ -253,8 +280,8 @@ export interface NextCardItem {
   due_date: number;
   hidden: boolean;
   created_at: number;
-  front?: FrontBackSegment[];
-  back?: FrontBackSegment[];
+  front: FrontBackSegment[];
+  back: FrontBackSegment[];
 }
 
 export interface GetNextCardRes {

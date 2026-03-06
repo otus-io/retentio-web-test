@@ -11,6 +11,15 @@ import { getApiBaseUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
+/** Backend may return value as media id or full URL (/api/media/{id}); normalize to id for MediaBlock. */
+function getMediaIdFromValue(value: string): string {
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    const m = value.match(/\/api\/media\/([^/?#]+)/);
+    return m ? m[1] : value;
+  }
+  return value;
+}
+
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
   maxIntervalSec: number;
@@ -478,13 +487,13 @@ export function CardSection({
                     content = <FieldWithMedia text={seg.value} token={authToken ?? null} />;
                     break;
                   case "audio":
-                    if (authToken) content = <MediaBlock kind="audio" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="audio" id={getMediaIdFromValue(seg.value)} token={authToken} />;
                     break;
                   case "image":
-                    if (authToken) content = <MediaBlock kind="image" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="image" id={getMediaIdFromValue(seg.value)} token={authToken} />;
                     break;
                   case "video":
-                    if (authToken) content = <MediaBlock kind="video" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="video" id={getMediaIdFromValue(seg.value)} token={authToken} />;
                     break;
                   default:
                     content = <span className="text-muted-foreground">{seg.value || "—"}</span>;

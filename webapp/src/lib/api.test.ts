@@ -304,4 +304,30 @@ describe("GetNextCard response shape (front/back segments)", () => {
     expect((res.data.card.back as FrontBackSegment[])[0].field).toBe("");
     expect((res.data.card.back as FrontBackSegment[])[0].type).toBe("image");
   });
+
+  it("accepts segment value as full media URL (backend returns URL when Host is set)", () => {
+    const res: GetNextCardRes = {
+      data: {
+        card: {
+          id: "c1",
+          fact_id: "f1",
+          template: [[0, 1], [2]],
+          last_review: 1704067200,
+          due_date: 1704153600,
+          hidden: false,
+          created_at: 1704067200,
+          front: [
+            { field: "Word", type: "text", value: "Apple" },
+            { field: "", type: "image", value: "https://api.example.com/api/media/im1" },
+          ],
+          back: [{ field: "Audio", type: "audio", value: "https://api.example.com/api/media/au1" }],
+        },
+        urgency: 1.0,
+      },
+      meta: {},
+    };
+    expect(res.data.card.front[1].type).toBe("image");
+    expect(res.data.card.front[1].value).toContain("/api/media/im1");
+    expect(res.data.card.back[0].value).toContain("/api/media/au1");
+  });
 });

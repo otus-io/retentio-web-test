@@ -184,7 +184,7 @@ describe("AddFactsForm", () => {
       { type: "media", entry: { file: file2, type: "image", fieldName: "img" } },
     ];
     renderForm({ factRow: row });
-    expect(screen.getByRole("button", { name: /add media/i })).toBeDisabled();
+    expect(screen.getByLabelText(/add media/i)).toBeDisabled();
   });
 
   it("renders attached media with type label and name in the row", () => {
