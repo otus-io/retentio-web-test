@@ -11,15 +11,6 @@ import { getApiBaseUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 
-/** Backend may return value as media id or full URL (/api/media/{id}); normalize to id for MediaBlock. */
-function getMediaIdFromValue(value: string): string {
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    const m = value.match(/\/api\/media\/([^/?#]+)/);
-    return m ? m[1] : value;
-  }
-  return value;
-}
-
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
   maxIntervalSec: number;
@@ -126,11 +117,13 @@ function MediaBlock({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const baseUrl = getApiBaseUrl();
+  const fetchUrl =
+    id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
 
   useEffect(() => {
     let revoked = false;
     let createdUrl: string | null = null;
-    fetch(`${baseUrl}/api/media/${id}`, {
+    fetch(fetchUrl, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("Failed to load"))))
@@ -150,7 +143,7 @@ function MediaBlock({
       revoked = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [id, token, baseUrl]);
+  }, [fetchUrl, token]);
 
   if (error) return <span className="text-muted-foreground text-sm">[media unavailable]</span>;
   if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
@@ -487,13 +480,13 @@ export function CardSection({
                     content = <FieldWithMedia text={seg.value} token={authToken ?? null} />;
                     break;
                   case "audio":
-                    if (authToken) content = <MediaBlock kind="audio" id={getMediaIdFromValue(seg.value)} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="audio" id={seg.value} token={authToken} />;
                     break;
                   case "image":
-                    if (authToken) content = <MediaBlock kind="image" id={getMediaIdFromValue(seg.value)} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="image" id={seg.value} token={authToken} />;
                     break;
                   case "video":
-                    if (authToken) content = <MediaBlock kind="video" id={getMediaIdFromValue(seg.value)} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="video" id={seg.value} token={authToken} />;
                     break;
                   default:
                     content = <span className="text-muted-foreground">{seg.value || "—"}</span>;
