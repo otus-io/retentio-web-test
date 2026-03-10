@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# Setup script to install git hooks for WordUpX
+# Setup script to install git hooks for retentio-webapp
 # Run this once after cloning the repo: ./utils/scripts/setup-hooks.sh
 # =============================================================================
 

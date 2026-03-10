@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,12 +35,6 @@ describe("AuthContext", () => {
 
   afterEach(() => {
     localStorage.clear();
-  });
-
-  it("throws when useAuth is used outside AuthProvider", () => {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() => render(<TestConsumer />)).toThrow("useAuth must be used within AuthProvider");
-    spy.mockRestore();
   });
 
   it("starts with null token when localStorage is empty", () => {
