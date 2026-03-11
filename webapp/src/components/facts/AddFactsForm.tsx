@@ -21,6 +21,7 @@ export function makeInitialFactRow(deck: DeckItem): FactCell[] {
 
 const DRAG_TYPE_FIELD = "text/plain";
 const DRAG_TYPE_SPLIT = "application/x-wordupx-split";
+const MAX_MEDIA_FILES = 10;
 
 function getMediaType(file: File): "image" | "audio" {
   return file.type.startsWith("image/") ? "image" : "audio";
@@ -111,7 +112,7 @@ export function AddFactsForm({
     return c.type === "text" ? c.label : c.entry.fieldName;
   };
 
-  const addMediaDisabled = addingFacts || row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length >= 2;
+  const addMediaDisabled = addingFacts || row.filter((c): c is FactCell & { type: "media" } => c.type === "media").length >= MAX_MEDIA_FILES;
 
   function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>) {
     // #region agent log
@@ -131,7 +132,7 @@ export function AddFactsForm({
     const valid = chosen.filter(
       (f) => f.type.startsWith("image/") || f.type.startsWith("audio/")
     );
-    const toAdd = valid.slice(0, Math.max(0, 2 - mediaCount)).map((file) => ({
+    const toAdd = valid.slice(0, Math.max(0, MAX_MEDIA_FILES - mediaCount)).map((file) => ({
       file,
       type: getMediaType(file),
       fieldName: getMediaFieldNameSuffix(getMediaType(file)),
