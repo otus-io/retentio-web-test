@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# Pre-commit hook for retentio-webapp
-# Runs format/lint checks for changed files. Only runs checks relevant to staged files.
+# Run all pre-commit checks (same as pre-commit hook, but runs on full repo).
+# Usage: ./utils/run-test.sh
 # =============================================================================
 
 set -e
@@ -12,22 +12,19 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo "🔍 Running pre-commit checks..."
+echo "🔍 Running pre-commit checks (full repo)..."
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
-
-WEBAPP_CHANGED=$(git diff --cached --name-only -- 'webapp/' | grep -v '/node_modules/' | head -1)
-YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM -- '*.yml' '*.yaml' 2>/dev/null | grep -v '/node_modules/' || true)
-MD_FILES=$(git diff --cached --name-only --diff-filter=ACM -- '*.md' '*.mdc' 2>/dev/null | grep -v '/node_modules/' | grep -v '\.cursor/' || true)
 
 FAILED=0
 
 # =============================================================================
-# YAML lint (only if .yml/.yaml files changed)
+# YAML lint (all .yml/.yaml in repo)
 # =============================================================================
+YAML_FILES=$(find . -maxdepth 3 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -path './.git/*' 2>/dev/null || true)
 if [ -n "$YAML_FILES" ]; then
     echo -e "${YELLOW}━━━ YAML Checks ━━━${NC}"
     echo "📋 Linting YAML files..."
@@ -53,8 +50,9 @@ if [ -n "$YAML_FILES" ]; then
 fi
 
 # =============================================================================
-# Markdown lint (only if .md/.mdc files changed)
+# Markdown lint (all .md/.mdc in repo)
 # =============================================================================
+MD_FILES=$(find . -maxdepth 4 -type f \( -name '*.md' -o -name '*.mdc' \) ! -path './.git/*' ! -path '*node_modules*' ! -path './.cursor/*' 2>/dev/null || true)
 if [ -n "$MD_FILES" ]; then
     echo -e "${YELLOW}━━━ Markdown Checks ━━━${NC}"
     echo "📋 Linting Markdown files..."
@@ -79,9 +77,9 @@ if [ -n "$MD_FILES" ]; then
 fi
 
 # =============================================================================
-# Webapp checks (only if webapp/ files changed)
+# Webapp build
 # =============================================================================
-if [ -n "$WEBAPP_CHANGED" ]; then
+if [ -d "webapp" ]; then
     echo -e "${YELLOW}━━━ Webapp Checks ━━━${NC}"
     echo "🔨 Checking webapp build..."
     if (cd webapp && npm run build); then
@@ -96,17 +94,12 @@ fi
 # =============================================================================
 # Final result
 # =============================================================================
-if [ -z "$WEBAPP_CHANGED" ] && [ -z "$YAML_FILES" ] && [ -z "$MD_FILES" ]; then
-    echo -e "${GREEN}No webapp, YAML, or Markdown changes — skipping checks.${NC}"
-fi
-
 if [ $FAILED -ne 0 ]; then
     echo ""
-    echo -e "${RED}━━━ Pre-commit checks FAILED ━━━${NC}"
-    echo -e "${RED}Fix the issues above before committing.${NC}"
-    echo -e "Tip: Use ${YELLOW}git commit --no-verify${NC} to skip (not recommended)."
+    echo -e "${RED}━━━ Checks FAILED ━━━${NC}"
+    echo -e "${RED}Fix the issues above.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}━━━ All pre-commit checks passed ✓ ━━━${NC}"
+echo -e "${GREEN}━━━ All checks passed ✓ ━━━${NC}"
 exit 0
