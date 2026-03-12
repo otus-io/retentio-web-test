@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CardSection } from "./CardSection";
-import type { DeckItem, FrontBackSegment, GetCardsRes, GetNextCardRes } from "@/lib/api";
+import type { DeckItem, GetCardsRes, GetNextCardRes } from "@/lib/api";
 
 const mockDeck: DeckItem = {
   id: "deck1",
@@ -34,8 +34,8 @@ function makeNextCard(overrides: Partial<GetNextCardRes["data"]> = {}): GetNextC
       due_date: dueDate,
       hidden: false,
       created_at: dueDate - 86400,
-      front: [{ field: "Word", type: "text", value: "Apple" }],
-      back: [{ field: "Translation", type: "text", value: "苹果" }],
+      front: [{ field: "Word", items: [{ type: "text", value: "Apple" }] }],
+      back: [{ field: "Translation", items: [{ type: "text", value: "苹果" }] }],
     },
     urgency: 0.5,
     ...overrides,
@@ -68,7 +68,7 @@ describe("CardSection", () => {
     expect(screen.getByText("Click to flip")).toBeInTheDocument();
   });
 
-  it("renders card when front and back use type/value shape", () => {
+  it("renders card when front and back use entry/items shape", () => {
     const nextCard = makeNextCard({
       card: {
         id: "c2",
@@ -79,10 +79,9 @@ describe("CardSection", () => {
         hidden: false,
         created_at: 0,
         front: [
-          { field: "Q", type: "text", value: "Question?" },
-          { field: "", type: "audio", value: "aud1" },
-        ] as FrontBackSegment[],
-        back: [{ field: "A", type: "text", value: "Answer" }] as FrontBackSegment[],
+          { field: "Q", items: [{ type: "text", value: "Question?" }, { type: "audio", value: "aud1" }] },
+        ],
+        back: [{ field: "A", items: [{ type: "text", value: "Answer" }] }],
       },
       urgency: 1,
     });

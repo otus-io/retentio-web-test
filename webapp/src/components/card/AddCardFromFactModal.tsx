@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { DeckItem, FactItem } from "@/lib/api";
+import type { DeckItem, Entry, FactItem } from "@/lib/api";
 import { request, uploadMultipart, debugLog } from "@/lib/api";
 import type { UploadMediaRes } from "@/lib/api";
 import {
@@ -14,7 +14,6 @@ import {
   type AddFactRes,
 } from "@/lib/api";
 
-const MEDIA_MARKER = /^\[(image|audio):([a-z0-9]+)\]$/;
 const DRAG_TYPE_FIELD = "text/plain";
 const DRAG_TYPE_SPLIT = "application/x-wordupx-split";
 
@@ -31,20 +30,24 @@ function getMediaType(file: File): "image" | "audio" {
 
 function factToRow(fact: FactItem, deck: DeckItem): AddCardCell[] {
   const fields = deck.field ?? [];
-  return fact.entries.map((entry, i) => {
-    const trimmed = entry.trim();
-    const m = trimmed.match(MEDIA_MARKER);
-    if (m) {
-      const kind = m[1] as "image" | "audio";
-      const defaultField = kind === "audio" ? "audio" : "img";
+  return fact.entries.map((entry: Entry, i) => {
+    if (entry.audio)
       return {
         type: "existing_media" as const,
-        kind,
-        id: m[2],
-        fieldName: fields[i] ?? defaultField,
+        kind: "audio" as const,
+        id: entry.audio,
+        fieldName: fields[i] ?? "audio",
       };
-    }
-    return { type: "text" as const, value: entry, label: fields[i] ?? "" };
+    if (entry.image)
+      return {
+        type: "existing_media" as const,
+        kind: "image" as const,
+        id: entry.image,
+        fieldName: fields[i] ?? "img",
+      };
+    if (entry.video)
+      return { type: "text" as const, value: `video:${entry.video}`, label: fields[i] ?? "" };
+    return { type: "text" as const, value: entry.text ?? "", label: fields[i] ?? "" };
   });
 }
 
@@ -55,8 +58,9 @@ function contentUnchanged(original: FactItem, row: AddCardCell[]): boolean {
   for (let i = 0; i < row.length; i++) {
     const c = row[i];
     const orig = original.entries[i];
-    if (c.type === "text" && c.value !== orig) return false;
-    if (c.type === "existing_media" && orig !== `[${c.kind}:${c.id}]`) return false;
+    if (c.type === "text" && c.value !== (orig.text ?? "")) return false;
+    if (c.type === "existing_media" && (c.kind === "audio" ? orig.audio !== c.id : orig.image !== c.id))
+      return false;
   }
   return true;
 }
@@ -278,10 +282,11 @@ export function AddCardFromFactModal({
           }
         }
         let mi = 0;
-        const entries = row.map((c) => {
-          if (c.type === "text") return c.value.trim();
-          if (c.type === "existing_media") return `[${c.kind}:${c.id}]`;
-          return `[${uploadedMarkers[mi].type}:${uploadedMarkers[mi++].id}]`;
+        const entries: Entry[] = row.map((c) => {
+          if (c.type === "text") return { text: c.value.trim() };
+          if (c.type === "existing_media") return c.kind === "audio" ? { audio: c.id } : { image: c.id };
+          const m = uploadedMarkers[mi++];
+          return m.type === "audio" ? { audio: m.id } : { image: m.id };
         });
         const fields = row.map((c) => {
           if (c.type === "text") return c.label;

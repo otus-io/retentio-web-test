@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FactsList } from "./FactsList";
-import type { DeckItem, FactItem } from "@/lib/api";
+import type { DeckItem, Entry, FactItem } from "@/lib/api";
 
 const mockDeck: DeckItem = {
   id: "d1",
@@ -26,7 +26,7 @@ const mockDeck: DeckItem = {
 function makeFacts(n: number): FactItem[] {
   return Array.from({ length: n }, (_, i) => ({
     id: `fact${i + 1}`,
-    entries: [`Word${i + 1}`, `译${i + 1}`],
+    entries: [{ text: `Word${i + 1}` }, { text: `译${i + 1}` }],
   }));
 }
 
@@ -36,11 +36,11 @@ const defaultProps = {
   factError: "",
   factSuccess: "",
   editingFactId: null,
-  editingFactValues: [],
+  editingFactEntries: [] as Entry[],
   editingFactSplit: 1,
   editingFactSibling: false,
   setEditingFactId: vi.fn(),
-  setEditingFactValues: vi.fn(),
+  setEditingFactEntries: vi.fn(),
   setEditingFactSplit: vi.fn(),
   setEditingFactSibling: vi.fn(),
   setFactError: vi.fn(),
@@ -86,15 +86,15 @@ describe("FactsList", () => {
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
   });
 
-  it("calls setEditingFactId and setEditingFactValues when Edit is clicked", async () => {
+  it("calls setEditingFactId and setEditingFactEntries when Edit is clicked", async () => {
     const user = userEvent.setup();
     const setEditingFactId = vi.fn();
-    const setEditingFactValues = vi.fn();
-    renderList(makeFacts(1), { setEditingFactId, setEditingFactValues });
+    const setEditingFactEntries = vi.fn();
+    renderList(makeFacts(1), { setEditingFactId, setEditingFactEntries });
     await user.click(screen.getByRole("button", { expanded: false }));
     await user.click(screen.getByRole("menuitem", { name: /edit/i }));
     expect(setEditingFactId).toHaveBeenCalledWith("fact1");
-    expect(setEditingFactValues).toHaveBeenCalledWith(["Word1", "译1"]);
+    expect(setEditingFactEntries).toHaveBeenCalledWith([{ text: "Word1" }, { text: "译1" }]);
   });
 
   it("calls setDeleteFactId when Delete is clicked from the menu", async () => {
@@ -131,7 +131,7 @@ describe("FactsList", () => {
   it("renders edit form with field values when editingFactId matches", () => {
     renderList(makeFacts(1), {
       editingFactId: "fact1",
-      editingFactValues: ["Word1", "译1"],
+      editingFactEntries: [{ text: "Word1" }, { text: "译1" }],
     });
     expect(screen.getByDisplayValue("Word1")).toBeInTheDocument();
     expect(screen.getByDisplayValue("译1")).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe("FactsList", () => {
     const setEditingFactId = vi.fn();
     renderList(makeFacts(1), {
       editingFactId: "fact1",
-      editingFactValues: ["Word1", "译1"],
+      editingFactEntries: [{ text: "Word1" }, { text: "译1" }],
       setEditingFactId,
     });
     await user.click(screen.getByRole("button", { name: /cancel/i }));
@@ -156,7 +156,7 @@ describe("FactsList", () => {
     const onUpdateFact = vi.fn((e: React.FormEvent) => e.preventDefault());
     renderList(makeFacts(1), {
       editingFactId: "fact1",
-      editingFactValues: ["Word1", "译1"],
+      editingFactEntries: [{ text: "Word1" }, { text: "译1" }],
       onUpdateFact,
     });
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -206,9 +206,9 @@ describe("FactsList", () => {
     });
   });
 
-  it("formats bracketed media markers as plain text in the list", () => {
+  it("formats media entries as plain text in the list", () => {
     const facts: FactItem[] = [
-      { id: "f1", entries: ["[audio:abc123]", "Hello"] },
+      { id: "f1", entries: [{ audio: "abc123" }, { text: "Hello" }] },
     ];
     renderList(facts);
     expect(screen.getByText(/audio:abc123/)).toBeInTheDocument();

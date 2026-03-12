@@ -11,6 +11,7 @@ import {
   type AddFactReq,
   type AddFactRes,
   type DeckItem,
+  type Entry,
   type FactItem,
   type GetDeckRes,
   type GetFactsRes,
@@ -31,7 +32,7 @@ import {
   DeckInfoCard,
 } from "@/components/deck";
 import { CardSection } from "@/components/card";
-import { AddFactsForm, FactsList, type FactCell, makeInitialFactRow } from "@/components/facts";
+import { AddFactsForm, FactsList, type AddFactEntry, makeInitialFactRow } from "@/components/facts";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +48,7 @@ export default function DeckPage() {
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [factRow, setFactRow] = useState<FactCell[]>([]);
+  const [factRow, setFactRow] = useState<AddFactEntry[]>([]);
   const [addFactOp, setAddFactOp] = useState<AddFactOperation>("append");
   const [addFactSplit, setAddFactSplit] = useState(1);
   const [addingFacts, setAddingFacts] = useState(false);
@@ -56,7 +57,7 @@ export default function DeckPage() {
   const [factsList, setFactsList] = useState<FactItem[]>([]);
   const [loadingFacts, setLoadingFacts] = useState(false);
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
-  const [editingFactValues, setEditingFactValues] = useState<string[]>([]);
+  const [editingFactEntries, setEditingFactEntries] = useState<Entry[]>([]);
   const [editingFactSplit, setEditingFactSplit] = useState(1);
   const [editingFactSibling, setEditingFactSibling] = useState(false);
   const [factError, setFactError] = useState("");
@@ -258,16 +259,8 @@ export default function DeckPage() {
     e.preventDefault();
     if (!token || !id || !deck) return;
     const row = factRow;
-    const hasContent = row.some(
-      (c) => (c.type === "text" ? c.value.trim() !== "" : true)
-    );
+    const hasContent = row.some((e) => e.text.trim() !== "" || e.media.length > 0);
     if (!hasContent) {
-      setAddFactsError("Add at least one field or media.");
-      return;
-    }
-    const textValues = row.map((c) => (c.type === "text" ? c.value.trim() : ""));
-    const allEmpty = textValues.every((s) => s === "") && row.every((c) => c.type !== "media");
-    if (allEmpty) {
       setAddFactsError("At least one field or media is required.");
       return;
     }
@@ -275,32 +268,26 @@ export default function DeckPage() {
     setSuccessMessage("");
     setAddingFacts(true);
     try {
-      const uploadedMarkers: { id: string; type: "image" | "audio"; fieldName: string }[] = [];
-      const mediaCells = row.filter(
-        (c): c is FactCell & { type: "media" } => c.type === "media"
-      );
-      if (mediaCells.length > 0 && token) {
-        for (const { entry } of mediaCells) {
+      const entries: Entry[] = [];
+      for (const entry of row) {
+        let audioId: string | undefined;
+        let imageId: string | undefined;
+        for (const { file } of entry.media) {
           const formData = new FormData();
-          formData.append("file", entry.file);
+          formData.append("file", file);
           const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
           const id = res?.data?.id != null ? String(res.data.id).trim() : "";
           if (!id) throw new Error("Upload response missing media id");
-          uploadedMarkers.push({
-            id,
-            type: entry.type,
-            fieldName: entry.fieldName || (entry.type === "audio" ? "audio" : "img"),
-          });
+          const type = file.type.startsWith("image/") ? "image" : "audio";
+          if (type === "audio") audioId ??= id;
+          else imageId ??= id;
         }
+        const out: Entry = { text: entry.text.trim() };
+        if (audioId) out.audio = audioId;
+        if (imageId) out.image = imageId;
+        entries.push(out);
       }
-      let mi = 0;
-      const entries = row.map((c) =>
-        c.type === "text" ? c.value.trim() : `[${uploadedMarkers[mi].type}:${uploadedMarkers[mi++].id}]`
-      );
-      const fields = row.map((c) =>
-        c.type === "text" ? c.label : (c as FactCell & { type: "media" }).entry.fieldName
-      );
-      const facts = [entries];
+      const fields = row.map((e) => e.label);
       const err = validateAddFactBody({ hasFacts: true });
       if (err) {
         setAddFactsError(err);
@@ -308,11 +295,11 @@ export default function DeckPage() {
         return;
       }
       const body: AddFactReq = {
-        facts: facts.map((entries) => {
-          const item: { entries: string[]; fields?: string[] } = { entries };
-          if (uploadedMarkers.length > 0) item.fields = fields;
-          return item;
-        }),        ...buildTemplateForRequest(row.length, addFactSplit, sibling),
+        facts: [{
+          entries,
+          ...(fields.some((f) => f !== "") ? { fields } : {}),
+        }],
+        ...buildTemplateForRequest(row.length, addFactSplit, sibling),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
@@ -321,7 +308,8 @@ export default function DeckPage() {
       });
       setFactRow(makeInitialFactRow(deck));
       setAddFactSplit(1);
-      setSuccessMessage(mediaCells.length > 0 ? "Facts and media added." : "Facts added.");
+      const hasMedia = row.some((e) => e.media.length > 0);
+      setSuccessMessage(hasMedia ? "Facts and media added." : "Facts added.");
       setAddFactsOpen(false);
       await fetchDeck();
       await fetchFacts();
@@ -336,22 +324,24 @@ export default function DeckPage() {
   async function handleUpdateFact(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !id || !editingFactId || !deck) return;
-    const values = editingFactValues.map((s) => s.trim());
-    if (values.length === 0 || values.some((v) => !v)) {
-      setFactError("Each field is required.");
+    const entries = editingFactEntries;
+    const hasContent = (e: Entry) =>
+      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+    if (entries.length === 0 || !entries.every(hasContent)) {
+      setFactError("Each entry must have at least one of text, audio, image, or video.");
       return;
     }
     setFactError("");
     setFactSuccess("");
     try {
-      const body: UpdateFactReq = { entries: values };
+      const body: UpdateFactReq = { entries };
       await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
         method: "PATCH",
         token,
         body: JSON.stringify(body),
       });
       setEditingFactId(null);
-      setEditingFactValues([]);
+      setEditingFactEntries([]);
       setFactSuccess("Fact updated.");
       await fetchFacts();
       await fetchDeck();
@@ -360,12 +350,14 @@ export default function DeckPage() {
     }
   }
 
-  async function handleSaveFactFromCard(factId: string, values: string[]) {
+  async function handleSaveFactFromCard(factId: string, entries: Entry[]) {
     if (!token || !id || !deck) return;
-    if (values.length === 0 || values.some((v) => !v)) {
-      throw new Error("All fields required");
+    const hasContent = (e: Entry) =>
+      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+    if (entries.length === 0 || !entries.every(hasContent)) {
+      throw new Error("Each entry must have at least one of text, audio, image, or video.");
     }
-    const body: UpdateFactReq = { entries: values };
+    const body: UpdateFactReq = { entries };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {
       method: "PATCH",
       token,
@@ -594,11 +586,11 @@ export default function DeckPage() {
               factError={factError}
               factSuccess={factSuccess}
               editingFactId={editingFactId}
-              editingFactValues={editingFactValues}
+              editingFactEntries={editingFactEntries}
               editingFactSplit={editingFactSplit}
               editingFactSibling={editingFactSibling}
               setEditingFactId={setEditingFactId}
-              setEditingFactValues={setEditingFactValues}
+              setEditingFactEntries={setEditingFactEntries}
               setEditingFactSplit={setEditingFactSplit}
               setEditingFactSibling={setEditingFactSibling}
               setFactError={setFactError}

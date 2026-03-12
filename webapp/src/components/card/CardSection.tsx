@@ -5,8 +5,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem, FactItem } from "@/lib/api";
-import type { FrontBackSegment, GetCardsRes, GetNextCardRes } from "@/lib/api";
+import type { DeckItem, Entry, FactItem } from "@/lib/api";
+import type { CardEntryItem, GetCardsRes, GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
@@ -266,7 +266,7 @@ interface CardSectionProps {
   cardSuccess: string;
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
-  onSaveFact?: (factId: string, values: string[]) => Promise<void>;
+  onSaveFact?: (factId: string, entries: Entry[]) => Promise<void>;
   /** When next card has precomputed front/back, fact is not loaded. Pass this to fetch fact by id when opening Duplicate or Edit. */
   onRequestFact?: (factId: string) => Promise<FactItem | null>;
   authToken?: string | null;
@@ -307,7 +307,7 @@ export function CardSection({
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
   const [editPopupOpen, setEditPopupOpen] = useState(false);
   const [editFactId, setEditFactId] = useState<string | null>(null);
-  const [editFactValues, setEditFactValues] = useState<string[]>([]);
+  const [editFactEntries, setEditFactEntries] = useState<Entry[]>([]);
   const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [imageRevealed, setImageRevealed] = useState(false);
@@ -364,7 +364,7 @@ export function CardSection({
     if (!nextCard) return;
     if (nextCardFact) {
       setEditFactId(nextCardFact.id);
-      setEditFactValues([...nextCardFact.entries]);
+      setEditFactEntries(nextCardFact.entries.map((e) => ({ ...e })));
       setEditError("");
       setEditPopupOpen(true);
       return;
@@ -373,25 +373,27 @@ export function CardSection({
       const fact = await onRequestFact(nextCard.card.fact_id);
       if (fact) {
         setEditFactId(fact.id);
-        setEditFactValues([...fact.entries]);
+        setEditFactEntries(fact.entries.map((e) => ({ ...e })));
         setEditError("");
         setEditPopupOpen(true);
       }
     }
   };
 
+  const hasContent = (e: Entry) =>
+    (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onSaveFact || !editFactId || !deck) return;
-    const values = editFactValues.map((s) => s.trim());
-    if (values.length !== editFactValues.length || values.some((v) => !v)) {
-      setEditError("Each field is required.");
+    if (editFactEntries.length === 0 || !editFactEntries.every(hasContent)) {
+      setEditError("Each entry must have at least one of text, audio, image, or video.");
       return;
     }
     setEditError("");
     setEditSaving(true);
     try {
-      await onSaveFact(editFactId, values);
+      await onSaveFact(editFactId, editFactEntries);
       setEditPopupOpen(false);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Update failed");
@@ -468,38 +470,36 @@ export function CardSection({
               Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
             </p>
             {(() => {
-              const frontSegments = Array.isArray(nextCard.card.front) ? nextCard.card.front : null;
-              const backSegments = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
-              const useSegments = frontSegments && backSegments;
+              const frontEntries = Array.isArray(nextCard.card.front) ? nextCard.card.front : null;
+              const backEntries = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
+              const useEntries = frontEntries && backEntries;
 
-              const renderSegment = (seg: FrontBackSegment, key: number) => {
-                const label = null; // Field names hidden by default on card
+              const renderItem = (item: CardEntryItem, key: number) => {
                 let content: ReactNode = null;
-                switch (seg.type) {
+                switch (item.type) {
                   case "text":
-                    content = <FieldWithMedia text={seg.value} token={authToken ?? null} />;
+                    content = <FieldWithMedia text={item.value} token={authToken ?? null} />;
                     break;
                   case "audio":
-                    if (authToken) content = <MediaBlock kind="audio" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="audio" id={item.value} token={authToken} />;
                     break;
                   case "image":
-                    if (authToken) content = <MediaBlock kind="image" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="image" id={item.value} token={authToken} />;
                     break;
                   case "video":
-                    if (authToken) content = <MediaBlock kind="video" id={seg.value} token={authToken} />;
+                    if (authToken) content = <MediaBlock kind="video" id={item.value} token={authToken} />;
                     break;
                   default:
-                    content = <span className="text-muted-foreground">{seg.value || "—"}</span>;
+                    content = <span className="text-muted-foreground">{item.value || "—"}</span>;
                 }
                 return (
                   <span key={key} className="inline-flex flex-col items-center gap-0.5">
-                    {label}
                     {content ?? "—"}
                   </span>
                 );
               };
 
-              if (useSegments) {
+              if (useEntries) {
                 return (
                   <div
                     className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
@@ -522,23 +522,27 @@ export function CardSection({
                         className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center text-lg [backface-visibility:hidden]"
                         style={{ transform: "rotateY(0deg)" }}
                       >
-                        {frontSegments.map((seg, i) => renderSegment(seg, i))}
+                        {frontEntries.map((entry, entryIdx) => (
+                          <div key={entryIdx} className="flex flex-wrap items-center justify-center gap-3">
+                            {entry.items.map((item, i) => renderItem(item, entryIdx * 1000 + i))}
+                          </div>
+                        ))}
                       </div>
                       <div
                         className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center [backface-visibility:hidden]"
                         style={{ transform: "rotateY(180deg)" }}
                       >
-                        {backSegments.length > 0 ? (
+                        {backEntries.length > 0 ? (
                           <>
                             <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
-                              {backSegments.slice(0, 1).map((seg, i) => renderSegment(seg, i))}
+                              {backEntries[0].items.map((item, i) => renderItem(item, i))}
                             </div>
-                            {backSegments.length > 1 && (
+                            {backEntries.length > 1 && (
                               examplesRevealed ? (
                                 <div className="mt-3 space-y-2 text-left">
-                                  {backSegments.slice(1).map((seg, i) => (
-                                    <p key={i} className="text-base">
-                                      {renderSegment(seg, i + 1)}
+                                  {backEntries.slice(1).map((entry, entryIdx) => (
+                                    <p key={entryIdx} className="text-base">
+                                      {entry.items.map((item, i) => renderItem(item, entryIdx * 1000 + i))}
                                     </p>
                                   ))}
                                 </div>
@@ -686,18 +690,19 @@ export function CardSection({
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
               {editError && <p className="text-sm text-destructive">{editError}</p>}
               <div className="space-y-3">
-                {editFactValues.map((_, i) => (
+                {editFactEntries.map((entry, i) => (
                   <div key={i} className="space-y-1">
                     <Label htmlFor={`card-edit-field-${i}`}>
                       {i < (deck.field?.length ?? 0) ? deck.field![i] : `Field ${i + 1}`}
                     </Label>
                     <Input
                       id={`card-edit-field-${i}`}
-                      value={editFactValues[i] ?? ""}
+                      value={entry.text ?? ""}
                       onChange={(e) => {
-                        const next = [...editFactValues];
-                        next[i] = e.target.value;
-                        setEditFactValues(next);
+                        const next = editFactEntries.map((ent, j) =>
+                          j === i ? { ...ent, text: e.target.value } : ent
+                        );
+                        setEditFactEntries(next);
                       }}
                       disabled={editSaving}
                     />

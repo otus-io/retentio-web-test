@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AddFactsForm, makeInitialFactRow, type FactCell } from "./AddFactsForm";
+import { AddFactsForm, makeInitialFactRow, type AddFactEntry } from "./AddFactsForm";
 import type { DeckItem } from "@/lib/api";
 
 const mockDeck: DeckItem = {
@@ -18,12 +18,12 @@ const mockDeck: DeckItem = {
   },
 };
 
-function factRowFromValues(values: string[]): FactCell[] {
+function factRowFromValues(values: string[]): AddFactEntry[] {
   const fields = mockDeck.field ?? [];
-  return values.map((value, i) => ({
-    type: "text" as const,
-    value,
+  return values.map((text, i) => ({
     label: fields[i] ?? `Field ${i + 1}`,
+    text,
+    media: [],
   }));
 }
 
@@ -75,10 +75,10 @@ describe("AddFactsForm", () => {
     await user.type(first, "A");
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
-    const lastCall = calls[calls.length - 1]?.[0] as FactCell[] | undefined;
+    const lastCall = calls[calls.length - 1]?.[0] as AddFactEntry[] | undefined;
     expect(lastCall).toBeDefined();
     expect(lastCall!.length).toBe(2);
-    expect(lastCall![0].type === "text" && lastCall![0].value).toBe("A");
+    expect(lastCall![0].text).toBe("A");
   });
 
   it("Add field button calls setFactRow with one more text cell", async () => {
@@ -87,9 +87,9 @@ describe("AddFactsForm", () => {
     await user.click(screen.getByRole("button", { name: /add field/i }));
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
-    const lastRow = calls[calls.length - 1]?.[0] as FactCell[];
+    const lastRow = calls[calls.length - 1]?.[0] as AddFactEntry[];
     expect(lastRow).toHaveLength(3);
-    expect(lastRow.every((c) => c.type === "text")).toBe(true);
+    expect(lastRow.every((e) => e.media.length === 0)).toBe(true);
   });
 
   it("Remove field button calls setFactRow with that cell removed", async () => {
@@ -99,9 +99,9 @@ describe("AddFactsForm", () => {
     await user.click(removeButtons[0]);
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
-    const lastRow = calls[calls.length - 1]?.[0] as FactCell[];
+    const lastRow = calls[calls.length - 1]?.[0] as AddFactEntry[];
     expect(lastRow).toHaveLength(1);
-    expect(lastRow[0].type === "text" && lastRow[0].value).toBe("你好");
+    expect(lastRow[0].text).toBe("你好");
   });
 
   it("disables the Add facts submit button when all fields are empty", () => {
@@ -170,49 +170,39 @@ describe("AddFactsForm", () => {
     expect(setSibling).toHaveBeenCalledWith(true);
   });
 
-  it("renders the Add media button", () => {
+  it("each row has an options menu with Add media", async () => {
+    const user = userEvent.setup();
     renderForm();
-    expect(screen.getByRole("button", { name: /add media/i })).toBeInTheDocument();
+    const triggers = screen.getAllByRole("button", { name: "…" });
+    expect(triggers.length).toBeGreaterThanOrEqual(2);
+    await user.click(triggers[0]);
+    expect(screen.getByRole("menuitem", { name: /add media/i })).toBeInTheDocument();
   });
 
-  it("Add media button is disabled once 2 media cells are in the row", () => {
-    const file1 = new File(["a"], "a.mp3", { type: "audio/mpeg" });
-    const file2 = new File(["b"], "b.png", { type: "image/png" });
-    const row: FactCell[] = [
-      ...factRowFromValues(["", ""]),
-      { type: "media", entry: { file: file1, type: "audio", fieldName: "audio" } },
-      { type: "media", entry: { file: file2, type: "image", fieldName: "img" } },
-    ];
-    renderForm({ factRow: row });
-    expect(screen.getByLabelText(/add media/i)).toBeDisabled();
-  });
-
-  it("renders attached media with type label and name in the row", () => {
+  it("renders attached media file name in the entry row", () => {
     const file = new File(["data"], "sound.mp3", { type: "audio/mpeg" });
-    const row: FactCell[] = [
-      ...factRowFromValues(["", ""]),
-      { type: "media", entry: { file, type: "audio", fieldName: "audio" } },
+    const row: AddFactEntry[] = [
+      { label: "English", text: "", media: [{ file }] },
+      { label: "Chinese", text: "", media: [] },
     ];
     renderForm({ factRow: row });
-    expect(screen.getByText("Audio")).toBeInTheDocument();
     expect(screen.getByText("sound.mp3")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("audio")).toBeInTheDocument();
   });
 
-  it("calls setFactRow with media cell removed when Remove is clicked", async () => {
+  it("calls setFactRow with media removed when Remove media is clicked", async () => {
     const user = userEvent.setup();
     const file = new File(["data"], "sound.mp3", { type: "audio/mpeg" });
-    const row: FactCell[] = [
-      ...factRowFromValues(["", ""]),
-      { type: "media", entry: { file, type: "audio", fieldName: "audio" } },
+    const row: AddFactEntry[] = [
+      { label: "English", text: "", media: [{ file }] },
+      { label: "Chinese", text: "", media: [] },
     ];
     const { setFactRow } = renderForm({ factRow: row });
-    const removeButtons = screen.getAllByRole("button", { name: /remove field/i });
-    await user.click(removeButtons[removeButtons.length - 1]);
+    const removeMedia = screen.getByRole("button", { name: /remove media/i });
+    await user.click(removeMedia);
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
-    const lastRow = calls[calls.length - 1]?.[0] as FactCell[];
-    expect(lastRow.some((c) => c.type === "media")).toBe(false);
+    const lastRow = calls[calls.length - 1]?.[0] as AddFactEntry[];
+    expect(lastRow[0].media).toHaveLength(0);
   });
 
   it("renders Front and Back section labels when there are 2+ cells", () => {

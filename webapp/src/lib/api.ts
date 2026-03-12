@@ -165,8 +165,16 @@ export interface DeleteDeckRes {
   meta: { msg: string };
 }
 
+/** One slot of a fact: optional text, audio, image, video (at least one required). */
+export interface Entry {
+  text?: string;
+  audio?: string;
+  image?: string;
+  video?: string;
+}
+
 export interface AddFactItemReq {
-  entries: string[];
+  entries: Entry[];
   /** Optional column names; length must equal entries. When omitted, deck default fields are used. */
   fields?: string[];
 }
@@ -191,6 +199,15 @@ export interface AddCardForFactReq {
 export function validateAddFactBody(p: { hasFacts: boolean }): string | null {
   if (!p.hasFacts) return "Facts array is required.";
   return null;
+}
+
+/** Format one entry for display (e.g. in fact list). Prefers text; otherwise "audio:id" / "image:id" / "video:id". */
+export function entryToDisplayString(entry: Entry): string {
+  if (entry.text != null && entry.text !== "") return entry.text;
+  if (entry.audio) return `audio:${entry.audio}`;
+  if (entry.image) return `image:${entry.image}`;
+  if (entry.video) return `video:${entry.video}`;
+  return "";
 }
 
 /** Returns { template } for AddFactReq when needed; otherwise {}. */
@@ -238,7 +255,7 @@ export type AddFactOperation = "append" | "prepend" | "shuffle" | "spread";
 
 export interface FactItem {
   id: string;
-  entries: string[];
+  entries: Entry[];
 }
 
 export interface GetFactsRes {
@@ -251,7 +268,7 @@ export interface GetFactRes {
 }
 
 export interface UpdateFactReq {
-  entries?: string[];
+  entries?: Entry[];
 }
 
 export interface UpdateFactRes {
@@ -264,14 +281,19 @@ export interface DeleteFactRes {
   meta: { msg: string };
 }
 
-// Segment: field (label or ""), type (text|audio|image|video), value (text content, media id, or full media URL). Next-card front/back.
-export interface FrontBackSegment {
-  field: string;
-  type: string;
+// One item in a card entry: type + value (text content or media URL).
+export interface CardEntryItem {
+  type: "text" | "audio" | "image" | "video";
   value: string;
 }
 
-// Cards: template = [[front indices], [back indices]]; front/back are always present (back may be []).
+// One entry on front/back: optional field label + items (typed content). Order follows template.
+export interface CardEntry {
+  field?: string;
+  items: CardEntryItem[];
+}
+
+// Cards: template = [[front indices], [back indices]]; front/back are arrays of CardEntry (back may be []).
 export interface NextCardItem {
   id: string;
   fact_id: string;
@@ -280,8 +302,8 @@ export interface NextCardItem {
   due_date: number;
   hidden: boolean;
   created_at: number;
-  front: FrontBackSegment[];
-  back: FrontBackSegment[];
+  front: CardEntry[];
+  back: CardEntry[];
 }
 
 export interface GetNextCardRes {

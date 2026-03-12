@@ -6,7 +6,6 @@ import {
   buildTemplateWithSplit,
   buildTemplateForRequest,
   type GetNextCardRes,
-  type FrontBackSegment,
 } from "./api";
 
 const mockFetch = vi.fn();
@@ -206,8 +205,8 @@ describe("uploadMultipart", () => {
   });
 });
 
-describe("GetNextCard response shape (front/back segments)", () => {
-  it("accepts response with front and back segment arrays (field, type, value)", () => {
+describe("GetNextCard response shape (front/back entry objects)", () => {
+  it("accepts response with front and back entry arrays (field, items: type, value)", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -218,8 +217,8 @@ describe("GetNextCard response shape (front/back segments)", () => {
           due_date: 1704153600,
           hidden: false,
           created_at: 1704067200,
-          front: [{ field: "Word", type: "text", value: "Apple" }],
-          back: [{ field: "Translation", type: "text", value: "苹果" }],
+          front: [{ field: "Word", items: [{ type: "text", value: "Apple" }] }],
+          back: [{ field: "Translation", items: [{ type: "text", value: "苹果" }] }],
         },
         urgency: 2.598,
       },
@@ -227,9 +226,9 @@ describe("GetNextCard response shape (front/back segments)", () => {
     };
     expect(res.data.card.front).toHaveLength(1);
     expect(res.data.card.back).toHaveLength(1);
-    expect((res.data.card.front as FrontBackSegment[])[0].type).toBe("text");
-    expect((res.data.card.front as FrontBackSegment[])[0].value).toBe("Apple");
-    expect((res.data.card.back as FrontBackSegment[])[0].value).toBe("苹果");
+    expect(res.data.card.front[0].items[0].type).toBe("text");
+    expect(res.data.card.front[0].items[0].value).toBe("Apple");
+    expect(res.data.card.back[0].items[0].value).toBe("苹果");
   });
 
   it("accepts front-only response with empty back array", () => {
@@ -243,7 +242,7 @@ describe("GetNextCard response shape (front/back segments)", () => {
           due_date: 1704153600,
           hidden: false,
           created_at: 1704067200,
-          front: [{ field: "Question", type: "text", value: "Only front" }],
+          front: [{ field: "Question", items: [{ type: "text", value: "Only front" }] }],
           back: [],
         },
         urgency: 1.0,
@@ -254,7 +253,7 @@ describe("GetNextCard response shape (front/back segments)", () => {
     expect(res.data.card.back).toHaveLength(0);
   });
 
-  it("accepts segments with audio, image, and video", () => {
+  it("accepts entries with audio, image, and video items", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -266,22 +265,21 @@ describe("GetNextCard response shape (front/back segments)", () => {
           hidden: false,
           created_at: 1704067200,
           front: [
-            { field: "Front", type: "text", value: "Word" },
-            { field: "Pronunciation", type: "audio", value: "abc123" },
+            { field: "Front", items: [{ type: "text", value: "Word" }, { type: "audio", value: "abc123" }] },
           ],
-          back: [{ field: "Picture", type: "image", value: "img456" }],
+          back: [{ field: "Picture", items: [{ type: "image", value: "img456" }] }],
         },
         urgency: 1.2,
       },
       meta: {},
     };
-    expect((res.data.card.front as FrontBackSegment[])[1].type).toBe("audio");
-    expect((res.data.card.front as FrontBackSegment[])[1].value).toBe("abc123");
-    expect((res.data.card.back as FrontBackSegment[])[0].type).toBe("image");
-    expect((res.data.card.back as FrontBackSegment[])[0].value).toBe("img456");
+    expect(res.data.card.front[0].items[1].type).toBe("audio");
+    expect(res.data.card.front[0].items[1].value).toBe("abc123");
+    expect(res.data.card.back[0].items[0].type).toBe("image");
+    expect(res.data.card.back[0].items[0].value).toBe("img456");
   });
 
-  it("accepts segments with empty field", () => {
+  it("accepts entries with optional field", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -292,20 +290,18 @@ describe("GetNextCard response shape (front/back segments)", () => {
           due_date: 0,
           hidden: false,
           created_at: 0,
-          front: [{ field: "", type: "text", value: "No label" }],
-          back: [{ field: "", type: "image", value: "img1" }],
+          front: [{ items: [{ type: "text", value: "No label" }] }],
+          back: [{ items: [{ type: "image", value: "img1" }] }],
         },
         urgency: 0,
       },
       meta: {},
     };
-    expect((res.data.card.front as FrontBackSegment[])[0].field).toBe("");
-    expect((res.data.card.front as FrontBackSegment[])[0].value).toBe("No label");
-    expect((res.data.card.back as FrontBackSegment[])[0].field).toBe("");
-    expect((res.data.card.back as FrontBackSegment[])[0].type).toBe("image");
+    expect(res.data.card.front[0].items[0].value).toBe("No label");
+    expect(res.data.card.back[0].items[0].type).toBe("image");
   });
 
-  it("accepts segment value as full media URL (backend returns URL when Host is set)", () => {
+  it("accepts item value as full media URL (backend returns URL when Host is set)", () => {
     const res: GetNextCardRes = {
       data: {
         card: {
@@ -317,17 +313,16 @@ describe("GetNextCard response shape (front/back segments)", () => {
           hidden: false,
           created_at: 1704067200,
           front: [
-            { field: "Word", type: "text", value: "Apple" },
-            { field: "", type: "image", value: "https://api.example.com/api/media/im1" },
+            { field: "Word", items: [{ type: "text", value: "Apple" }, { type: "image", value: "https://api.example.com/api/media/im1" }] },
           ],
-          back: [{ field: "Audio", type: "audio", value: "https://api.example.com/api/media/au1" }],
+          back: [{ field: "Audio", items: [{ type: "audio", value: "https://api.example.com/api/media/au1" }] }],
         },
         urgency: 1.0,
       },
       meta: {},
     };
-    expect(res.data.card.front[1].type).toBe("image");
-    expect(res.data.card.front[1].value).toContain("/api/media/im1");
-    expect(res.data.card.back[0].value).toContain("/api/media/au1");
+    expect(res.data.card.front[0].items[1].type).toBe("image");
+    expect(res.data.card.front[0].items[1].value).toContain("/api/media/im1");
+    expect(res.data.card.back[0].items[0].value).toContain("/api/media/au1");
   });
 });

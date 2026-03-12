@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem, FactItem } from "@/lib/api";
-import { formatMediaMarkersForDisplay } from "@/lib/utils";
+import type { DeckItem, Entry, FactItem } from "@/lib/api";
+import { entryToDisplayString } from "@/lib/api";
 
 const DEFAULT_PAGE_SIZE = 5;
 
@@ -23,11 +23,11 @@ interface FactsListProps {
   factError: string;
   factSuccess: string;
   editingFactId: string | null;
-  editingFactValues: string[];
+  editingFactEntries: Entry[];
   editingFactSplit: number;
   editingFactSibling: boolean;
   setEditingFactId: (id: string | null) => void;
-  setEditingFactValues: (v: string[]) => void;
+  setEditingFactEntries: (v: Entry[]) => void;
   setEditingFactSplit: (v: number) => void;
   setEditingFactSibling: (v: boolean) => void;
   setFactError: (v: string) => void;
@@ -46,11 +46,11 @@ export function FactsList({
   factError,
   factSuccess,
   editingFactId,
-  editingFactValues,
+  editingFactEntries,
   editingFactSplit: _editingFactSplit,
   editingFactSibling,
   setEditingFactId,
-  setEditingFactValues,
+  setEditingFactEntries,
   setEditingFactSplit,
   setEditingFactSibling,
   setFactError,
@@ -109,17 +109,18 @@ export function FactsList({
               <li key={f.id} className="px-3 py-2 first:pt-2 hover:bg-muted/50">
                 {editingFactId === f.id ? (
                   <form onSubmit={onUpdateFact} className="w-full space-y-3">
-                    {editingFactValues.map((_, i) => (
+                    {editingFactEntries.map((entry, i) => (
                       <div key={i} className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">
                           {getFieldLabel(deck, i)}
                         </Label>
                         <Input
-                          value={editingFactValues[i] ?? ""}
+                          value={entry.text ?? ""}
                           onChange={(e) => {
-                            const next = [...editingFactValues];
-                            next[i] = e.target.value;
-                            setEditingFactValues(next);
+                            const next = editingFactEntries.map((ent, j) =>
+                              j === i ? { ...ent, text: e.target.value } : ent
+                            );
+                            setEditingFactEntries(next);
                           }}
                         />
                       </div>
@@ -143,7 +144,7 @@ export function FactsList({
                         variant="outline"
                         onClick={() => {
                           setEditingFactId(null);
-                          setEditingFactValues([]);
+                          setEditingFactEntries([]);
                           setFactError("");
                         }}
                       >
@@ -154,13 +155,13 @@ export function FactsList({
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm min-w-0 flex-1">
-                      {f.entries.map(formatMediaMarkersForDisplay).join(" · ")}
+                      {f.entries.map(entryToDisplayString).join(" · ")}
                     </span>
                     <DropdownMenu>
                       <DropdownMenuItem
                         onClick={() => {
                           setEditingFactId(f.id);
-                          setEditingFactValues([...f.entries]);
+                          setEditingFactEntries(f.entries.map((e) => ({ ...e })));
                           setEditingFactSplit(1);
                           setEditingFactSibling(false);
                           setFactError("");
@@ -221,7 +222,7 @@ export function FactsList({
       >
         {deleteFactId && (() => {
           const fact = factsList.find((x) => x.id === deleteFactId);
-          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.entries.map(formatMediaMarkersForDisplay).join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
+          return <>Are you sure you want to delete this fact{fact ? <> (&quot;{fact.entries.map(entryToDisplayString).join(" · ")}&quot;)</> : null}? This cannot be undone.</>;
         })()}
       </Dialog>
     </Card>
