@@ -189,6 +189,26 @@ describe("AddFactsForm", () => {
     expect(screen.getByText("sound.mp3")).toBeInTheDocument();
   });
 
+  it("renders attached image file name in the entry row", () => {
+    const file = new File(["data"], "photo.png", { type: "image/png" });
+    const row: AddFactEntry[] = [
+      { label: "English", text: "", media: [{ file }] },
+      { label: "Chinese", text: "", media: [] },
+    ];
+    renderForm({ factRow: row });
+    expect(screen.getByText("photo.png")).toBeInTheDocument();
+  });
+
+  it("renders attached video file name in the entry row", () => {
+    const file = new File(["data"], "clip.mp4", { type: "video/mp4" });
+    const row: AddFactEntry[] = [
+      { label: "English", text: "", media: [{ file }] },
+      { label: "Chinese", text: "", media: [] },
+    ];
+    renderForm({ factRow: row });
+    expect(screen.getByText("clip.mp4")).toBeInTheDocument();
+  });
+
   it("calls setFactRow with media removed when Remove media is clicked", async () => {
     const user = userEvent.setup();
     const file = new File(["data"], "sound.mp3", { type: "audio/mpeg" });

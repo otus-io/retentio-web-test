@@ -272,19 +272,26 @@ export default function DeckPage() {
       for (const entry of row) {
         let audioId: string | undefined;
         let imageId: string | undefined;
+        let videoId: string | undefined;
         for (const { file } of entry.media) {
           const formData = new FormData();
           formData.append("file", file);
           const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
           const id = res?.data?.id != null ? String(res.data.id).trim() : "";
           if (!id) throw new Error("Upload response missing media id");
-          const type = file.type.startsWith("image/") ? "image" : "audio";
+          const type = file.type.startsWith("image/")
+            ? "image"
+            : file.type.startsWith("video/")
+              ? "video"
+              : "audio";
           if (type === "audio") audioId ??= id;
-          else imageId ??= id;
+          else if (type === "image") imageId ??= id;
+          else videoId ??= id;
         }
         const out: Entry = { text: entry.text.trim() };
         if (audioId) out.audio = audioId;
         if (imageId) out.image = imageId;
+        if (videoId) out.video = videoId;
         entries.push(out);
       }
       const fields = row.map((e) => e.label);

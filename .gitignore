@@ -61,6 +61,3 @@ app.*.map.json
 # Debug logs and dev binaries at repo root (run.sh, dev-run.sh write to logs/; folder kept via logs/.gitkeep)
 logs/*
 !logs/.gitkeep
-
-# Design docs (English only, not tracked)
-docs/design-doc/

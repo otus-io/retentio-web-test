@@ -133,7 +133,7 @@ export default function MediaPage() {
             {uploadSuccess && <p className="text-sm text-green-600">{uploadSuccess}</p>}
             <input
               type="file"
-              accept="image/*,audio/*"
+              accept="image/*,audio/*,video/*"
               onChange={handleUpload}
               disabled={uploading}
               className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
@@ -152,7 +152,7 @@ export default function MediaPage() {
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : items.length === 0 ? (
-              <p className="text-muted-foreground">No files yet. Upload an image or audio file above.</p>
+              <p className="text-muted-foreground">No files yet. Upload an image, audio, or video file above.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

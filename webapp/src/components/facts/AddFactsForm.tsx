@@ -106,7 +106,10 @@ export function AddFactsForm({
     setPendingMediaRowIndex(null);
     if (idx == null || idx < 0 || idx >= row.length) return;
     const valid = chosen.filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("audio/")
+      (f) =>
+        f.type.startsWith("image/") ||
+        f.type.startsWith("audio/") ||
+        f.type.startsWith("video/")
     );
     const entry = row[idx];
     const toAdd = valid.slice(0, Math.max(0, MAX_MEDIA_PER_ENTRY - entry.media.length)).map((file) => ({ file }));
@@ -379,7 +382,7 @@ export function AddFactsForm({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,audio/*"
+          accept="image/*,audio/*,video/*"
           multiple
           onChange={handleMediaSelect}
           className="hidden"

@@ -5,6 +5,7 @@ import {
   buildSiblingTemplate,
   buildTemplateWithSplit,
   buildTemplateForRequest,
+  entryToDisplayString,
   type GetNextCardRes,
 } from "./api";
 
@@ -203,6 +204,38 @@ describe("uploadMultipart", () => {
     });
     await expect(uploadMultipart("/api/media", new FormData())).rejects.toThrow("Forbidden");
   });
+
+  it("accepts video file in FormData and returns media id", async () => {
+    const payload = { data: { id: "vid123" }, meta: { msg: "media uploaded" } };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      json: () => Promise.resolve(payload),
+    });
+    const form = new FormData();
+    form.append("file", new File(["video bytes"], "clip.mp4", { type: "video/mp4" }));
+    const res = await uploadMultipart("/api/media", form, "tok");
+    expect(res).toEqual(payload);
+    expect((res as { data?: { id?: string } }).data?.id).toBe("vid123");
+  });
+});
+
+describe("entryToDisplayString", () => {
+  it("returns text when present", () => {
+    expect(entryToDisplayString({ text: "Hello" })).toBe("Hello");
+  });
+  it("returns audio:id when entry has audio only", () => {
+    expect(entryToDisplayString({ audio: "aud1" })).toBe("audio:aud1");
+  });
+  it("returns image:id when entry has image only", () => {
+    expect(entryToDisplayString({ image: "img1" })).toBe("image:img1");
+  });
+  it("returns video:id when entry has video only", () => {
+    expect(entryToDisplayString({ video: "vid1" })).toBe("video:vid1");
+  });
+  it("prefers text over media", () => {
+    expect(entryToDisplayString({ text: "Word", audio: "a1" })).toBe("Word");
+  });
 });
 
 describe("GetNextCard response shape (front/back entry objects)", () => {
@@ -259,7 +292,7 @@ describe("GetNextCard response shape (front/back entry objects)", () => {
         card: {
           id: "c1",
           fact_id: "f1",
-          template: [[0, 1], [2]],
+          template: [[0, 1], [2, 3]],
           last_review: 1704067200,
           due_date: 1704153600,
           hidden: false,
@@ -267,7 +300,10 @@ describe("GetNextCard response shape (front/back entry objects)", () => {
           front: [
             { field: "Front", items: [{ type: "text", value: "Word" }, { type: "audio", value: "abc123" }] },
           ],
-          back: [{ field: "Picture", items: [{ type: "image", value: "img456" }] }],
+          back: [
+            { field: "Picture", items: [{ type: "image", value: "img456" }] },
+            { field: "Clip", items: [{ type: "video", value: "vid789" }] },
+          ],
         },
         urgency: 1.2,
       },
@@ -277,6 +313,8 @@ describe("GetNextCard response shape (front/back entry objects)", () => {
     expect(res.data.card.front[0].items[1].value).toBe("abc123");
     expect(res.data.card.back[0].items[0].type).toBe("image");
     expect(res.data.card.back[0].items[0].value).toBe("img456");
+    expect(res.data.card.back[1].items[0].type).toBe("video");
+    expect(res.data.card.back[1].items[0].value).toBe("vid789");
   });
 
   it("accepts entries with optional field", () => {

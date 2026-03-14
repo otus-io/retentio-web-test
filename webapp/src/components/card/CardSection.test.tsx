@@ -95,6 +95,30 @@ describe("CardSection", () => {
     expect(screen.getByText("Click to flip")).toBeInTheDocument();
   });
 
+  it("renders card with video item in front", () => {
+    const nextCard = makeNextCard({
+      card: {
+        id: "c3",
+        fact_id: "f3",
+        template: [[0], [1]],
+        last_review: 0,
+        due_date: 2000,
+        hidden: false,
+        created_at: 0,
+        front: [{ field: "Clip", items: [{ type: "video", value: "vid1" }] }],
+        back: [{ field: "Caption", items: [{ type: "text", value: "Caption text" }] }],
+      },
+      urgency: 0.8,
+    });
+    render(
+      <CardSection
+        {...defaultProps}
+        nextCard={nextCard}
+      />
+    );
+    expect(screen.getByText("Click to flip")).toBeInTheDocument();
+  });
+
   it("does not render card content when nextCard is null", () => {
     render(
       <CardSection

@@ -9,3 +9,9 @@ alwaysApply: false
 - English only -- do not create `_zh.md` translations for design docs
 - Follow the existing format: title, rationale sections, Go/JSON code snippets, handler descriptions, test specifications
 - See `docs/design-doc/card-rescheduling.md` as the reference template
+
+## Markdown Lint Compliance
+
+- Use **headings** (e.g. `### Section title`) for section titles, not bold/italic (MD036).
+- Use **spaces** for indentation only; no hard tabs (MD010).
+- Use **at most one** consecutive blank line between blocks (MD012).
