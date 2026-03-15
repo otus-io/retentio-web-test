@@ -16,6 +16,7 @@ import {
   type GetDeckRes,
   type GetFactsRes,
   type GetNextCardRes,
+  type NextCardItem,
   type GetCardsRes,
   type RescheduleReq,
   type RescheduleRes,
@@ -143,21 +144,33 @@ export default function DeckPage() {
     }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
+      // Backend returns card: [] when there are no cards; avoid using .front/.fact_id on an array
+      const card = res.data.card as NextCardItem | unknown[];
+      const noCard = Array.isArray(card) || card == null;
+      if (noCard) {
+        setNextCard(null);
+        setNextCardFact(null);
+        setNextCardMeta(res.meta ?? null);
+        return;
+      }
       setNextCard(res.data);
       setNextCardMeta(res.meta ?? null);
+      const cardObj = card as NextCardItem;
       const hasSegments =
-        Array.isArray(res.data.card.front) &&
-        Array.isArray(res.data.card.back) &&
-        res.data.card.front.length >= 0 &&
-        res.data.card.back.length >= 0;
+        Array.isArray(cardObj.front) &&
+        Array.isArray(cardObj.back) &&
+        cardObj.front.length >= 0 &&
+        cardObj.back.length >= 0;
       if (hasSegments) {
         setNextCardFact(null);
-      } else {
+      } else if (cardObj.fact_id) {
         const factRes = await request<{ data: { fact: FactItem } }>(
-          `/api/decks/${id}/facts/${res.data.card.fact_id}`,
+          `/api/decks/${id}/facts/${cardObj.fact_id}`,
           { token }
         );
         setNextCardFact(factRes.data.fact);
+      } else {
+        setNextCardFact(null);
       }
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
