@@ -25,11 +25,9 @@ interface FactsListProps {
   editingFactId: string | null;
   editingFactEntries: Entry[];
   editingFactSplit: number;
-  editingFactSibling: boolean;
   setEditingFactId: (id: string | null) => void;
   setEditingFactEntries: (v: Entry[]) => void;
   setEditingFactSplit: (v: number) => void;
-  setEditingFactSibling: (v: boolean) => void;
   setFactError: (v: string) => void;
   onUpdateFact: (e: React.FormEvent) => void;
   onDeleteFact: (factId: string) => void;
@@ -48,11 +46,9 @@ export function FactsList({
   editingFactId,
   editingFactEntries,
   editingFactSplit: _editingFactSplit,
-  editingFactSibling,
   setEditingFactId,
   setEditingFactEntries,
   setEditingFactSplit,
-  setEditingFactSibling,
   setFactError,
   onUpdateFact,
   onDeleteFact,
@@ -125,18 +121,6 @@ export function FactsList({
                         />
                       </div>
                     ))}
-                    <div className="flex items-center gap-2">
-                      <input
-                        id={`fact-sibling-${f.id}`}
-                        type="checkbox"
-                        checked={editingFactSibling}
-                        onChange={(e) => setEditingFactSibling(e.target.checked)}
-                        className="h-4 w-4 rounded border-input"
-                      />
-                      <Label htmlFor={`fact-sibling-${f.id}`} className="font-normal cursor-pointer text-sm">
-                        Sibling
-                      </Label>
-                    </div>
                     <div className="flex gap-2">
                       <Button type="submit">Save</Button>
                       <Button
@@ -163,7 +147,6 @@ export function FactsList({
                           setEditingFactId(f.id);
                           setEditingFactEntries(f.entries.map((e) => ({ ...e })));
                           setEditingFactSplit(1);
-                          setEditingFactSibling(false);
                           setFactError("");
                         }}
                       >

@@ -60,7 +60,6 @@ export default function DeckPage() {
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
   const [editingFactEntries, setEditingFactEntries] = useState<Entry[]>([]);
   const [editingFactSplit, setEditingFactSplit] = useState(1);
-  const [editingFactSibling, setEditingFactSibling] = useState(false);
   const [factError, setFactError] = useState("");
   const [factSuccess, setFactSuccess] = useState("");
   const [deleteFactId, setDeleteFactId] = useState<string | null>(null);
@@ -608,11 +607,9 @@ export default function DeckPage() {
               editingFactId={editingFactId}
               editingFactEntries={editingFactEntries}
               editingFactSplit={editingFactSplit}
-              editingFactSibling={editingFactSibling}
               setEditingFactId={setEditingFactId}
               setEditingFactEntries={setEditingFactEntries}
               setEditingFactSplit={setEditingFactSplit}
-              setEditingFactSibling={setEditingFactSibling}
               setFactError={setFactError}
               onUpdateFact={handleUpdateFact}
               onDeleteFact={handleDeleteFact}
