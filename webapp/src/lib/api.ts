@@ -1,5 +1,154 @@
 const baseUrl = (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "http://localhost:8080";
 
+/** True when upload failures should log details (browser console + optional agent ingest). */
+const debugUpload =
+  import.meta.env.DEV || String(import.meta.env.VITE_DEBUG_UPLOAD ?? "") === "true";
+
+// #region agent log
+function ingestUploadDebug(payload: Record<string, unknown>): void {
+  if (!debugUpload || typeof window === "undefined") return;
+  fetch("http://127.0.0.1:7897/ingest/cdc1917e-6ca0-4c9a-ad91-28c529ea507b", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "e56295",
+    },
+    body: JSON.stringify({
+      sessionId: "e56295",
+      timestamp: Date.now(),
+      ...payload,
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
+function apiHostLabel(fullUrl: string): string {
+  try {
+    return new URL(fullUrl).host;
+  } catch {
+    return "API";
+  }
+}
+
+/** Approximate body size and a short preview of FormData parts (for upload diagnostics). */
+function summarizeFormData(form: FormData): {
+  approxPayloadBytes: number;
+  formDataPartCount: number;
+  formDataPartsPreview: { name: string; kind: string; size?: number }[];
+} {
+  const preview: { name: string; kind: string; size?: number }[] = [];
+  let approxPayloadBytes = 0;
+  let partCount = 0;
+  for (const [name, value] of form.entries()) {
+    partCount += 1;
+    const v: unknown = value;
+    if (v instanceof File) {
+      approxPayloadBytes += v.size;
+      if (preview.length < 10) preview.push({ name, kind: "file", size: v.size });
+    } else if (v instanceof Blob) {
+      approxPayloadBytes += v.size;
+      if (preview.length < 10) preview.push({ name, kind: "blob", size: v.size });
+    } else {
+      const n = new Blob([String(v)]).size;
+      approxPayloadBytes += n;
+      if (preview.length < 10) preview.push({ name, kind: "field", size: n });
+    }
+  }
+  return { approxPayloadBytes, formDataPartCount: partCount, formDataPartsPreview: preview };
+}
+
+function urlDiagnostics(fullUrl: string): Record<string, unknown> {
+  try {
+    const u = new URL(fullUrl);
+    const defaultPort = u.protocol === "https:" ? "443" : u.protocol === "http:" ? "80" : "";
+    return {
+      urlHostname: u.hostname,
+      urlPort: u.port || defaultPort || "",
+      urlPathname: u.pathname,
+      urlProtocol: u.protocol,
+    };
+  } catch {
+    return { urlParseFailed: true };
+  }
+}
+
+function browserUploadContext(): Record<string, unknown> {
+  if (typeof navigator === "undefined") return {};
+  type NavConn = Navigator & {
+    connection?: { effectiveType?: string; downlink?: number; rtt?: number; saveData?: boolean };
+  };
+  const nav = navigator as NavConn;
+  const c = nav.connection;
+  return {
+    navigatorOnLine: nav.onLine,
+    visibilityState: typeof document !== "undefined" ? document.visibilityState : undefined,
+    userAgentSnippet: nav.userAgent?.slice(0, 160),
+    connectionEffectiveType: c?.effectiveType,
+    connectionDownlinkMbps: c?.downlink,
+    connectionRttMs: c?.rtt,
+    saveData: c?.saveData,
+  };
+}
+
+function xhrWireDiagnostics(xhr: XMLHttpRequest, requestUrl: string): Record<string, unknown> {
+  let responseHeaders = "";
+  try {
+    responseHeaders = xhr.getAllResponseHeaders() ?? "";
+  } catch {
+    responseHeaders = "(getAllResponseHeaders failed)";
+  }
+  return {
+    ...urlDiagnostics(requestUrl),
+    xhrStatus: xhr.status,
+    xhrStatusText: xhr.statusText,
+    xhrReadyState: xhr.readyState,
+    xhrResponseURL: xhr.responseURL || null,
+    responseHeadersLength: responseHeaders.length,
+    responseHeadersPreview: responseHeaders ? responseHeaders.slice(0, 600) : null,
+  };
+}
+
+/** True when upload progress reported the full body sent (XHR may still fail while awaiting the response). */
+function xhrUploadPhaseComplete(
+  last: { loaded: number; total: number; lengthComputable: boolean } | null
+): boolean {
+  if (!last?.lengthComputable || last.total <= 0) return false;
+  // Small slack: multipart boundaries can make loaded slightly differ from FormData byte estimate.
+  return last.loaded >= last.total - 4096;
+}
+
+function logUploadFailure(
+  hypothesisId: string,
+  kind: string,
+  path: string,
+  fullUrl: string,
+  extra: Record<string, unknown>,
+  logImpl: (...args: unknown[]) => void = console.warn
+): void {
+  const data = {
+    kind,
+    path,
+    fullUrl,
+    baseUrl,
+    pageOrigin: typeof window !== "undefined" ? window.location.origin : "",
+    apiScheme: (() => {
+      try {
+        return new URL(fullUrl).protocol;
+      } catch {
+        return "invalid-url";
+      }
+    })(),
+    ...extra,
+  };
+  logImpl(`[api upload] ${kind}`, data);
+  ingestUploadDebug({
+    hypothesisId,
+    location: "api.ts:upload",
+    message: kind,
+    data,
+  });
+}
+
 export function getApiBaseUrl(): string {
   return baseUrl;
 }
@@ -68,6 +217,20 @@ export async function uploadMultipart(
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Upload timed out. Try a smaller file or try again.");
     }
+    const fullUrl = `${baseUrl}${path}`;
+    logUploadFailure(
+      "H_fetch",
+      "fetch upload threw (offline/CORS/mixed-content?)",
+      path,
+      fullUrl,
+      {
+        errName: err instanceof Error ? err.name : typeof err,
+        errMessage: err instanceof Error ? err.message : String(err),
+        ...browserUploadContext(),
+        ...summarizeFormData(formData),
+      },
+      console.error
+    );
     throw err;
   }
   clearTimeout(timeoutId);
@@ -89,17 +252,31 @@ export function uploadMultipartWithProgress(
 ): Promise<unknown> {
   if (clientId) formData.append("client_id", clientId);
   const url = `${baseUrl}${path}`;
+  const payloadSummary = summarizeFormData(formData);
+  const startedAt = typeof performance !== "undefined" ? performance.now() : 0;
+  let lastUpload: { loaded: number; total: number; lengthComputable: boolean } | null = null;
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.timeout = timeoutMs;
+    if (debugUpload) {
+      console.debug("[api upload] XHR start", { path, url, timeoutMs, ...payloadSummary });
+    }
     xhr.upload.onprogress = (e) => {
+      lastUpload = {
+        loaded: e.loaded,
+        total: e.total,
+        lengthComputable: e.lengthComputable,
+      };
       if (e.lengthComputable && e.total > 0 && onProgress) {
         onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
       }
     };
     xhr.onload = () => {
+      const elapsedSinceOpenMs =
+        typeof performance !== "undefined" ? Math.round(performance.now() - startedAt) : undefined;
       const text = xhr.responseText ?? "";
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
@@ -117,11 +294,82 @@ export function uploadMultipartWithProgress(
       } catch {
         if (text.trim()) msg = text;
       }
+      logUploadFailure("H_http_status", "XHR completed with error status", path, url, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        responseLen: text.length,
+        responsePreview: text.slice(0, 400),
+        elapsedSinceOpenMs,
+        lastUploadProgress: lastUpload,
+        ...payloadSummary,
+        ...browserUploadContext(),
+        ...xhrWireDiagnostics(xhr, url),
+      });
       reject(new Error(msg));
     };
-    xhr.onerror = () => reject(new Error("Network error"));
-    xhr.ontimeout = () =>
+    xhr.onerror = () => {
+      const elapsedSinceOpenMs =
+        typeof performance !== "undefined" ? Math.round(performance.now() - startedAt) : undefined;
+      const afterFullUpload = xhrUploadPhaseComplete(lastUpload);
+      const kind = afterFullUpload
+        ? "XHR onerror after upload finished (awaiting response)"
+        : "XHR onerror (TLS/CORS/DNS/connection drop)";
+      const failureHint = afterFullUpload
+        ? "Upload progress reported 100% of the body sent; failure likely while waiting for HTTP response — e.g. API/proxy timeout, max body/time limit, server OOM/crash during bulk-import, or connection reset. Check API and reverse-proxy logs."
+        : "JS cannot read net::ERR_* (e.g. ERR_CONNECTION_REFUSED). DevTools → Network → select this request → read the Status / error text.";
+      logUploadFailure(
+        afterFullUpload ? "H_xhr_after_upload" : "H_xhr_network",
+        kind,
+        path,
+        url,
+        {
+          ...xhrWireDiagnostics(xhr, url),
+          ...browserUploadContext(),
+          ...payloadSummary,
+          elapsedSinceOpenMs,
+          lastUploadProgress: lastUpload,
+          timeoutConfiguredMs: timeoutMs,
+          uploadPhaseReportedComplete: afterFullUpload,
+          note: failureHint,
+        },
+        console.error
+      );
+      const host = apiHostLabel(url);
+      if (afterFullUpload && lastUpload && lastUpload.total > 0) {
+        const mb = Math.max(1, Math.round(lastUpload.total / (1024 * 1024)));
+        reject(
+          new Error(
+            `Upload finished (~${mb} MB) but the connection dropped before a response. Often the API or a proxy timed out, rejected large bodies, or crashed while processing (check server logs). Host: ${host}.`
+          )
+        );
+        return;
+      }
+      reject(
+        new Error(
+          `Network error (${host}). Open DevTools → Network for the failed request; see [api upload] in the console for details.`
+        )
+      );
+    };
+    xhr.ontimeout = () => {
+      const elapsedSinceOpenMs =
+        typeof performance !== "undefined" ? Math.round(performance.now() - startedAt) : undefined;
+      logUploadFailure(
+        "H_timeout",
+        "XHR timeout",
+        path,
+        url,
+        {
+          timeoutMs,
+          elapsedSinceOpenMs,
+          lastUploadProgress: lastUpload,
+          ...payloadSummary,
+          ...browserUploadContext(),
+          ...xhrWireDiagnostics(xhr, url),
+        },
+        console.error
+      );
       reject(new Error("Upload timed out. Try a smaller file or try again."));
+    };
     xhr.send(formData);
   });
 }

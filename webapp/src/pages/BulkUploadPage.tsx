@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   BULK_IMPORT_UPLOAD_TIMEOUT_MS,
+  getApiBaseUrl,
   request,
   uploadMultipart,
   uploadMultipartWithProgress,
@@ -896,7 +897,13 @@ export default function BulkUploadPage() {
       void loadDeckAndFacts();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Bulk import failed.";
-      console.error("[bulk-import]", msg, e);
+      console.error("[bulk-import]", {
+        message: msg,
+        deckId: id,
+        apiBaseUrl: getApiBaseUrl(),
+        path: `/api/decks/${id}/facts/bulk-import`,
+      });
+      console.error("[bulk-import] cause", e);
       setError(msg);
     } finally {
       setSubmitting(false);
