@@ -13,6 +13,11 @@ function renderHeader(onLogout = vi.fn()) {
 }
 
 describe("DeckHeader", () => {
+  it("renders a link to /decks", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /^deck$/i })).toHaveAttribute("href", "/decks");
+  });
+
   it("renders a link to /profile", () => {
     renderHeader();
     expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "/profile");

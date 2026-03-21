@@ -39,16 +39,20 @@ export async function request<T>(
 
 const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — backend may run ffmpeg/cwebp
 
+/** Long timeout for bulk ZIP import (~100MB transfer + thousands of media conversions on server). */
+export const BULK_IMPORT_UPLOAD_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+
 /** Optional client_id enables idempotent uploads (backend returns existing media if already uploaded). */
 export async function uploadMultipart(
   path: string,
   formData: FormData,
   token?: string | null,
-  clientId?: string | null
+  clientId?: string | null,
+  timeoutMs: number = UPLOAD_TIMEOUT_MS
 ): Promise<unknown> {
   if (clientId) formData.append("client_id", clientId);
   const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), UPLOAD_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   let res: Response;
@@ -69,6 +73,57 @@ export async function uploadMultipart(
   clearTimeout(timeoutId);
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
+}
+
+/**
+ * Same as {@link uploadMultipart} but reports upload progress via XMLHttpRequest (fetch has no upload progress).
+ * `onProgress` receives 0–100 while bytes are sent; may not fire if the browser cannot compute total size.
+ */
+export function uploadMultipartWithProgress(
+  path: string,
+  formData: FormData,
+  token?: string | null,
+  clientId?: string | null,
+  timeoutMs: number = UPLOAD_TIMEOUT_MS,
+  onProgress?: (percent: number) => void
+): Promise<unknown> {
+  if (clientId) formData.append("client_id", clientId);
+  const url = `${baseUrl}${path}`;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = timeoutMs;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0 && onProgress) {
+        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      }
+    };
+    xhr.onload = () => {
+      const text = xhr.responseText ?? "";
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          if (!text.trim()) resolve({});
+          else resolve(JSON.parse(text));
+        } catch {
+          reject(new Error("Invalid JSON response"));
+        }
+        return;
+      }
+      let msg = xhr.statusText || "Request failed";
+      try {
+        const body = JSON.parse(text) as ApiError;
+        if (body.msg) msg = body.msg;
+      } catch {
+        if (text.trim()) msg = text;
+      }
+      reject(new Error(msg));
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.ontimeout = () =>
+      reject(new Error("Upload timed out. Try a smaller file or try again."));
+    xhr.send(formData);
+  });
 }
 
 export interface LoginRes {
@@ -98,6 +153,11 @@ export interface ListMediaRes {
 
 export interface UploadMediaRes {
   data: MediaItem;
+  meta: { msg: string };
+}
+
+export interface BulkImportRes {
+  data: { facts_added: number; media_uploaded: number };
   meta: { msg: string };
 }
 
@@ -135,7 +195,8 @@ export interface GetDecksRes {
 
 export interface CreateDeckReq {
   name: string;
-  fields: string[];
+  /** Omit or use [] for an empty deck; field names can be set later (e.g. Bulk Upload CSV header). */
+  fields?: string[];
   rate?: number;
 }
 

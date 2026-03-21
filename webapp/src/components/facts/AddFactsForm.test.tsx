@@ -49,14 +49,14 @@ function renderForm(overrides: Partial<Parameters<typeof AddFactsForm>[0]> = {})
 }
 
 describe("AddFactsForm", () => {
-  it("renders the Add facts heading", () => {
+  it("renders the add facts heading", () => {
     renderForm();
     expect(screen.getByText("Add facts", { selector: "p" })).toBeInTheDocument();
   });
 
-  it("renders one Value input per factRow text cell", () => {
+  it("renders one value input per factRow text cell", () => {
     renderForm({ factRow: factRowFromValues(["Hello", "你好"]) });
-    const inputs = screen.getAllByPlaceholderText("Value");
+    const inputs = screen.getAllByPlaceholderText("value");
     expect(inputs).toHaveLength(2);
     expect(inputs[0]).toHaveValue("Hello");
     expect(inputs[1]).toHaveValue("你好");
@@ -71,7 +71,7 @@ describe("AddFactsForm", () => {
   it("calls setFactRow when a field value is typed", async () => {
     const user = userEvent.setup();
     const { setFactRow } = renderForm();
-    const [first] = screen.getAllByPlaceholderText("Value");
+    const [first] = screen.getAllByPlaceholderText("value");
     await user.type(first, "A");
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
@@ -129,7 +129,7 @@ describe("AddFactsForm", () => {
   it("disables all inputs and buttons while addingFacts is true", () => {
     renderForm({ factRow: factRowFromValues(["Hello", "你好"]), addingFacts: true });
     expect(screen.getByRole("button", { name: /adding/i })).toBeDisabled();
-    for (const input of screen.getAllByPlaceholderText("Value")) {
+    for (const input of screen.getAllByPlaceholderText("value")) {
       expect(input).toBeDisabled();
     }
   });
@@ -139,7 +139,7 @@ describe("AddFactsForm", () => {
     expect(screen.getByRole("button", { name: /adding…/i })).toBeInTheDocument();
   });
 
-  it("renders the operation select with Append selected by default", () => {
+  it("renders the operation select with append selected by default", () => {
     renderForm();
     expect(screen.getByRole("combobox")).toHaveValue("append");
   });
@@ -225,7 +225,7 @@ describe("AddFactsForm", () => {
     expect(lastRow[0].media).toHaveLength(0);
   });
 
-  it("renders Front and Back section labels when there are 2+ cells", () => {
+  it("renders front and back section labels when there are 2+ cells", () => {
     renderForm({ addFactSplit: 1 });
     expect(screen.getByRole("button", { name: /collapse front/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /collapse back/i })).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("AddFactsForm", () => {
     it("shows default template when split is 1 and sibling unchecked", () => {
       renderForm({ factRow: factRowFromValues(["a", "b"]), addFactSplit: 1, sibling: false });
       expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
-        "default (0 front, rest back)"
+        "Default (0 front, rest back)"
       );
     });
 
@@ -287,7 +287,7 @@ describe("AddFactsForm", () => {
         />
       );
       expect(screen.getByTestId("add-facts-template")).toHaveTextContent(
-        "default (0 front, rest back)"
+        "Default (0 front, rest back)"
       );
 
       rerender(

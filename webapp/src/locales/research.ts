@@ -23,35 +23,35 @@ export interface ResearchStrings {
 
 export const researchStrings: Record<HomeLang, ResearchStrings> = {
   en: {
-    title: "Spaced repetition: a summary",
+    title: "spaced repetition: a summary",
     summaryP1:
-      "Spaced Repetition System (SRS) is the practice of reviewing material at increasing intervals. Instead of seeing the same item every day or cramming before a test, you review each item when it is due — and that interval grows longer each time you remember it. Decades of research show that spacing reviews over time leads to much better long-term retention than massed practice or cramming.",
+      "spaced repetition system (srs) is the practice of reviewing material at increasing intervals. instead of seeing the same item every day or cramming before a test, you review each item when it is due — and that interval grows longer each time you remember it. decades of research show that spacing reviews over time leads to much better long-term retention than massed practice or cramming.",
     summaryP2:
-      "The idea is simple: if you see something too soon, you waste time; if you see it too late, you have already forgotten and must relearn it. Spaced repetition aims for the sweet spot — review just when you are about to forget — so that each review strengthens memory without unnecessary repetition.",
+      "the idea is simple: if you see something too soon, you waste time; if you see it too late, you have already forgotten and must relearn it. spaced repetition aims for the sweet spot — review just when you are about to forget — so that each review strengthens memory without unnecessary repetition.",
     summaryP3:
-      "This summary draws on the report from Yudame Research’s podcast episode on spaced repetition (Algorithms for Life, Ep. 1). Below we outline the main concepts and why they matter for learning.",
-    sectionSpacing: "The spacing effect",
+      "this summary draws on the report from yudame research’s podcast episode on spaced repetition (algorithms for life, ep. 1). below we outline the main concepts and why they matter for learning.",
+    sectionSpacing: "the spacing effect",
     summaryP4:
-      "The spacing effect is one of the most replicated findings in cognitive psychology: if you study the same material in two sessions, you remember more when those sessions are separated in time than when they are back-to-back. Hermann Ebbinghaus demonstrated this in the 1880s using nonsense syllables; later researchers have confirmed it for vocabulary, facts, and skills across many domains.",
+      "the spacing effect is one of the most replicated findings in cognitive psychology: if you study the same material in two sessions, you remember more when those sessions are separated in time than when they are back-to-back. hermann ebbinghaus demonstrated this in the 1880s using nonsense syllables; later researchers have confirmed it for vocabulary, facts, and skills across many domains.",
     summaryP5:
-      "Why does spacing work? One leading explanation is that each time you successfully recall something after a delay, you strengthen the long-term trace. Forgetting a little (but not completely) before reviewing seems to make the memory more durable. Cramming, by contrast, produces strong short-term memory that fades quickly.",
-    sectionForgetting: "The forgetting curve",
+      "why does spacing work? one leading explanation is that each time you successfully recall something after a delay, you strengthen the long-term trace. forgetting a little (but not completely) before reviewing seems to make the memory more durable. cramming, by contrast, produces strong short-term memory that fades quickly.",
+    sectionForgetting: "the forgetting curve",
     summaryP6:
-      "Ebbinghaus also described the forgetting curve: after learning, retention drops quickly at first and then levels off. Without review, most of what we “learn” in a single session is lost within days. The curve is not fixed — it changes with the strength of the memory and how we encode the material.",
+      "ebbinghaus also described the forgetting curve: after learning, retention drops quickly at first and then levels off. without review, most of what we “learn” in a single session is lost within days. the curve is not fixed — it changes with the strength of the memory and how we encode the material.",
     summaryP7:
-      "Spaced repetition uses this curve. By reviewing at or just before the point where you would forget, you extend the interval each time. Easy items move to longer intervals (days, weeks, months); hard items stay on shorter intervals until they stabilize. The result is that you spend most of your time on items that actually need review, not on ones you already know well.",
-    sectionAlgorithms: "How SRS algorithms work",
+      "spaced repetition uses this curve. by reviewing at or just before the point where you would forget, you extend the interval each time. easy items move to longer intervals (days, weeks, months); hard items stay on shorter intervals until they stabilize. the result is that you spend most of your time on items that actually need review, not on ones you already know well.",
+    sectionAlgorithms: "how srs algorithms work",
     summaryP8:
-      "Manual spacing is possible but hard to manage at scale. Algorithms like SM-2 (used in Anki and many other tools) automate the decision: after each review, they compute the next interval based on how well you recalled the item. If you remembered easily, the interval increases; if you struggled or failed, the interval shortens or resets. The exact formula varies, but the principle is the same: use your performance to schedule the next review.",
+      "manual spacing is possible but hard to manage at scale. algorithms like sm-2 (used in anki and many other tools) automate the decision: after each review, they compute the next interval based on how well you recalled the item. if you remembered easily, the interval increases; if you struggled or failed, the interval shortens or resets. the exact formula varies, but the principle is the same: use your performance to schedule the next review.",
     summaryP9:
-      "Retentio follows this approach. Each card has a due date; when you review it, the system updates the interval and the next due date. You do not choose when to see each card — the algorithm does. That way you can focus on answering and let the system handle the scheduling.",
-    sectionPractice: "Why it matters in practice",
+      "retentio follows this approach. each card has a due date; when you review it, the system updates the interval and the next due date. you do not choose when to see each card — the algorithm does. that way you can focus on answering and let the system handle the scheduling.",
+    sectionPractice: "why it matters in practice",
     summaryP10:
-      "Spaced repetition is not a trick; it is a way of aligning study with how memory actually works. It reduces total study time because you stop over-reviewing material you already know and focus on what is slipping. It also reduces stress: instead of last-minute cramming, you do a steady amount of review each day, and the system keeps track of what is due.",
+      "spaced repetition is not a trick; it is a way of aligning study with how memory actually works. it reduces total study time because you stop over-reviewing material you already know and focus on what is slipping. it also reduces stress: instead of last-minute cramming, you do a steady amount of review each day, and the system keeps track of what is due.",
     summaryP11:
-      "Whether you are learning a language, preparing for exams, or building a knowledge base of facts and concepts, spacing your reviews makes the effort more efficient and the results longer-lasting. For a deeper dive and more detail, see the full report linked below.",
-    readFullReport: "Read the full report",
-    backToHome: "Back to home",
+      "whether you are learning a language, preparing for exams, or building a knowledge base of facts and concepts, spacing your reviews makes the effort more efficient and the results longer-lasting. for a deeper dive and more detail, see the full report linked below.",
+    readFullReport: "read the full report",
+    backToHome: "back to home",
   },
   zh: {
     title: "间隔重复：概要",

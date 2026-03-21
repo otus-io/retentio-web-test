@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { DeckInfoCard } from "./DeckInfoCard";
 import type { DeckItem } from "@/lib/api";
 
@@ -34,7 +35,11 @@ function renderCard(overrides: Partial<Parameters<typeof DeckInfoCard>[0]> = {})
     onDelete: vi.fn(),
     ...overrides,
   };
-  render(<DeckInfoCard {...props} />);
+  render(
+    <MemoryRouter>
+      <DeckInfoCard {...props} />
+    </MemoryRouter>
+  );
   return props;
 }
 
@@ -60,6 +65,12 @@ describe("DeckInfoCard", () => {
     expect(screen.getAllByText("10").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("20")).toBeInTheDocument(); // cards_count
     expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
+  });
+
+  it("links Bulk Upload to this deck", () => {
+    renderCard();
+    const link = screen.getByRole("link", { name: /Bulk Upload \(ZIP\)/i });
+    expect(link).toHaveAttribute("href", "/decks/deck123/bulk-upload");
   });
 
   it("calls onEdit when Edit menu item is clicked", async () => {

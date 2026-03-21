@@ -28,7 +28,7 @@ export default function LoginPage() {
       await login(username, password);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "login failed");
     } finally {
       setLoading(false);
     }
@@ -36,13 +36,21 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-border/80 bg-card/95 px-4 py-3">
+      <header className="border-b border-border/80 bg-card/95 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/"
           className="text-xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
         >
           Retentio
         </Link>
+        <nav className="flex items-center gap-3">
+          <Link
+            to="/decks"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            deck
+          </Link>
+        </nav>
       </header>
       <div className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-sm">

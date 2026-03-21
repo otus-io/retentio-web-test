@@ -225,7 +225,7 @@ export function FieldWithMedia({
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >
-            img
+            Show image
           </button>
         )}
         {images}
@@ -245,7 +245,7 @@ export function FieldWithMedia({
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >
-            img
+            Show image
           </button>
         )}
         {images}
@@ -693,7 +693,7 @@ export function CardSection({
                 {editFactEntries.map((entry, i) => (
                   <div key={i} className="space-y-1">
                     <Label htmlFor={`card-edit-field-${i}`}>
-                      {i < (deck.field?.length ?? 0) ? deck.field![i] : `Field ${i + 1}`}
+                      {i < (deck.field?.length ?? 0) ? deck.field![i] : `field ${i + 1}`}
                     </Label>
                     <Input
                       id={`card-edit-field-${i}`}
