@@ -110,6 +110,16 @@ function escapeCsvField(s: string, delimiter: "," | ";"): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
+/** True if the parsed CSV row has at least one field (column), even if every cell is blank. */
+function rowHasAtLeastOneColumn(cells: string[]): boolean {
+  return cells.length >= 1;
+}
+
+/** True if the row has at least one non-empty cell after trim (allows empty columns elsewhere). */
+function rowHasNonEmptyCell(cells: string[]): boolean {
+  return cells.some((c) => c.trim() !== "");
+}
+
 function withRenumberedRows(list: PreviewRow[]): PreviewRow[] {
   return list.map((r, i) => ({ ...r, index: i + 1 }));
 }
@@ -647,7 +657,10 @@ export default function BulkUploadPage() {
       const rowScanUpdateEvery = Math.max(1, Math.ceil(lineTotal / 50));
       for (let i = startRow; i < parsed.length; i += 1) {
         const row = parsed[i];
-        if (row.length < 2) continue;
+        if (!rowHasAtLeastOneColumn(row)) {
+          throw new Error("The CSV contains a row with no columns.");
+        }
+        if (!rowHasNonEmptyCell(row)) continue;
         const values = Array.from({ length: maxCols }, (_, c) => row[c] ?? "");
         displayIndex += 1;
         previewRows.push({
@@ -663,7 +676,9 @@ export default function BulkUploadPage() {
         }
       }
       if (previewRows.length === 0) {
-        throw new Error("No valid data rows found. Each row needs at least 2 columns.");
+        throw new Error(
+          "No valid data rows found. Each row needs at least one column and at least one non-empty cell."
+        );
       }
       setParseProgress(72);
       await nextMacrotask();
@@ -833,9 +848,12 @@ export default function BulkUploadPage() {
   async function handleSubmit() {
     if (!token || !id || !zipFile || rows.length === 0) return;
     for (const row of rows) {
-      const front = row.values[0]?.trim() ?? "";
-      if (row.values.length < 2 || front === "") {
-        setError("Each row needs at least two columns and a non-empty first column.");
+      if (!rowHasAtLeastOneColumn(row.values)) {
+        setError("Each row needs at least one column.");
+        return;
+      }
+      if (!rowHasNonEmptyCell(row.values)) {
+        setError("Each row needs at least one non-empty cell (empty columns are allowed).");
         return;
       }
     }
