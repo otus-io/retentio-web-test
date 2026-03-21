@@ -1,0 +1,45 @@
+---
+name: Webapp CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/webapp-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/webapp-ci.yml'
+
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: webapp
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_API_URL: https://api.wordupx.com:8443
