@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'webapp/**'
+      - '.github/workflows/deploy-webapp.yml'
 
 jobs:
   deploy-webapp:
@@ -18,6 +19,6 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd ~/otus-io/retentio-webapp || exit 1
+            cd "$HOME/otusio/retentio-webapp" || exit 1
             git pull origin main || exit 1
             (cd webapp && VITE_API_URL=https://api.wordupx.com:8443 npm run build) || exit 1
