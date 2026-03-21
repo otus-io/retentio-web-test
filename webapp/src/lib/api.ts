@@ -39,7 +39,7 @@ export async function request<T>(
 
 const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — backend may run ffmpeg/cwebp
 
-/** Long timeout for bulk ZIP import (~100MB transfer + thousands of media conversions on server). */
+/** Long timeout for bulk ZIP import (~500MB transfer + many media files on server). */
 export const BULK_IMPORT_UPLOAD_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
 /** Optional client_id enables idempotent uploads (backend returns existing media if already uploaded). */

@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  startTransition,
   type ChangeEvent,
 } from "react";
 import JSZip from "jszip";
@@ -35,9 +36,7 @@ import {
 import {
   bulkImportZipEntryIsMedia,
   bulkImportZipPathSkippable,
-  formatMatchedMediaForRow,
   listBulkImportMediaPaths,
-  listMatchedMediaPathsForPreview,
   normalizeZipPath,
 } from "@/lib/bulkImportNormalize";
 import { cn } from "@/lib/utils";
@@ -47,12 +46,12 @@ type PreviewRow = {
   /** 1-based display index in the table */
   index: number;
   values: string[];
-  /** Matched ZIP media basename(s), comma-separated; read-only in the table */
-  mediaName: string;
 };
 
-const MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_ZIP_SIZE_BYTES = 500 * 1024 * 1024;
 const PREVIEW_PAGE_SIZE = 50;
+const CSV_PARSE_LINES_PER_CHUNK = 400;
+const PREVIEW_ROW_BUILD_YIELD_EVERY = 400;
 
 /** Lets React commit `setParseProgress` before the next update (avoids React 18 batching the whole loop into one paint). */
 function nextMacrotask(): Promise<void> {
@@ -88,7 +87,8 @@ function parseCsvLine(line: string, delimiter: "," | ";"): string[] {
   return out;
 }
 
-function parseCsvText(text: string): { rows: string[][]; delimiter: "," | ";" } {
+/** Parses CSV in chunks with yields so the UI stays responsive on huge CSVs inside ZIPs. */
+async function parseCsvTextAsync(text: string): Promise<{ rows: string[][]; delimiter: "," | ";" }> {
   const rawLines = text
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -97,10 +97,15 @@ function parseCsvText(text: string): { rows: string[][]; delimiter: "," | ";" } 
   const commaCount = (rawLines[0].match(/,/g) ?? []).length;
   const semicolonCount = (rawLines[0].match(/;/g) ?? []).length;
   const delimiter: "," | ";" = semicolonCount > commaCount ? ";" : ",";
-  return {
-    rows: rawLines.map((line) => parseCsvLine(line, delimiter)),
-    delimiter,
-  };
+  const rows: string[][] = [];
+  for (let i = 0; i < rawLines.length; i += CSV_PARSE_LINES_PER_CHUNK) {
+    const end = Math.min(i + CSV_PARSE_LINES_PER_CHUNK, rawLines.length);
+    for (let j = i; j < end; j += 1) {
+      rows.push(parseCsvLine(rawLines[j], delimiter));
+    }
+    await nextMacrotask();
+  }
+  return { rows, delimiter };
 }
 
 function escapeCsvField(s: string, delimiter: "," | ";"): string {
@@ -246,8 +251,9 @@ export default function BulkUploadPage() {
     skippedDuplicateInCsv: number;
   } | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
-  /** Normalized ZIP paths for supported media files (exact match against row cells). */
+  /** Normalized ZIP paths for supported media files (same matching rules as the API). */
   const [mediaPaths, setMediaPaths] = useState<string[]>([]);
+  /** After a successful ZIP parse: presence + supported file counts under audio/, image/, video/. */
   const [csvPathInZip, setCsvPathInZip] = useState("facts.csv");
   const [csvDelimiter, setCsvDelimiter] = useState<"," | ";">(",");
   const [includeHeaderRow, setIncludeHeaderRow] = useState(false);
@@ -275,6 +281,11 @@ export default function BulkUploadPage() {
   const paginatedRows = rows.slice(previewStart, previewStart + PREVIEW_PAGE_SIZE);
 
   const duplicateRowIds = useMemo(() => duplicatePreviewRowIds(rows), [rows]);
+
+  const zipMediaFileCount = useMemo(
+    () => new Set(mediaPaths.map((p) => normalizeZipPath(p))).size,
+    [mediaPaths]
+  );
 
   const existingColCount = useMemo(
     () => existingFactsColumnCount(deckFields, existingFacts),
@@ -391,13 +402,11 @@ export default function BulkUploadPage() {
       existingFacts,
       columnCount
     );
-    const withMedia = kept.map((r) => ({
-      ...r,
-      mediaName: formatMatchedMediaForRow(r.values, mediaPaths),
-    }));
-    setRows(withRenumberedRows(withMedia));
-    setImportDedupeStats({ skippedAlreadyInDeck, skippedDuplicateInCsv });
-  }, [existingFacts, csvRawRows, columns.length, mediaPaths]);
+    startTransition(() => {
+      setRows(withRenumberedRows(kept));
+      setImportDedupeStats({ skippedAlreadyInDeck, skippedDuplicateInCsv });
+    });
+  }, [existingFacts, csvRawRows, columns.length]);
 
   async function handleLogout() {
     await logout();
@@ -609,12 +618,12 @@ export default function BulkUploadPage() {
       const allFiles = Object.values(zip.files).filter((entry) => !entry.dir);
       const csvFiles = allFiles.filter((entry) => {
         const n = normalizeZipPath(entry.name);
-        return (
-          !bulkImportZipPathSkippable(n) && n.toLowerCase().endsWith(".csv")
-        );
+        if (bulkImportZipPathSkippable(n)) return false;
+        const depth = n.split("/").filter(Boolean).length;
+        return depth === 1 && n.toLowerCase().endsWith(".csv");
       });
       if (csvFiles.length !== 1) {
-        throw new Error("ZIP must contain exactly one CSV file.");
+        throw new Error("ZIP must contain exactly one CSV at the archive root.");
       }
       setParseProgress(32);
       await nextMacrotask();
@@ -631,24 +640,19 @@ export default function BulkUploadPage() {
       })();
       setParseProgress(48);
       await nextMacrotask();
-      const { rows: parsed, delimiter } = parseCsvText(csvText);
+      const { rows: parsed, delimiter } = await parseCsvTextAsync(csvText);
       if (parsed.length === 0) throw new Error("CSV is empty.");
-
-      setCsvPathInZip(normalizeZipPath(csvFiles[0].name));
-      setCsvDelimiter(delimiter);
 
       let startRow = 0;
       if (parsed.length > 1 && parsed[0].every((cell) => cell.trim() !== "")) {
         startRow = 1;
       }
-      setIncludeHeaderRow(startRow === 1);
       const maxCols = parsed.reduce((m, row) => Math.max(m, row.length), 0);
       const header = startRow === 1
         ? Array.from({ length: maxCols }, (_, i) => parsed[0][i] ?? `Column ${i + 1}`)
         : Array.from({ length: maxCols }, (_, i) => `Column ${i + 1}`);
 
       const paths = listBulkImportMediaPaths(mediaFiles.map((m) => m.name));
-      setMediaPaths(paths);
 
       const previewRows: PreviewRow[] = [];
       let displayIndex = 0;
@@ -664,13 +668,16 @@ export default function BulkUploadPage() {
         const values = Array.from({ length: maxCols }, (_, c) => row[c] ?? "");
         displayIndex += 1;
         previewRows.push({
-          id: crypto.randomUUID(),
+          id: `ir-${i}`,
           index: displayIndex,
           values,
-          mediaName: formatMatchedMediaForRow(values, paths),
         });
         const lineDone = i - startRow + 1;
-        if (lineDone % rowScanUpdateEvery === 0 || lineDone === lineTotal) {
+        if (
+          lineDone % rowScanUpdateEvery === 0 ||
+          lineDone === lineTotal ||
+          lineDone % PREVIEW_ROW_BUILD_YIELD_EVERY === 0
+        ) {
           setParseProgress(48 + Math.min(22, Math.floor((lineDone / lineTotal) * 22)));
           await nextMacrotask();
         }
@@ -690,11 +697,17 @@ export default function BulkUploadPage() {
       }
       setParseProgress(92);
       await nextMacrotask();
-      setColumns(header);
-      setCsvRawRows(previewRows);
-      setPreviewConfirmed(false);
-      setSelectedRowIds(new Set());
-      setPreviewPage(1);
+      startTransition(() => {
+        setCsvPathInZip(normalizeZipPath(csvFiles[0].name));
+        setCsvDelimiter(delimiter);
+        setIncludeHeaderRow(startRow === 1);
+        setMediaPaths(paths);
+        setColumns(header);
+        setCsvRawRows(previewRows);
+        setPreviewConfirmed(false);
+        setSelectedRowIds(new Set());
+        setPreviewPage(1);
+      });
       setParseProgress(100);
       await nextMacrotask();
     } catch (e) {
@@ -739,7 +752,7 @@ export default function BulkUploadPage() {
       return;
     }
     if (file.size > MAX_ZIP_SIZE_BYTES) {
-      setError("ZIP is too large. Max size is 100 MB.");
+      setError("ZIP is too large. Max size is 500 MB.");
       return;
     }
     setZipFile(file);
@@ -757,7 +770,6 @@ export default function BulkUploadPage() {
         return {
           ...r,
           values: nextValues,
-          mediaName: formatMatchedMediaForRow(nextValues, mediaPaths),
         };
       })
     );
@@ -824,12 +836,12 @@ export default function BulkUploadPage() {
         normToZipKey.set(normalizeZipPath(path), path);
       }
     }
-    const matchedNorms = new Set(listMatchedMediaPathsForPreview(rows, mediaPaths));
-    for (const norm of matchedNorms) {
-      const zipKey = normToZipKey.get(norm);
+    for (const norm of mediaPaths) {
+      const n = normalizeZipPath(norm);
+      const zipKey = normToZipKey.get(n);
       if (!zipKey) continue;
       const entry = zip.files[zipKey];
-      out.file(norm, await entry.async("uint8array"));
+      out.file(n, await entry.async("uint8array"));
     }
     const delim = csvDelimiter;
     const lines: string[] = [];
@@ -879,18 +891,7 @@ export default function BulkUploadPage() {
       )) as BulkImportRes;
       const added = res?.data?.facts_added ?? 0;
       const uploaded = res?.data?.media_uploaded ?? 0;
-      const totalMediaInZip = new Set(mediaPaths).size;
-      const ignored = Math.max(
-        0,
-        totalMediaInZip - listMatchedMediaPathsForPreview(rows, mediaPaths).length
-      );
-      const ignoredPart =
-        ignored > 0
-          ? `, ${ignored} ignored (not referenced in preview)`
-          : "";
-      setSuccess(
-        `Bulk import completed: ${added} facts added, ${uploaded} media uploaded${ignoredPart}.`
-      );
+      setSuccess(`Bulk import completed: ${added} facts added, ${uploaded} media uploaded.`);
       setPreviewConfirmed(false);
       void loadDeckAndFacts();
     } catch (e) {
@@ -939,7 +940,7 @@ export default function BulkUploadPage() {
               className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
             />
             <p className="text-xs text-muted-foreground">
-              expected zip: exactly one csv (any path) and optional audio/image files in any folder name. files are matched by stem (e.g. <code>Apple</code> ↔ <code>photos/apple.jpg</code>).
+              expected zip: one csv at the root and optional flat <code>audio/</code>, <code>image/</code>, <code>video/</code> folders (max 500&nbsp;MB). use <code>row_column.ext</code> names (ankifacts <code>-M</code>) or exact cell text as the file stem for legacy matching.
             </p>
             <p className="text-xs text-muted-foreground max-w-xl">
               when the preview appears below, review and edit rows if needed, confirm, then use <strong>submit import</strong>.
@@ -1287,9 +1288,21 @@ export default function BulkUploadPage() {
                 </div>
               </div>
             ) : rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Select a zip file to preview new rows and matched media filenames.</p>
+              <p className="text-sm text-muted-foreground">Select a zip file to preview import rows.</p>
             ) : (
               <div className="space-y-6">
+                <div
+                  role="status"
+                  className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm tabular-nums"
+                >
+                  <p className="font-medium text-foreground">Import summary</p>
+                  <p className="mt-1.5 text-muted-foreground">
+                    <span className="font-semibold text-foreground">{rows.length.toLocaleString()}</span>{" "}
+                    row{rows.length === 1 ? "" : "s"} ·{" "}
+                    <span className="font-semibold text-foreground">{zipMediaFileCount.toLocaleString()}</span>{" "}
+                    media file{zipMediaFileCount === 1 ? "" : "s"}
+                  </p>
+                </div>
                 {importDedupeStats &&
                   (importDedupeStats.skippedAlreadyInDeck > 0 ||
                     importDedupeStats.skippedDuplicateInCsv > 0) && (
@@ -1348,9 +1361,13 @@ export default function BulkUploadPage() {
                         </th>
                         <th className="px-3 py-2 text-left font-medium w-12">#</th>
                         {columns.map((col, idx) => (
-                          <th key={`${col}-${idx}`} className="px-3 py-2 text-left font-medium min-w-[8rem]">{col || `Column ${idx + 1}`}</th>
+                          <th
+                            key={`${col}-${idx}`}
+                            className="px-3 py-2 text-left font-medium min-w-[12rem]"
+                          >
+                            {col || `Column ${idx + 1}`}
+                          </th>
                         ))}
-                        <th className="px-3 py-2 text-left font-medium min-w-[10rem]">Media file</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1388,23 +1405,15 @@ export default function BulkUploadPage() {
                             </span>
                           </td>
                           {columns.map((_, idx) => (
-                            <td key={`${row.id}-${idx}`} className="px-3 py-2">
+                            <td key={`${row.id}-${idx}`} className="px-3 py-2 align-top">
                               <Input
                                 value={row.values[idx] ?? ""}
                                 onChange={(e) => updateCell(row.id, idx, e.target.value)}
-                                className="h-9 min-w-[6rem]"
-                                aria-label={`${columns[idx] ?? `Column ${idx + 1}`} row ${row.index}`}
+                                className="h-9 min-w-0 w-full min-w-[6rem]"
+                                aria-label={`${columns[idx] ?? `Column ${idx + 1}`}, text row ${row.index}`}
                               />
                             </td>
                           ))}
-                          <td className="px-3 py-2 align-middle">
-                            <span
-                              className="block max-w-[16rem] break-all text-xs font-mono text-foreground/90"
-                              title={row.mediaName || "No matching file in ZIP"}
-                            >
-                              {row.mediaName.trim() ? row.mediaName : "—"}
-                            </span>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1469,7 +1478,7 @@ export default function BulkUploadPage() {
                       disabled={parsing || submitting}
                     />
                     <Label htmlFor="bulk-preview-confirm" className="font-normal text-sm leading-snug cursor-pointer">
-                      I&apos;ve reviewed the preview. The text and media matches look correct, and I&apos;m ready to add these facts to the deck.
+                      I&apos;ve reviewed the preview and I&apos;m ready to add these facts to the deck.
                     </Label>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
