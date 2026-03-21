@@ -5,23 +5,13 @@ import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  request,
-  uploadMultipart,
-  getApiBaseUrl,
-  type ListMediaRes,
-  type MediaItem,
-  type UploadMediaRes,
-} from "@/lib/api";
+import { request, getApiBaseUrl, type ListMediaRes, type MediaItem } from "@/lib/api";
 
 export default function MediaPage() {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploadError, setUploadError] = useState("");
-  const [uploadSuccess, setUploadSuccess] = useState("");
-  const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [deleteSuccess, setDeleteSuccess] = useState("");
@@ -46,27 +36,6 @@ export default function MediaPage() {
   async function handleLogout() {
     await logout();
     navigate("/login", { replace: true });
-  }
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !token) return;
-    e.target.value = "";
-    setUploadError("");
-    setUploadSuccess("");
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      await uploadMultipart("/api/media", formData, token) as UploadMediaRes;
-      setUploadSuccess("Uploaded successfully.");
-      await fetchList();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
-      setUploadSuccess("");
-    } finally {
-      setUploading(false);
-    }
   }
 
   async function handleDownload(m: MediaItem) {
@@ -116,6 +85,9 @@ export default function MediaPage() {
           <h1 className="text-2xl font-semibold">Media</h1>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" asChild>
+              <Link to="/decks">Deck</Link>
+            </Button>
+            <Button variant="ghost" asChild>
               <Link to="/profile">Profile</Link>
             </Button>
             <Button variant="outline" onClick={handleLogout}>
@@ -123,24 +95,6 @@ export default function MediaPage() {
             </Button>
           </nav>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
-            {uploadSuccess && <p className="text-sm text-green-600">{uploadSuccess}</p>}
-            <input
-              type="file"
-              accept="image/*,audio/*,video/*"
-              onChange={handleUpload}
-              disabled={uploading}
-              className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
-            />
-            {uploading && <p className="text-sm text-muted-foreground">Uploading…</p>}
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
@@ -152,7 +106,9 @@ export default function MediaPage() {
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : items.length === 0 ? (
-              <p className="text-muted-foreground">No files yet. Upload an image, audio, or video file above.</p>
+              <p className="text-muted-foreground">
+                No files yet. Media you attach when adding facts or via bulk upload on a deck appears here.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

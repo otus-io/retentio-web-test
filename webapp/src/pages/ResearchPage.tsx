@@ -27,6 +27,12 @@ export default function ResearchPage() {
           </Link>
           <nav className="flex items-center gap-3">
             <LanguageSwitcher />
+            <Link
+              to="/decks"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              deck
+            </Link>
             {token ? (
               <Button asChild variant="default">
                 <Link to="/profile">{t.dashboard}</Link>
@@ -92,7 +98,7 @@ export default function ResearchPage() {
               {r.readFullReport} →
             </a>
             <span className="text-muted-foreground text-sm ml-1">
-              (Yudame Research — Algorithms for Life, Ep. 1)
+              (yudame research — algorithms for life, ep. 1)
             </span>
           </p>
         </article>

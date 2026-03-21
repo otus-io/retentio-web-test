@@ -27,7 +27,7 @@ export default function RegisterPage() {
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "registration failed");
     } finally {
       setLoading(false);
     }
@@ -35,18 +35,53 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Account created. Redirecting to login…</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex flex-col">
+        <header className="border-b border-border/80 bg-card/95 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            to="/"
+            className="text-xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+          >
+            Retentio
+          </Link>
+          <nav className="flex items-center gap-3">
+            <Link
+              to="/decks"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Deck
+            </Link>
+          </nav>
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm">
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground">Account created. Redirecting to login…</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b border-border/80 bg-card/95 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to="/"
+          className="text-xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+        >
+          Retentio
+        </Link>
+        <nav className="flex items-center gap-3">
+          <Link
+            to="/decks"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Deck
+          </Link>
+        </nav>
+      </header>
+      <div className="flex-1 flex items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Register</CardTitle>
@@ -95,6 +130,7 @@ export default function RegisterPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

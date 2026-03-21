@@ -27,10 +27,10 @@ export default function DeckEditPage() {
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       setName(res.data.name);
-      setFieldNames([...res.data.field]);
+      setFieldNames(res.data.field.length > 0 ? [...res.data.field] : ["", ""]);
       setRate(res.data.rate);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load deck");
+      setError(e instanceof Error ? e.message : "failed to load deck");
     } finally {
       setLoading(false);
     }
@@ -45,11 +45,11 @@ export default function DeckEditPage() {
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
     if (fields.length < 2) {
-      setError("At least two fields required");
+      setError("at least two fields required");
       return;
     }
     if (rate < 1 || rate > 1000) {
-      setError("Rate must be between 1 and 1000");
+      setError("rate must be between 1 and 1000");
       return;
     }
     setError("");
@@ -63,7 +63,7 @@ export default function DeckEditPage() {
       });
       navigate("/profile", { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
+      setError(e instanceof Error ? e.message : "update failed");
     } finally {
       setSaving(false);
     }
@@ -72,7 +72,11 @@ export default function DeckEditPage() {
   if (loading) {
     return (
       <div className="min-h-screen p-4 md:p-6">
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-lg mx-auto space-y-4">
+          <p className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+            <Link to="/decks" className="text-primary hover:underline">Deck</Link>
+            <Link to="/profile" className="text-primary hover:underline">Profile</Link>
+          </p>
           <p className="text-muted-foreground">Loading…</p>
         </div>
       </div>
@@ -82,8 +86,9 @@ export default function DeckEditPage() {
   return (
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-lg mx-auto space-y-4">
-        <p className="text-sm">
-          <Link to="/profile" className="text-primary hover:underline">← Profile</Link>
+        <p className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+          <Link to="/decks" className="text-primary hover:underline">Deck</Link>
+          <Link to="/profile" className="text-primary hover:underline">Profile</Link>
         </p>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DeckEditForm

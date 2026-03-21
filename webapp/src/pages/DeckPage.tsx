@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +39,9 @@ export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
   const { token, logout } = useAuth();
   const navigate = useNavigate();
+  /** Ignore async results after navigating to another deck (avoids stale UI). */
+  const routeDeckIdRef = useRef(id);
+  routeDeckIdRef.current = id;
   const [deck, setDeck] = useState<DeckItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -82,12 +85,28 @@ export default function DeckPage() {
     return () => document.removeEventListener("keydown", onKey);
   }, [addFactsOpen]);
 
+  useEffect(() => {
+    setDeck(null);
+    setFactsList([]);
+    setCardStats(null);
+    setNextCard(null);
+    setNextCardFact(null);
+    setNextCardMeta(null);
+    setError("");
+    setEditing(false);
+    setSuccessMessage("");
+    setFactSuccess("");
+    setCardSuccess("");
+  }, [id]);
+
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
+    const targetDeckId = id;
     setLoading(true);
     setError("");
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
+      if (routeDeckIdRef.current !== targetDeckId) return;
       const data = res.data;
       setDeck(data);
       setName(data.name);
@@ -96,10 +115,11 @@ export default function DeckPage() {
       setFactRow(makeInitialFactRow(data));
       setAddFactSplit(1);
     } catch (e) {
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setError(e instanceof Error ? e.message : "Failed to load deck");
       setDeck(null);
     } finally {
-      setLoading(false);
+      if (routeDeckIdRef.current === targetDeckId) setLoading(false);
     }
   }, [token, id]);
 
@@ -109,32 +129,39 @@ export default function DeckPage() {
 
   const fetchFacts = useCallback(async () => {
     if (!token || !id) return;
+    const targetDeckId = id;
     setLoadingFacts(true);
     try {
       const res = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setFactsList(res.data.facts);
     } catch {
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setFactsList([]);
     } finally {
-      setLoadingFacts(false);
+      if (routeDeckIdRef.current === targetDeckId) setLoadingFacts(false);
     }
   }, [token, id]);
 
   const fetchCards = useCallback(async () => {
     if (!token || !id) return;
+    const targetDeckId = id;
     setLoadingCards(true);
     try {
       const res = await request<GetCardsRes>(`/api/decks/${id}/cards`, { token });
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setCardStats(res.data);
     } catch {
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setCardStats(null);
     } finally {
-      setLoadingCards(false);
+      if (routeDeckIdRef.current === targetDeckId) setLoadingCards(false);
     }
   }, [token, id]);
 
   const handleGetNextCard = useCallback(async (keepCurrentCard?: boolean) => {
     if (!token || !id) return;
+    const targetDeckId = id;
     setCardError("");
     setLoadingNextCard(true);
     if (!keepCurrentCard) {
@@ -143,6 +170,7 @@ export default function DeckPage() {
     }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
+      if (routeDeckIdRef.current !== targetDeckId) return;
       // Backend returns card: [] when there are no cards; avoid using .front/.fact_id on an array
       const card = res.data.card as NextCardItem | unknown[];
       const noCard = Array.isArray(card) || card == null;
@@ -167,17 +195,19 @@ export default function DeckPage() {
           `/api/decks/${id}/facts/${cardObj.fact_id}`,
           { token }
         );
+        if (routeDeckIdRef.current !== targetDeckId) return;
         setNextCardFact(factRes.data.fact);
       } else {
         setNextCardFact(null);
       }
     } catch (e) {
+      if (routeDeckIdRef.current !== targetDeckId) return;
       setCardError(e instanceof Error ? e.message : "No card or failed to load");
       setNextCard(null);
       setNextCardFact(null);
       setNextCardMeta(null);
     } finally {
-      setLoadingNextCard(false);
+      if (routeDeckIdRef.current === targetDeckId) setLoadingNextCard(false);
     }
   }, [token, id]);
 
@@ -227,7 +257,7 @@ export default function DeckPage() {
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
     if (fields.length < 2) {
-      setError("At least two fields required");
+      setError("At least two fields are required");
       return;
     }
     if (rate < 1 || rate > 1000) {
@@ -290,7 +320,7 @@ export default function DeckPage() {
           formData.append("file", file);
           const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
           const id = res?.data?.id != null ? String(res.data.id).trim() : "";
-          if (!id) throw new Error("Upload response missing media id");
+          if (!id) throw new Error("upload response missing media id");
           const type = file.type.startsWith("image/")
             ? "image"
             : file.type.startsWith("video/")
@@ -482,7 +512,21 @@ export default function DeckPage() {
   if (loading) {
     return (
       <div className="min-h-screen p-4 md:p-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <nav className="flex items-center gap-2">
+            <Link to="/decks" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              Deck
+            </Link>
+            <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              Profile
+            </Link>
+            <Link to="/media" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              Media
+            </Link>
+            <Button variant="outline" onClick={handleLogout}>
+              Logout
+            </Button>
+          </nav>
           <p className="text-muted-foreground">Loading deck…</p>
         </div>
       </div>
@@ -494,8 +538,14 @@ export default function DeckPage() {
       <div className="min-h-screen p-4 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
           <nav className="flex items-center gap-2">
+            <Link to="/decks" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              Deck
+            </Link>
             <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
               Profile
+            </Link>
+            <Link to="/media" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+              Media
             </Link>
             <Button variant="outline" onClick={handleLogout}>
               Logout

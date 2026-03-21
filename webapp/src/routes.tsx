@@ -9,6 +9,8 @@ import MediaPage from "@/pages/MediaPage";
 import ProfilePage from "@/pages/ProfilePage";
 import RegisterPage from "@/pages/RegisterPage";
 import ManualPage from "@/pages/ManualPage";
+import BulkUploadPage from "@/pages/BulkUploadPage";
+import DecksListPage from "@/pages/DecksListPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -37,6 +39,14 @@ export const routes = [
     ),
   },
   {
+    path: "/decks",
+    element: (
+      <ProtectedRoute>
+        <DecksListPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/decks/:id/edit",
     element: (
       <ProtectedRoute>
@@ -49,6 +59,14 @@ export const routes = [
     element: (
       <ProtectedRoute>
         <DeckPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/decks/:id/bulk-upload",
+    element: (
+      <ProtectedRoute>
+        <BulkUploadPage />
       </ProtectedRoute>
     ),
   },

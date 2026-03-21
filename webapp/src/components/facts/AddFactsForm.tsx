@@ -177,7 +177,7 @@ export function AddFactsForm({
         ) : (
           <Input
             aria-label="Field name"
-            placeholder={`Field ${colIndex + 1}`}
+            placeholder={`field ${colIndex + 1}`}
             value={entry.label}
             onChange={(e) => setTextLabel(colIndex, e.target.value)}
             disabled={addingFacts}
@@ -186,7 +186,7 @@ export function AddFactsForm({
         )}
         <Input
           id={`fact-0-${colIndex}`}
-          placeholder="Value"
+          placeholder="value"
           value={entry.text}
           onChange={(e) => setCell(colIndex, e.target.value)}
           disabled={addingFacts}
@@ -271,7 +271,7 @@ export function AddFactsForm({
                   </span>
                   <Input
                     id={`fact-0-${i}`}
-                    placeholder="Value"
+                    placeholder="value"
                     value={entry.text}
                     onChange={(e) => setCell(i, e.target.value)}
                     disabled={addingFacts}
@@ -282,19 +282,19 @@ export function AddFactsForm({
                       onClick={() => addMediaToRow(i)}
                       disabled={addingFacts || entry.media.length >= MAX_MEDIA_PER_ENTRY}
                     >
-                      Add media
-                    </DropdownMenuItem>
-                  </DropdownMenu>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeCell(i)}
-                    disabled={addingFacts}
-                    aria-label="Remove"
-                  >
-                    ×
-                  </Button>
+            Add media
+          </DropdownMenuItem>
+        </DropdownMenu>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => removeCell(i)}
+          disabled={addingFacts}
+          aria-label="Remove"
+        >
+          ×
+        </Button>
                 </div>
                 {entry.media.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 pl-10">
@@ -417,12 +417,12 @@ export function AddFactsForm({
           </Label>
         </div>
         <p className="text-xs text-muted-foreground font-mono" data-testid="add-facts-template">
-          Template:{" "}
+          template:{" "}
           {sibling
             ? JSON.stringify(buildSiblingTemplate(row.length, split))
             : split !== 1
               ? JSON.stringify([buildTemplateWithSplit(row.length, split)])
-              : "default (0 front, rest back)"}
+              : "Default (0 front, rest back)"}
         </p>
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={addingFacts}>
