@@ -272,7 +272,7 @@
 ```
 
 > 📝 保存 `deck_id` - 后续步骤需要用到。
-> **为什么卡组没有 template？** 模板不存储在卡组上。添加词条时可传入可选参数 `template`（每个词条一个 `[[正面索引], [背面索引]]`）。服务端将该布局写入每张**卡片**的 `template`。**默认不生成兄弟卡（反向卡）**，每词条仅一张卡（正面第一条、背面其余）。省略 `template` 即使用该默认。
+> **为什么卡组没有 template？** 模板不存储在卡组上。添加词条时可传入可选参数 `template`（详见下方 [添加词条](#添加词条)）。默认每词条**一张卡**（正面第一条、背面其余）。若要生成**兄弟卡**（同一词条的多张卡），需传入三维 template，见下文。
 
 ---
 
@@ -377,7 +377,7 @@
 > 添加词条后，`cards_count` 和 `unseen_cards` 会增加。
 > 随着复习的进行，`reviewed_cards` 会增长，`unseen_cards` 会减少。
 >
-> 卡组卡片总数默认等于词条数：**每词条一张卡，默认不生成兄弟卡**。若需为某词条增加第二张卡（如反向卡），请调用 `POST /api/decks/{id}/card`，body 传 `{"fact_id": "<factId>", "template": [[1], [0]]}`。若该 template 已存在则返回 400。
+> 默认每词条一张卡（见 [模板：默认与兄弟卡](#模板默认与兄弟卡)）。若需为某词条再增加一张卡（如反向卡），请调用 `POST /api/decks/{id}/card`，body 传 `{"fact_id": "<factId>", "template": [[1], [0]]}`。若该 template 已存在则返回 400。
 >
 > 客户端计算学习进度百分比：`reviewed_cards / cards_count * 100`。
 
@@ -476,7 +476,7 @@
 - `id`: `a1b2c3d4e5f6`（您的卡组 ID）
 - `operation`: `append`
 
-**请求体：** 词条数组（每项含 `entries`）及可选的 `template`。每条 **entry** 为对象，含可选字段 `text`、`audio`、`image`、`video`（至少填一项）。服务端为每个词条生成唯一 ID，并为每个词条创建**一张卡片**（默认不生成反向/兄弟卡）。卡片的正/背面布局由 `template[i]` 指定（词条索引 `i`），省略或长度不足时使用默认 `[[0], [1, 2, ...]]`。
+**请求体：** 词条数组（每项含 `entries`）及可选的 `template`。每条 **entry** 为对象，含可选字段 `text`、`audio`、`image`、`video`（至少填一项）。服务端为每个词条生成唯一 ID，并根据 `template` 为每个词条创建一张或多张卡片（见下方 **模板：默认与兄弟卡**）。
 
 ```json
 {
@@ -506,17 +506,43 @@
 }
 ```
 
-可选 **`template`**：布局数组，与词条一一对应。每项为 `[[正面索引], [背面索引]]`（如 `[[0], [1]]`）。省略或长度不足时，对应词条使用默认布局。例如两个词条、第二个为反向：
+#### 模板：默认与兄弟卡
+
+**模板**定义一张卡如何展示词条的条目：**正面**（问题）和**背面**（答案），各为一组条目索引。
+
+- **一张卡**由**二维**值表示：`[[正面索引], [背面索引]]`。  
+  例：`[[0], [1]]` 表示正面为第 0 条、背面为第 1 条。  
+  例：`[[0], [1, 2, 3]]` 表示正面为第 0 条、背面为第 1、2、3 条。
+
+- **省略 `template` 时的默认行为：**  
+  每个词条生成**一张卡**，布局为：正面 = 第 `0` 条，背面 = 其余 `[1, 2, …]`。因此简单「第一条为问题、其余为答案」时无需传 `template`。
+
+- **兄弟卡**指同一词条的**多张**卡（如「词→译」和「译→词」）。若在添加词条时一次性生成，需传入**三维** `template`：即**二维模板的数组**。服务端会为请求中的**每个词条**按该数组中的每个二维模板各生成一张卡。  
+  例：对 3 条目的词条，每个词条生成 3 张卡（第 0 条→其余、第 1 条→其余、第 2 条→其余）：
+
+```json
+"template": [
+  [[0], [1, 2]],
+  [[1], [0, 2]],
+  [[2], [0, 1]]
+]
+```
+
+因此：**二维** = 一张卡（一种正/背面划分）；**三维** = 每词条多张卡（兄弟卡）。若只传一个二维模板（如仅反向 `[[1], [0]]`），API 也接受：会视为「仅含一个模板」的数组，即每个词条一张反向卡。
+
+示例：每个词条两张兄弟卡（正常 + 反向）：
 
 ```json
 "template": [ [[0], [1]], [[1], [0]] ]
 ```
 
+每个词条会得到正面=0/背面=1 与正面=1/背面=0 各一张。若只想为部分词条增加反向卡，可稍后对单个词条调用 `POST /api/decks/{id}/card` 添加。
+
 > **理解请求体：**
 >
 > - **`entries`**：entry 对象数组。每个 entry 含可选 `text`、`audio`、`image`、`video`（至少一项）。第 `i` 个 entry 对应第 `i` 列，可用 `fields[i]` 作为标签。在同一 entry 中同时写文本与音频（如 `{ "text": "I go to school.", "audio": "ex1id" }`）可明确该音频对应该句。
 > - **`fields`**（可选）：该词条各列的显示名称；第 `i` 个条目对应 `fields[i]`。省略则使用卡组默认 `fields`。若提供，长度须与 `entries` 一致。
-> - **`template`**（可选）：按词条的布局。每词条一个 `[][]int`；省略或 `i >= len(template)` 时使用默认 `[[0], [1, 2, ...]]`。
+> - **`template`**（可选）：省略或为空时，每个词条生成**一张卡**，默认布局 `[[0], [1, 2, ...]]`。若提供，须为**三维**数组：二维模板的列表。**每个**词条会按该列表中的每个二维模板各生成一张卡（兄弟卡）。每个二维模板须对当前所有词条有效（条目数一致）；索引须在范围内、互不重复且覆盖全部条目。
 
 **响应:**
 
@@ -658,7 +684,7 @@
 
 - `id`: `a1b2c3d4e5f6`（您的卡组 ID）
 
-**响应结构：** `front` 与 `back` 为**词条对象数组**，顺序按 **template**。每个词条有可选 **`field`**（标签）和 **`items`**：`{ "type": "text"|"audio"|"image"|"video", "value": string }` 的数组。每项内 item 顺序固定：text → audio → image → video（仅存在的类型）。一项可有多种类型的多个 item。媒体类型的 `value` 在服务端能解析 base URL 时为**完整媒体 URL**（如 `https://api.wordupx.com:8443/api/media/abc123`）。使用该 URL 并携带相同 `Authorization: Bearer <token>` 即可下载。
+**响应结构：** `front` 与 `back` 为**词条对象数组**，顺序按 **template**（每个对象对应 template 在该侧的一个词条索引）。每个对象与事实中的**词条（entry）**一致：可选 **`field`**（标签），以及可选的 **`text`**、**`audio`**、**`image`**、**`video`** 字符串键（无内容则省略）。正文与对应读音音频在同一对象上并列（例如 `"text": "Hello"` 与 `"audio": "https://…/api/media/…"`），对应关系明确。`audio` / `image` / `video` 在服务端能解析 base URL 时为**完整媒体 URL**（如 `https://api.wordupx.com:8443/api/media/abc123`）。使用该 URL 并携带相同 `Authorization: Bearer <token>` 即可下载。
 
 **响应（无字段名）：**
 
@@ -674,10 +700,10 @@
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"items": [{"type": "text", "value": "Apple"}]}
+        {"text": "Apple"}
       ],
       "back": [
-        {"items": [{"type": "text", "value": "苹果"}]}
+        {"text": "苹果"}
       ]
     },
     "urgency": 1.0
@@ -702,10 +728,10 @@
       "hidden": false,
       "created_at": 1763269700,
       "front": [
-        {"field": "Word", "items": [{"type": "text", "value": "Apple"}]}
+        {"field": "Word", "text": "Apple"}
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "苹果"}]}
+        {"field": "Translation", "text": "苹果"}
       ]
     },
     "urgency": 2.598
@@ -732,15 +758,13 @@
       "front": [
         {
           "field": "Word",
-          "items": [
-            {"type": "text", "value": "Hello"},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud001"},
-            {"type": "image", "value": "https://api.example.com/api/media/img002"}
-          ]
+          "text": "Hello",
+          "audio": "https://api.example.com/api/media/aud001",
+          "image": "https://api.example.com/api/media/img002"
         }
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "你好"}]}
+        {"field": "Translation", "text": "你好"}
       ]
     },
     "urgency": 1.0
@@ -767,21 +791,17 @@
       "front": [
         {
           "field": "Example",
-          "items": [
-            {"type": "text", "value": "First sentence."},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud001"}
-          ]
+          "text": "First sentence.",
+          "audio": "https://api.example.com/api/media/aud001"
         },
         {
           "field": "Example",
-          "items": [
-            {"type": "text", "value": "Second sentence."},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud002"}
-          ]
+          "text": "Second sentence.",
+          "audio": "https://api.example.com/api/media/aud002"
         }
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "翻译"}]}
+        {"field": "Translation", "text": "翻译"}
       ]
     },
     "urgency": 1.0
@@ -806,7 +826,7 @@
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"field": "Question", "items": [{"type": "text", "value": "Only front text"}]}
+        {"field": "Question", "text": "Only front text"}
       ],
       "back": []
     },
@@ -816,7 +836,7 @@
 }
 ```
 
-**多词条且含媒体的卡片（template [[0, 1], [2, 3]]；媒体 item 的 `value` 为完整 URL）：**
+**多词条且含媒体的卡片（template [[0, 1], [2, 3]]；媒体键的值为完整 URL）：**
 
 ```json
 {
@@ -830,12 +850,12 @@
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"field": "Front", "items": [{"type": "text", "value": "Word"}]},
-        {"field": "Pronunciation", "items": [{"type": "audio", "value": "https://api.wordupx.com:8443/api/media/abc123"}]}
+        {"field": "Front", "text": "Word"},
+        {"field": "Pronunciation", "audio": "https://api.wordupx.com:8443/api/media/abc123"}
       ],
       "back": [
-        {"field": "Picture", "items": [{"type": "image", "value": "https://api.wordupx.com:8443/api/media/def456"}]},
-        {"field": "Clip", "items": [{"type": "video", "value": "https://api.wordupx.com:8443/api/media/vid789"}, {"type": "text", "value": "Translation"}]}
+        {"field": "Picture", "image": "https://api.wordupx.com:8443/api/media/def456"},
+        {"field": "Clip", "video": "https://api.wordupx.com:8443/api/media/vid789", "text": "Translation"}
       ]
     },
     "urgency": 1.2
@@ -1088,7 +1108,7 @@
 
 **接口：** `GET /api/media/{id}`
 
-按 ID 返回用户拥有的媒体文件（二进制）。需在请求头中携带 `Authorization: Bearer <token>`。响应头包含 `Content-Type`、`Content-Length` 和 `ETag`（与 `checksum` 一致）。请求头中携带 `If-None-Match: <ETag>` 可在文件未变更时获得 `304 Not Modified`。**获取下一张卡片** 接口会在音频/图片/视频段的 `value` 中返回完整 URL（如 `https://api.wordupx.com:8443/api/media/{id}`）；使用该 URL 并携带相同认证头即可加载文件。
+按 ID 返回用户拥有的媒体文件（二进制）。需在请求头中携带 `Authorization: Bearer <token>`。响应头包含 `Content-Type`、`Content-Length` 和 `ETag`（与 `checksum` 一致）。请求头中携带 `If-None-Match: <ETag>` 可在文件未变更时获得 `304 Not Modified`。**获取下一张卡片** 接口会在每个正面/背面词条对象的 `audio`、`image`、`video` 字段中给出完整 URL（如 `https://api.wordupx.com:8443/api/media/{id}`）；使用该 URL 并携带相同认证头即可加载文件。
 
 ### 删除媒体
 
