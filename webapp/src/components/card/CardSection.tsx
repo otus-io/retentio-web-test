@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, Entry, FactItem } from "@/lib/api";
-import type { CardEntryItem, GetCardsRes, GetNextCardRes } from "@/lib/api";
+import { cardEntryToRenderItems, type CardEntryItem, type GetCardsRes, type GetNextCardRes } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
@@ -524,7 +524,9 @@ export function CardSection({
                       >
                         {frontEntries.map((entry, entryIdx) => (
                           <div key={entryIdx} className="flex flex-wrap items-center justify-center gap-3">
-                            {entry.items.map((item, i) => renderItem(item, entryIdx * 1000 + i))}
+                            {cardEntryToRenderItems(entry).map((item, i) =>
+                              renderItem(item, entryIdx * 1000 + i)
+                            )}
                           </div>
                         ))}
                       </div>
@@ -535,14 +537,16 @@ export function CardSection({
                         {backEntries.length > 0 ? (
                           <>
                             <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
-                              {backEntries[0].items.map((item, i) => renderItem(item, i))}
+                              {cardEntryToRenderItems(backEntries[0]).map((item, i) => renderItem(item, i))}
                             </div>
                             {backEntries.length > 1 && (
                               examplesRevealed ? (
                                 <div className="mt-3 space-y-2 text-left">
                                   {backEntries.slice(1).map((entry, entryIdx) => (
                                     <p key={entryIdx} className="text-base">
-                                      {entry.items.map((item, i) => renderItem(item, entryIdx * 1000 + i))}
+                                      {cardEntryToRenderItems(entry).map((item, i) =>
+                                        renderItem(item, entryIdx * 1000 + i)
+                                      )}
                                     </p>
                                   ))}
                                 </div>

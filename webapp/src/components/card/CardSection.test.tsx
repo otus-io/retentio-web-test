@@ -34,8 +34,8 @@ function makeNextCard(overrides: Partial<GetNextCardRes["data"]> = {}): GetNextC
       due_date: dueDate,
       hidden: false,
       created_at: dueDate - 86400,
-      front: [{ field: "Word", items: [{ type: "text", value: "Apple" }] }],
-      back: [{ field: "Translation", items: [{ type: "text", value: "苹果" }] }],
+      front: [{ field: "Word", text: "Apple" }],
+      back: [{ field: "Translation", text: "苹果" }],
     },
     urgency: 0.5,
     ...overrides,
@@ -55,7 +55,7 @@ const defaultProps = {
 };
 
 describe("CardSection", () => {
-  it("renders next card with normalized segments (field, type, value)", () => {
+  it("renders next card with entry text fields", () => {
     const nextCard = makeNextCard();
     render(
       <CardSection
@@ -68,7 +68,7 @@ describe("CardSection", () => {
     expect(screen.getByText("Click to flip")).toBeInTheDocument();
   });
 
-  it("renders card when front and back use entry/items shape", () => {
+  it("renders card when front has text and audio siblings", () => {
     const nextCard = makeNextCard({
       card: {
         id: "c2",
@@ -78,10 +78,8 @@ describe("CardSection", () => {
         due_date: 1000,
         hidden: false,
         created_at: 0,
-        front: [
-          { field: "Q", items: [{ type: "text", value: "Question?" }, { type: "audio", value: "aud1" }] },
-        ],
-        back: [{ field: "A", items: [{ type: "text", value: "Answer" }] }],
+        front: [{ field: "Q", text: "Question?", audio: "aud1" }],
+        back: [{ field: "A", text: "Answer" }],
       },
       urgency: 1,
     });
@@ -105,8 +103,8 @@ describe("CardSection", () => {
         due_date: 2000,
         hidden: false,
         created_at: 0,
-        front: [{ field: "Clip", items: [{ type: "video", value: "vid1" }] }],
-        back: [{ field: "Caption", items: [{ type: "text", value: "Caption text" }] }],
+        front: [{ field: "Clip", video: "vid1" }],
+        back: [{ field: "Caption", text: "Caption text" }],
       },
       urgency: 0.8,
     });

@@ -590,16 +590,29 @@ export interface DeleteFactRes {
   meta: { msg: string };
 }
 
-// One item in a card entry: type + value (text content or media URL).
+// One item for rendering a next-card face slot: type + value (text or media URL).
 export interface CardEntryItem {
   type: "text" | "audio" | "image" | "video";
   value: string;
 }
 
-// One entry on front/back: optional field label + items (typed content). Order follows template.
+/** One template slot on GET next card front/back: optional field + optional text/audio/image/video (same as fact entry keys). */
 export interface CardEntry {
   field?: string;
-  items: CardEntryItem[];
+  text?: string;
+  audio?: string;
+  image?: string;
+  video?: string;
+}
+
+/** Expands a CardEntry to ordered render pieces: text, then audio, image, video. */
+export function cardEntryToRenderItems(entry: CardEntry): CardEntryItem[] {
+  const out: CardEntryItem[] = [];
+  if (entry.text) out.push({ type: "text", value: entry.text });
+  if (entry.audio) out.push({ type: "audio", value: entry.audio });
+  if (entry.image) out.push({ type: "image", value: entry.image });
+  if (entry.video) out.push({ type: "video", value: entry.video });
+  return out;
 }
 
 // Cards: template = [[front indices], [back indices]]; front/back are arrays of CardEntry (back may be []).
