@@ -64,8 +64,10 @@ describe("AddFactsForm", () => {
 
   it("renders deck field names as labels", () => {
     renderForm();
-    expect(screen.getAllByText("English").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Chinese").length).toBeGreaterThanOrEqual(1);
+    const labelInputs = screen.getAllByLabelText("Field name");
+    const values = labelInputs.map((input) => (input as HTMLInputElement).value);
+    expect(values).toContain("English");
+    expect(values).toContain("Chinese");
   });
 
   it("calls setFactRow when a field value is typed", async () => {
@@ -79,6 +81,18 @@ describe("AddFactsForm", () => {
     expect(lastCall).toBeDefined();
     expect(lastCall!.length).toBe(2);
     expect(lastCall![0].text).toBe("A");
+  });
+
+  it("calls setFactRow when a field name is edited", async () => {
+    const user = userEvent.setup();
+    const { setFactRow } = renderForm();
+    const [firstLabelInput] = screen.getAllByLabelText("Field name");
+    await user.type(firstLabelInput, " Updated");
+    expect(setFactRow).toHaveBeenCalled();
+    const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
+    const lastCall = calls[calls.length - 1]?.[0] as AddFactEntry[] | undefined;
+    expect(lastCall).toBeDefined();
+    expect(lastCall![0].label).toContain("Updated");
   });
 
   it("Add field button calls setFactRow with one more text cell", async () => {

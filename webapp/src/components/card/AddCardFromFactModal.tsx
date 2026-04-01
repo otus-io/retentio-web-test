@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { DeckItem, Entry, FactItem } from "@/lib/api";
-import { request, uploadMultipart, debugLog } from "@/lib/api";
+import { request, uploadMultipart, debugLog, fileLooksLikeJson } from "@/lib/api";
 import type { UploadMediaRes } from "@/lib/api";
 import {
   buildSiblingTemplate,
@@ -17,16 +17,17 @@ import {
 const DRAG_TYPE_FIELD = "text/plain";
 const DRAG_TYPE_SPLIT = "application/x-wordupx-split";
 
-type FactMediaEntry = { file: File; type: "image" | "audio" | "video"; fieldName: string };
+type FactMediaEntry = { file: File; type: "image" | "audio" | "video" | "json"; fieldName: string };
 
 type AddCardCell =
   | { type: "text"; value: string; label: string }
-  | { type: "existing_media"; kind: "image" | "audio" | "video"; id: string; fieldName: string }
+  | { type: "existing_media"; kind: "image" | "audio" | "video" | "json"; id: string; fieldName: string }
   | { type: "media"; entry: FactMediaEntry };
 
-function getMediaType(file: File): "image" | "audio" | "video" {
+function getMediaType(file: File): "image" | "audio" | "video" | "json" {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
+  if (fileLooksLikeJson(file)) return "json";
   return "audio";
 }
 
@@ -54,6 +55,13 @@ function factToRow(fact: FactItem, deck: DeckItem): AddCardCell[] {
         id: entry.video,
         fieldName: fields[i] ?? "video",
       };
+    if (entry.json)
+      return {
+        type: "existing_media" as const,
+        kind: "json" as const,
+        id: entry.json,
+        fieldName: fields[i] ?? "json",
+      };
     return { type: "text" as const, value: entry.text ?? "", label: fields[i] ?? "" };
   });
 }
@@ -67,7 +75,14 @@ function contentUnchanged(original: FactItem, row: AddCardCell[]): boolean {
     const orig = original.entries[i];
     if (c.type === "text" && c.value !== (orig.text ?? "")) return false;
     if (c.type === "existing_media") {
-      const origId = c.kind === "audio" ? orig.audio : c.kind === "image" ? orig.image : orig.video;
+      const origId =
+        c.kind === "audio"
+          ? orig.audio
+          : c.kind === "image"
+            ? orig.image
+            : c.kind === "video"
+              ? orig.video
+              : orig.json;
       if (origId !== c.id) return false;
     }
   }
@@ -213,14 +228,22 @@ export function AddCardFromFactModal({
       (f) =>
         f.type.startsWith("image/") ||
         f.type.startsWith("audio/") ||
-        f.type.startsWith("video/")
+        f.type.startsWith("video/") ||
+        fileLooksLikeJson(f)
     );
     const toAdd = valid.slice(0, Math.max(0, 2 - totalMedia)).map((file) => {
       const type = getMediaType(file);
       return {
         file,
         type,
-        fieldName: type === "audio" ? "audio" : type === "video" ? "video" : "img",
+        fieldName:
+          type === "audio"
+            ? "audio"
+            : type === "video"
+              ? "video"
+              : type === "json"
+                ? "json"
+                : "img",
       };
     });
     if (toAdd.length)
@@ -277,7 +300,11 @@ export function AddCardFromFactModal({
         const mediaCells = row.filter(
           (c): c is AddCardCell & { type: "media" } => c.type === "media"
         );
-        const uploadedMarkers: { id: string; type: "image" | "audio" | "video"; fieldName: string }[] = [];
+        const uploadedMarkers: {
+          id: string;
+          type: "image" | "audio" | "video" | "json";
+          fieldName: string;
+        }[] = [];
         if (mediaCells.length > 0) {
           for (const { entry } of mediaCells) {
             const formData = new FormData();
@@ -294,7 +321,13 @@ export function AddCardFromFactModal({
               type: entry.type,
               fieldName:
                 entry.fieldName ||
-                (entry.type === "audio" ? "audio" : entry.type === "video" ? "video" : "img"),
+                (entry.type === "audio"
+                  ? "audio"
+                  : entry.type === "video"
+                    ? "video"
+                    : entry.type === "json"
+                      ? "json"
+                      : "img"),
             });
           }
         }
@@ -306,13 +339,17 @@ export function AddCardFromFactModal({
               ? { audio: c.id }
               : c.kind === "video"
                 ? { video: c.id }
-                : { image: c.id };
+                : c.kind === "json"
+                  ? { json: c.id }
+                  : { image: c.id };
           const m = uploadedMarkers[mi++];
           return m.type === "audio"
             ? { audio: m.id }
             : m.type === "video"
               ? { video: m.id }
-              : { image: m.id };
+              : m.type === "json"
+                ? { json: m.id }
+                : { image: m.id };
         });
         const fields = row.map((c) => {
           if (c.type === "text") return c.label;
@@ -376,13 +413,21 @@ export function AddCardFromFactModal({
     }
     if (cell.type === "existing_media") {
       const kindLabel =
-        cell.kind === "image" ? "Image" : cell.kind === "video" ? "Video" : "Audio";
+        cell.kind === "image"
+          ? "Image"
+          : cell.kind === "video"
+            ? "Video"
+            : cell.kind === "json"
+              ? "JSON"
+              : "Audio";
       const kindClass =
         cell.kind === "image"
           ? "text-amber-600"
           : cell.kind === "video"
             ? "text-green-600"
-            : "text-blue-600";
+            : cell.kind === "json"
+              ? "text-violet-600"
+              : "text-blue-600";
       return (
         <>
           <span className={`${kindClass} text-sm font-medium w-20 shrink-0`}>{kindLabel}</span>
@@ -400,13 +445,21 @@ export function AddCardFromFactModal({
       );
     }
     const typeLabel =
-      cell.entry.type === "image" ? "Image" : cell.entry.type === "video" ? "Video" : "Audio";
+      cell.entry.type === "image"
+        ? "Image"
+        : cell.entry.type === "video"
+          ? "Video"
+          : cell.entry.type === "json"
+            ? "JSON"
+            : "Audio";
     const typeClass =
       cell.entry.type === "image"
         ? "text-amber-600"
         : cell.entry.type === "video"
           ? "text-green-600"
-          : "text-blue-600";
+          : cell.entry.type === "json"
+            ? "text-violet-600"
+            : "text-blue-600";
     return (
       <>
         <span className={`${typeClass} text-sm font-medium w-20 shrink-0`}>{typeLabel}</span>
@@ -655,7 +708,7 @@ export function AddCardFromFactModal({
                   ref={fileInputRef}
                   id="add-card-media-input"
                   type="file"
-                  accept="image/*,audio/*,video/*"
+                  accept="image/*,audio/*,video/*,application/json,.json"
                   multiple
                   onChange={handleMediaSelect}
                   className="hidden"

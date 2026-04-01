@@ -17,6 +17,11 @@ describe("formatMediaMarkersForDisplay", () => {
     expect(formatMediaMarkersForDisplay("see [image:xyz789]")).toBe("see image:xyz789");
   });
 
+  it("replaces [json:id] and [video:id]", () => {
+    expect(formatMediaMarkersForDisplay("d [json:abc12]")).toBe("d json:abc12");
+    expect(formatMediaMarkersForDisplay("[video:v1]")).toBe("video:v1");
+  });
+
   it("replaces multiple markers", () => {
     expect(formatMediaMarkersForDisplay("[audio:a][image:b]")).toBe("audio:aimage:b");
   });

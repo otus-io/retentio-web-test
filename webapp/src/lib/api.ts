@@ -474,12 +474,20 @@ export interface DeleteDeckRes {
   meta: { msg: string };
 }
 
-/** One slot of a fact: optional text, audio, image, video (at least one required). */
+/** True when a file should be uploaded as JSON media (MIME or .json extension). */
+export function fileLooksLikeJson(file: File): boolean {
+  const t = file.type.toLowerCase();
+  if (t === "application/json" || t === "text/json") return true;
+  return file.name.toLowerCase().endsWith(".json");
+}
+
+/** One slot of a fact: optional text, audio, image, video, json (at least one required). */
 export interface Entry {
   text?: string;
   audio?: string;
   image?: string;
   video?: string;
+  json?: string;
 }
 
 export interface AddFactItemReq {
@@ -510,12 +518,13 @@ export function validateAddFactBody(p: { hasFacts: boolean }): string | null {
   return null;
 }
 
-/** Format one entry for display (e.g. in fact list). Prefers text; otherwise "audio:id" / "image:id" / "video:id". */
+/** Format one entry for display (e.g. in fact list). Prefers text; otherwise "audio:id" / "image:id" / "video:id" / "json:id". */
 export function entryToDisplayString(entry: Entry): string {
   if (entry.text != null && entry.text !== "") return entry.text;
   if (entry.audio) return `audio:${entry.audio}`;
   if (entry.image) return `image:${entry.image}`;
   if (entry.video) return `video:${entry.video}`;
+  if (entry.json) return `json:${entry.json}`;
   return "";
 }
 
@@ -592,26 +601,28 @@ export interface DeleteFactRes {
 
 // One item for rendering a next-card face slot: type + value (text or media URL).
 export interface CardEntryItem {
-  type: "text" | "audio" | "image" | "video";
+  type: "text" | "audio" | "image" | "video" | "json";
   value: string;
 }
 
-/** One template slot on GET next card front/back: optional field + optional text/audio/image/video (same as fact entry keys). */
+/** One template slot on GET next card front/back: optional field + optional text/audio/image/video/json (same as fact entry keys). */
 export interface CardEntry {
   field?: string;
   text?: string;
   audio?: string;
   image?: string;
   video?: string;
+  json?: string;
 }
 
-/** Expands a CardEntry to ordered render pieces: text, then audio, image, video. */
+/** Expands a CardEntry to ordered render pieces: text, then audio, image, video, json. */
 export function cardEntryToRenderItems(entry: CardEntry): CardEntryItem[] {
   const out: CardEntryItem[] = [];
   if (entry.text) out.push({ type: "text", value: entry.text });
   if (entry.audio) out.push({ type: "audio", value: entry.audio });
   if (entry.image) out.push({ type: "image", value: entry.image });
   if (entry.video) out.push({ type: "video", value: entry.video });
+  if (entry.json) out.push({ type: "json", value: entry.json });
   return out;
 }
 
