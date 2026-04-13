@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
-import { buildSiblingTemplate, buildTemplateWithSplit } from "@/lib/api";
+import { buildSiblingTemplate, buildTemplateWithSplit, fileLooksLikeJson } from "@/lib/api";
 
 /** One entry in the Add facts row: label, text value, and optional media files. Type is derived from file when uploading. */
 export type AddFactEntry = {
@@ -109,7 +109,8 @@ export function AddFactsForm({
       (f) =>
         f.type.startsWith("image/") ||
         f.type.startsWith("audio/") ||
-        f.type.startsWith("video/")
+        f.type.startsWith("video/") ||
+        fileLooksLikeJson(f)
     );
     const entry = row[idx];
     const toAdd = valid.slice(0, Math.max(0, MAX_MEDIA_PER_ENTRY - entry.media.length)).map((file) => ({ file }));
@@ -170,20 +171,14 @@ export function AddFactsForm({
         ) : (
           <span className="flex h-10 w-8 shrink-0" aria-hidden />
         )}
-        {(deck.field ?? []).includes(entry.label) ? (
-          <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-            {entry.label}
-          </span>
-        ) : (
-          <Input
-            aria-label="Field name"
-            placeholder={`field ${colIndex + 1}`}
-            value={entry.label}
-            onChange={(e) => setTextLabel(colIndex, e.target.value)}
-            disabled={addingFacts}
-            className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
-          />
-        )}
+        <Input
+          aria-label="Field name"
+          placeholder={`field ${colIndex + 1}`}
+          value={entry.label}
+          onChange={(e) => setTextLabel(colIndex, e.target.value)}
+          disabled={addingFacts}
+          className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
+        />
         <Input
           id={`fact-0-${colIndex}`}
           placeholder="value"
@@ -266,9 +261,14 @@ export function AddFactsForm({
               >
                 <div className="flex items-center gap-2 flex-nowrap">
                   <span className="flex h-10 w-8 shrink-0" aria-hidden />
-                  <span className="flex h-10 w-20 shrink-0 items-center text-sm font-medium">
-                    {entry.label}
-                  </span>
+                  <Input
+                    aria-label="Field name"
+                    placeholder={`field ${i + 1}`}
+                    value={entry.label}
+                    onChange={(e) => setTextLabel(i, e.target.value)}
+                    disabled={addingFacts}
+                    className="!w-20 !px-0 h-10 shrink-0 text-sm font-medium border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none placeholder:text-foreground/50"
+                  />
                   <Input
                     id={`fact-0-${i}`}
                     placeholder="value"
@@ -382,7 +382,7 @@ export function AddFactsForm({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,audio/*,video/*"
+          accept="image/*,audio/*,video/*,application/json,.json"
           multiple
           onChange={handleMediaSelect}
           className="hidden"

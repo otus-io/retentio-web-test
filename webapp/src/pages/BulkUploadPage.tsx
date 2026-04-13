@@ -29,6 +29,7 @@ import {
   type MediaItem,
   type UpdateFactReq,
   type UploadMediaRes,
+  fileLooksLikeJson,
 } from "@/lib/api";
 import {
   filterDuplicateImportRows,
@@ -163,7 +164,11 @@ function factEntryAt(fact: FactItem, idx: number): Entry {
 function factHasSomeContent(entries: Entry[]): boolean {
   return entries.some(
     (e) =>
-      (e.text?.trim() ?? "") !== "" || Boolean(e.audio) || Boolean(e.image) || Boolean(e.video)
+      (e.text?.trim() ?? "") !== "" ||
+      Boolean(e.audio) ||
+      Boolean(e.image) ||
+      Boolean(e.video) ||
+      Boolean(e.json)
   );
 }
 
@@ -180,7 +185,7 @@ function updateFactEntryText(fact: FactItem, entryIndex: number, text: string): 
 function mergeEntryMediaPatch(
   fact: FactItem,
   entryIndex: number,
-  patch: Partial<Pick<Entry, "audio" | "image" | "video">>
+  patch: Partial<Pick<Entry, "audio" | "image" | "video" | "json">>
 ): FactItem {
   const len = Math.max(fact.entries.length, entryIndex + 1);
   const entries: Entry[] = Array.from({ length: len }, (_, j) => {
@@ -194,7 +199,7 @@ function mergeEntryMediaPatch(
 function clearEntryMediaSlot(
   fact: FactItem,
   entryIndex: number,
-  slot: "audio" | "image" | "video"
+  slot: "audio" | "image" | "video" | "json"
 ): FactItem {
   const len = Math.max(fact.entries.length, entryIndex + 1);
   const entries: Entry[] = Array.from({ length: len }, (_, j) => {
@@ -207,10 +212,11 @@ function clearEntryMediaSlot(
   return { ...fact, entries };
 }
 
-function mediaSlotForFile(file: File): "audio" | "image" | "video" | null {
+function mediaSlotForFile(file: File): "audio" | "image" | "video" | "json" | null {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/") || file.type === "application/ogg") return "audio";
+  if (fileLooksLikeJson(file)) return "json";
   return null;
 }
 
@@ -235,7 +241,7 @@ export default function BulkUploadPage() {
   const pendingExistingMediaPickRef = useRef<{
     factId: string;
     entryIndex: number;
-    replaceSlot?: "audio" | "image" | "video";
+    replaceSlot?: "audio" | "image" | "video" | "json";
   } | null>(null);
   const [existingSaveError, setExistingSaveError] = useState("");
   const [existingSaveSuccess, setExistingSaveSuccess] = useState("");
@@ -254,7 +260,7 @@ export default function BulkUploadPage() {
   const [columns, setColumns] = useState<string[]>([]);
   /** Normalized ZIP paths for supported media files (same matching rules as the API). */
   const [mediaPaths, setMediaPaths] = useState<string[]>([]);
-  /** After a successful ZIP parse: presence + supported file counts under audio/, image/, video/. */
+  /** After a successful ZIP parse: presence + supported file counts under audio/, image/, video/, json/. */
   const [csvPathInZip, setCsvPathInZip] = useState("facts.csv");
   const [csvDelimiter, setCsvDelimiter] = useState<"," | ";">(",");
   const [includeHeaderRow, setIncludeHeaderRow] = useState(false);
@@ -363,6 +369,7 @@ export default function BulkUploadPage() {
         if (e.audio) ids.add(e.audio);
         if (e.image) ids.add(e.image);
         if (e.video) ids.add(e.video);
+        if (e.json) ids.add(e.json);
       }
     }
     const missing = [...ids].filter((id) => !mediaFilenameByIdRef.current.has(id));
@@ -425,7 +432,7 @@ export default function BulkUploadPage() {
   function openExistingMediaPicker(target: {
     factId: string;
     entryIndex: number;
-    replaceSlot?: "audio" | "image" | "video";
+    replaceSlot?: "audio" | "image" | "video" | "json";
   }) {
     pendingExistingMediaPickRef.current = target;
     existingMediaFileInputRef.current?.click();
@@ -434,7 +441,7 @@ export default function BulkUploadPage() {
   function clearExistingFactMediaSlot(
     factId: string,
     entryIndex: number,
-    slot: "audio" | "image" | "video"
+    slot: "audio" | "image" | "video" | "json"
   ) {
     setExistingFacts((prev) =>
       prev.map((f) => (f.id === factId ? clearEntryMediaSlot(f, entryIndex, slot) : f))
@@ -455,7 +462,8 @@ export default function BulkUploadPage() {
         (target.replaceSlot === "image" && file.type.startsWith("image/")) ||
         (target.replaceSlot === "video" && file.type.startsWith("video/")) ||
         (target.replaceSlot === "audio" &&
-          (file.type.startsWith("audio/") || file.type === "application/ogg"));
+          (file.type.startsWith("audio/") || file.type === "application/ogg")) ||
+        (target.replaceSlot === "json" && fileLooksLikeJson(file));
       if (!ok) {
         setExistingSaveError(`Please choose a ${target.replaceSlot} file for this slot.`);
         return;
@@ -463,7 +471,7 @@ export default function BulkUploadPage() {
     } else {
       const slotFromMime = mediaSlotForFile(file);
       if (!slotFromMime) {
-        setExistingSaveError("Unsupported file type. Use an image, audio, or video file.");
+        setExistingSaveError("Unsupported file type. Use an image, audio, video, or JSON file.");
         return;
       }
     }
@@ -479,7 +487,7 @@ export default function BulkUploadPage() {
       if (!newId) throw new Error("Upload response missing media id");
       const filename = res.data.filename ?? file.name;
 
-      const patch: Partial<Pick<Entry, "audio" | "image" | "video">> = {};
+      const patch: Partial<Pick<Entry, "audio" | "image" | "video" | "json">> = {};
       if (target.replaceSlot) {
         patch[target.replaceSlot] = newId;
       } else {
@@ -947,7 +955,7 @@ export default function BulkUploadPage() {
               className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
             />
             <p className="text-xs text-muted-foreground">
-              expected zip: one csv at the root and optional flat <code>audio/</code>, <code>image/</code>, <code>video/</code> folders (max 500&nbsp;MB). use <code>row_column.ext</code> names (ankifacts <code>-M</code>) or exact cell text as the file stem for legacy matching.
+              expected zip: one csv at the root and optional flat <code>audio/</code>, <code>image/</code>, <code>video/</code>, <code>json/</code> folders (max 500&nbsp;MB). use <code>row_column.ext</code> names (ankifacts <code>-M</code>) or exact cell text as the file stem for legacy matching.
             </p>
             <p className="text-xs text-muted-foreground max-w-xl">
               when the preview appears below, review and edit rows if needed, confirm, then use <strong>submit import</strong>.
@@ -997,7 +1005,7 @@ export default function BulkUploadPage() {
                     ref={existingMediaFileInputRef}
                     type="file"
                     className="sr-only"
-                    accept="image/*,audio/*,video/*"
+                    accept="image/*,audio/*,video/*,application/json,.json"
                     aria-hidden="true"
                     tabIndex={-1}
                     onChange={(e) => void handleExistingMediaFileChange(e)}
@@ -1050,11 +1058,17 @@ export default function BulkUploadPage() {
                               const ent = factEntryAt(fact, idx);
                               const mediaUploading =
                                 existingMediaUploadingKey === `${fact.id}-${idx}`;
-                              const slotLabel: Record<"audio" | "image" | "video", string> = {
+                              const slotLabel: Record<"audio" | "image" | "video" | "json", string> = {
                                 audio: "Audio",
                                 image: "Image",
                                 video: "Video",
+                                json: "JSON",
                               };
+                              const entryMediaFull =
+                                Boolean(ent.audio) &&
+                                Boolean(ent.image) &&
+                                Boolean(ent.video) &&
+                                Boolean(ent.json);
                               return (
                                 <td key={`${fact.id}-c${idx}`} className="px-3 py-2 max-w-[20rem]">
                                   <Input
@@ -1069,7 +1083,7 @@ export default function BulkUploadPage() {
                                       {mediaUploading && (
                                         <p className="text-xs text-muted-foreground">Uploading…</p>
                                       )}
-                                      {(["audio", "image", "video"] as const).map((slot) => {
+                                      {(["audio", "image", "video", "json"] as const).map((slot) => {
                                         const mid = ent[slot];
                                         if (!mid) return null;
                                         const fname = mediaFilenameById.get(mid) ?? `${mid.slice(0, 10)}…`;
@@ -1093,7 +1107,7 @@ export default function BulkUploadPage() {
                                       align="end"
                                       className="shrink-0 opacity-0 transition-opacity group-hover/media:opacity-100 focus-within:opacity-100"
                                     >
-                                      {!(ent.audio && ent.image && ent.video) ? (
+                                      {!entryMediaFull ? (
                                         <DropdownMenuItem
                                           disabled={existingFactsBusy}
                                           onClick={() =>
@@ -1178,6 +1192,31 @@ export default function BulkUploadPage() {
                                             }
                                           >
                                             Remove video
+                                          </DropdownMenuItem>
+                                        </>
+                                      ) : null}
+                                      {ent.json ? (
+                                        <>
+                                          <DropdownMenuItem
+                                            disabled={existingFactsBusy}
+                                            onClick={() =>
+                                              openExistingMediaPicker({
+                                                factId: fact.id,
+                                                entryIndex: idx,
+                                                replaceSlot: "json",
+                                              })
+                                            }
+                                          >
+                                            Replace JSON…
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            variant="destructive"
+                                            disabled={existingFactsBusy}
+                                            onClick={() =>
+                                              clearExistingFactMediaSlot(fact.id, idx, "json")
+                                            }
+                                          >
+                                            Remove JSON
                                           </DropdownMenuItem>
                                         </>
                                       ) : null}

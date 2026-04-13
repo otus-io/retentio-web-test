@@ -26,6 +26,7 @@ import {
   type UpdateCardRes,
   type UpdateFactReq,
   type UploadMediaRes,
+  fileLooksLikeJson,
 } from "@/lib/api";
 import {
   DeckHeader,
@@ -315,6 +316,7 @@ export default function DeckPage() {
         let audioId: string | undefined;
         let imageId: string | undefined;
         let videoId: string | undefined;
+        let jsonId: string | undefined;
         for (const { file } of entry.media) {
           const formData = new FormData();
           formData.append("file", file);
@@ -325,15 +327,19 @@ export default function DeckPage() {
             ? "image"
             : file.type.startsWith("video/")
               ? "video"
-              : "audio";
+              : fileLooksLikeJson(file)
+                ? "json"
+                : "audio";
           if (type === "audio") audioId ??= id;
           else if (type === "image") imageId ??= id;
-          else videoId ??= id;
+          else if (type === "video") videoId ??= id;
+          else jsonId ??= id;
         }
         const out: Entry = { text: entry.text.trim() };
         if (audioId) out.audio = audioId;
         if (imageId) out.image = imageId;
         if (videoId) out.video = videoId;
+        if (jsonId) out.json = jsonId;
         entries.push(out);
       }
       const fields = row.map((e) => e.label);
@@ -375,9 +381,9 @@ export default function DeckPage() {
     if (!token || !id || !editingFactId || !deck) return;
     const entries = editingFactEntries;
     const hasContent = (e: Entry) =>
-      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video || !!e.json;
     if (entries.length === 0 || !entries.every(hasContent)) {
-      setFactError("Each entry must have at least one of text, audio, image, or video.");
+      setFactError("Each entry must have at least one of text, audio, image, video, or JSON.");
       return;
     }
     setFactError("");
@@ -402,9 +408,9 @@ export default function DeckPage() {
   async function handleSaveFactFromCard(factId: string, entries: Entry[]) {
     if (!token || !id || !deck) return;
     const hasContent = (e: Entry) =>
-      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video || !!e.json;
     if (entries.length === 0 || !entries.every(hasContent)) {
-      throw new Error("Each entry must have at least one of text, audio, image, or video.");
+      throw new Error("Each entry must have at least one of text, audio, image, video, or JSON.");
     }
     const body: UpdateFactReq = { entries };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {

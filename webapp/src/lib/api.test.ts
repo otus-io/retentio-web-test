@@ -7,6 +7,7 @@ import {
   buildTemplateForRequest,
   entryToDisplayString,
   cardEntryToRenderItems,
+  fileLooksLikeJson,
   type GetNextCardRes,
 } from "./api";
 
@@ -234,8 +235,19 @@ describe("entryToDisplayString", () => {
   it("returns video:id when entry has video only", () => {
     expect(entryToDisplayString({ video: "vid1" })).toBe("video:vid1");
   });
+  it("returns json:id when entry has json only", () => {
+    expect(entryToDisplayString({ json: "j1" })).toBe("json:j1");
+  });
   it("prefers text over media", () => {
     expect(entryToDisplayString({ text: "Word", audio: "a1" })).toBe("Word");
+  });
+});
+
+describe("fileLooksLikeJson", () => {
+  it("detects application/json and .json extension", () => {
+    expect(fileLooksLikeJson(new File(["{}"], "x.bin", { type: "application/json" }))).toBe(true);
+    expect(fileLooksLikeJson(new File(["{}"], "data.json", { type: "" }))).toBe(true);
+    expect(fileLooksLikeJson(new File(["x"], "note.txt", { type: "text/plain" }))).toBe(false);
   });
 });
 
@@ -360,14 +372,15 @@ describe("GetNextCard response shape (front/back entry objects)", () => {
 });
 
 describe("cardEntryToRenderItems", () => {
-  it("orders text, audio, image, video", () => {
+  it("orders text, audio, image, video, json", () => {
     const items = cardEntryToRenderItems({
       text: "T",
       audio: "a",
       image: "i",
       video: "v",
+      json: "j",
     });
-    expect(items.map((x) => x.type)).toEqual(["text", "audio", "image", "video"]);
-    expect(items.map((x) => x.value)).toEqual(["T", "a", "i", "v"]);
+    expect(items.map((x) => x.type)).toEqual(["text", "audio", "image", "video", "json"]);
+    expect(items.map((x) => x.value)).toEqual(["T", "a", "i", "v", "j"]);
   });
 });

@@ -262,7 +262,7 @@ Requires the `Authorization: Bearer <token>` header. Invalidates the token so it
 ```
 
 > 📝 Save the `deck_id` - you'll need it for the next steps.
-> **Why no template on deck?** Templates are not stored on the deck. When you add facts, you can pass an optional `template` array (one `[[front indices], [back indices]]` per fact). The server writes that layout onto each **card**. By default, **no sibling (reversed) card is created**—only one card per fact (front = first entry, back = rest). Omit `template` to use that default.
+> **Why no template on deck?** Templates are not stored on the deck. When you add facts, you can pass an optional `template` (see [Add Facts](#add-facts)). By default you get **one card per fact** (front = first entry, back = rest). To get **sibling cards** (multiple cards from the same fact), send a 3D template—see below.
 
 ---
 
@@ -368,7 +368,7 @@ Requires the `Authorization: Bearer <token>` header. Invalidates the token so it
 > `unseen_cards` will increase. As you review cards,
 > `reviewed_cards` grows and `unseen_cards` decreases.
 >
-> The total cards in a deck equals the number of facts: **one card per fact by default, no sibling card**. To add a second card for a fact (e.g. reversed), use `POST /api/decks/{id}/card` with body `{"fact_id": "<factId>", "template": [[1], [0]]}`. The backend rejects 400 if that template already exists for the fact.
+> By default you get **one card per fact** (see [Template: default and sibling cards](#template-default-and-sibling-cards)). To add another card for a fact (e.g. reversed), use `POST /api/decks/{id}/card` with body `{"fact_id": "<factId>", "template": [[1], [0]]}`. The backend returns 400 if that template already exists for the fact.
 >
 > To calculate a progress percentage on the client side: `reviewed_cards / cards_count * 100`.
 
@@ -469,7 +469,7 @@ Shifts due dates and last_review of all cards in the deck by N days (1–365). O
 - `id`: `a1b2c3d4e5f6` (your deck ID)
 - `operation`: `append`
 
-**Request Body:** An array of fact items (each with `entries`) and optional `template`. Each **entry** is an object with optional `text`, `audio`, `image`, `video` (at least one required). The server generates a unique fact ID for each fact and creates **one card per fact** (no sibling/reversed card by default). Each card's front/back layout is given by `template[i]` for fact index `i`, or the default `[[0], [1, 2, ...]]` when omitted.
+**Request Body:** An array of fact items (each with `entries`) and optional `template`. Each **entry** is an object with optional `text`, `audio`, `image`, `video` (at least one required). The server generates a unique fact ID for each fact and creates one or more **cards** per fact depending on `template` (see **Template: default and sibling cards** below).
 
 ```json
 {
@@ -499,17 +499,43 @@ Example with media and multiple example sentences (each with its own audio):
 }
 ```
 
-Optional **`template`**: array of layouts, one per fact. Each element is `[[front indices], [back indices]]` (e.g. `[[0], [1]]` = front entry 0, back entry 1). If `template` is omitted or shorter than `facts`, missing facts use the default layout. Example with two facts, second fact reversed:
+#### Template: default and sibling cards
+
+A **template** defines how a card shows a fact’s entries: **front** (question) and **back** (answer), each as a list of entry indices.
+
+- **One card** is described by a **2D** value: `[[front indices], [back indices]]`.  
+  Example: `[[0], [1]]` → front = entry 0, back = entry 1.  
+  Example: `[[0], [1, 2, 3]]` → front = entry 0, back = entries 1, 2, 3.
+
+- **Default when `template` is omitted:**  
+  Every fact gets **one card** with the default layout: front = entry `0`, back = all others `[1, 2, …]`. So you don’t need to send `template` for simple “first entry = question, rest = answer” cards.
+
+- **Sibling cards** are multiple cards from the **same** fact (e.g. word→translation and translation→word). To create them in one request, send a **3D** `template`: an **array of 2D templates**. The server creates one card per 2D template **for every fact** in the request.  
+  Example: three cards per fact (entry 0→rest, entry 1→rest, entry 2→rest) for 3-entry facts:
+
+```json
+"template": [
+  [[0], [1, 2]],
+  [[1], [0, 2]],
+  [[2], [0, 1]]
+]
+```
+
+So: **2D** = one card (one front/back split); **3D** = multiple cards per fact (sibling cards). If you send a single 2D template (e.g. `[[1], [0]]` for reversed only), the API also accepts it: it is treated as an array of one template, so every fact gets one reversed card.
+
+Example — every fact gets two sibling cards (normal and reversed):
 
 ```json
 "template": [ [[0], [1]], [[1], [0]] ]
 ```
 
+Each fact gets one card with front=0/back=1 and one with front=1/back=0. To add a reversed card only for some facts, add those extra cards later with `POST /api/decks/{id}/card`.
+
 > **Understanding the request:**
 >
 > - **`entries`**: Array of entry objects. Each entry has optional `text`, `audio`, `image`, `video` (at least one required). Entry `i` corresponds to deck column `i`; use `fields[i]` as its label. Putting text and audio in the same entry (e.g. `{ "text": "I go to school.", "audio": "ex1id" }`) keeps that audio clearly associated with that sentence.
 > - **`fields`** (optional): Column names for this fact; entry `i` is shown under `fields[i]`. If omitted, use the deck's default `fields`. When provided, length must equal `len(entries)`.
-> - **`template`** (optional): Per-fact layout. One `[][]int` per fact; when empty or `i >= len(template)`, that fact gets default `[[0], [1, 2, ...]]`. The array is 3D (one layout per fact) so each fact can have a different front/back layout.
+> - **`template`** (optional): When empty or omitted, each fact gets **one card** with default `[[0], [1, 2, ...]]`. When provided, it must be a **3D** array: a list of 2D templates. **Every** fact gets one card per 2D template in that list (sibling cards). Each 2D template must be valid for every fact (same number of entries); indices must be in range, disjoint, and cover all entries.
 
 **Response:**
 
@@ -651,7 +677,9 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
 
 - `id`: `a1b2c3d4e5f6` (your deck ID)
 
-**Response shape:** `front` and `back` are arrays of **entry objects** in **template order**. Each entry has an optional **`field`** (label) and **`items`**: an array of `{ "type": "text"|"audio"|"image"|"video", "value": string }`. Items per entry are in fixed order: text, then audio, then image, then video (only present types). One entry can have multiple items of different types. For media types, `value` is the **full media URL** when the server can determine a base URL (e.g. `https://api.retentio.app:8443/api/media/abc123`). Use the URL with the same `Authorization: Bearer <token>` to download the file.
+**Response shape:** `front` and `back` are arrays of **entry objects** in **template order** (one object per fact entry index on that side). Each object matches a fact **entry**: optional **`field`** (label) and optional **`text`**, **`audio`**, **`image`**, **`video`** string keys (omitted when empty). Text and its pronunciation clip are explicit siblings on the same object (e.g. `"text": "Hello"` and `"audio": "https://api.retentio.app:8443/api/media/abc123"`). For media keys, values are **full media URLs** when the server can determine a base URL. Use each URL with the same `Authorization: Bearer <token>` to download the file.
+
+Each JSON example below has a matching integration test in [`api/tests/integration/card_test.go`](../../retentio-backend/api/tests/integration/card_test.go): `TestGetNextCard` (with field names) and `TestNextCardUrgencySelection` (no field names, text+audio+image, multi-front, front-only, split template `[[0,1],[2,3]]`, and full URL host).
 
 **Response (no field names):**
 
@@ -667,10 +695,10 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"items": [{"type": "text", "value": "Apple"}]}
+        {"text": "Apple"}
       ],
       "back": [
-        {"items": [{"type": "text", "value": "苹果"}]}
+        {"text": "苹果"}
       ]
     },
     "urgency": 1.0
@@ -695,10 +723,10 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "hidden": false,
       "created_at": 1763269700,
       "front": [
-        {"field": "Word", "items": [{"type": "text", "value": "Apple"}]}
+        {"field": "Word", "text": "Apple"}
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "苹果"}]}
+        {"field": "Translation", "text": "苹果"}
       ]
     },
     "urgency": 2.598
@@ -725,15 +753,13 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "front": [
         {
           "field": "Word",
-          "items": [
-            {"type": "text", "value": "Hello"},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud001"},
-            {"type": "image", "value": "https://api.example.com/api/media/img002"}
-          ]
+          "text": "Hello",
+          "audio": "https://api.example.com/api/media/aud001",
+          "image": "https://api.example.com/api/media/img002"
         }
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "你好"}]}
+        {"field": "Translation", "text": "你好"}
       ]
     },
     "urgency": 1.0
@@ -760,21 +786,17 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "front": [
         {
           "field": "Example",
-          "items": [
-            {"type": "text", "value": "First sentence."},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud001"}
-          ]
+          "text": "First sentence.",
+          "audio": "https://api.example.com/api/media/aud001"
         },
         {
           "field": "Example",
-          "items": [
-            {"type": "text", "value": "Second sentence."},
-            {"type": "audio", "value": "https://api.example.com/api/media/aud002"}
-          ]
+          "text": "Second sentence.",
+          "audio": "https://api.example.com/api/media/aud002"
         }
       ],
       "back": [
-        {"field": "Translation", "items": [{"type": "text", "value": "翻译"}]}
+        {"field": "Translation", "text": "翻译"}
       ]
     },
     "urgency": 1.0
@@ -799,7 +821,7 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"field": "Question", "items": [{"type": "text", "value": "Only front text"}]}
+        {"field": "Question", "text": "Only front text"}
       ],
       "back": []
     },
@@ -809,7 +831,7 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
 }
 ```
 
-**Card with multiple entries and media (template [[0, 1], [2, 3]]; media items have full URL in `value`):**
+**Card with multiple entries and media (template [[0, 1], [2, 3]]; media keys hold full URLs):**
 
 ```json
 {
@@ -823,12 +845,12 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "hidden": false,
       "created_at": 1763269600,
       "front": [
-        {"field": "Front", "items": [{"type": "text", "value": "Word"}]},
-        {"field": "Pronunciation", "items": [{"type": "audio", "value": "https://api.retentio.app:8443/api/media/abc123"}]}
+        {"field": "Front", "text": "Word"},
+        {"field": "Pronunciation", "audio": "https://api.retentio.app:8443/api/media/abc123"}
       ],
       "back": [
-        {"field": "Picture", "items": [{"type": "image", "value": "https://api.retentio.app:8443/api/media/def456"}]},
-        {"field": "Clip", "items": [{"type": "video", "value": "https://api.retentio.app:8443/api/media/vid789"}, {"type": "text", "value": "Translation"}]}
+        {"field": "Picture", "image": "https://api.retentio.app:8443/api/media/def456"},
+        {"field": "Clip", "video": "https://api.retentio.app:8443/api/media/vid789", "text": "Translation"}
       ]
     },
     "urgency": 1.2
@@ -1082,7 +1104,7 @@ Returns metadata only (id, owner, filename, mime, size, checksum, created_at), n
 
 **Endpoint:** `GET /api/media/{id}`
 
-Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response gives full URLs for audio/image/video segments (e.g. `https://api.retentio.app:8443/api/media/{id}`); use that URL with the same auth header to load the file.
+Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response puts full URLs in the `audio`, `image`, and `video` fields of each front/back entry (e.g. `https://api.retentio.app:8443/api/media/{id}`); use that URL with the same auth header to load the file.
 
 ### Delete media
 

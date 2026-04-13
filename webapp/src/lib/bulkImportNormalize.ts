@@ -6,7 +6,7 @@ export function normalizeZipPath(name: string): string {
   return name.replace(/\\/g, "/").trim();
 }
 
-const BULK_MEDIA_FOLDERS = new Set(["audio", "image", "video"]);
+const BULK_MEDIA_FOLDERS = new Set(["audio", "image", "video", "json"]);
 
 export function bulkImportZipPathSkippable(name: string): boolean {
   const norm = normalizeZipPath(name);
@@ -23,11 +23,12 @@ export function bulkImportMediaExtOk(ext: string): boolean {
   return (
     [".mp3", ".wav", ".ogg", ".m4a", ".mp4"].includes(e) ||
     [".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(e) ||
-    [".mov", ".webm"].includes(e)
+    [".mov", ".webm"].includes(e) ||
+    e === ".json"
   );
 }
 
-/** True for media files directly under audio/, image/, or video/ (no nesting). */
+/** True for media files directly under audio/, image/, video/, or json/ (no nesting). */
 export function bulkImportZipEntryIsMedia(name: string): boolean {
   const norm = normalizeZipPath(name);
   if (bulkImportZipPathSkippable(norm)) return false;

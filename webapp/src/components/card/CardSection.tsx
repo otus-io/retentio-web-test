@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, Entry, FactItem } from "@/lib/api";
@@ -47,10 +46,10 @@ function formatInterval(seconds: number): string {
   return `${sec}s`;
 }
 
-// Marker format: [audio:id] or [image:id] (design doc). Also accept bare "audio:id" / "image:id". Id is [a-z0-9]+.
-const MEDIA_MARKER_RE = /\[(audio|image):([a-z0-9]+)\]/g;
-// Bare "audio:id" / "image:id" — do not match when already inside brackets (e.g. "[image:id]").
-const BARE_MEDIA_MARKER_RE = /\b(audio|image):([a-z0-9]+)/g;
+// Marker format: [audio:id], [image:id], [video:id], [json:id] (API). Also bare "type:id". Ids: alphanumeric, _, :, -, .
+const MEDIA_MARKER_RE = /\[(audio|image|video|json):([^\]]+)\]/g;
+// Bare markers — do not match when already inside brackets (e.g. "[image:id]").
+const BARE_MEDIA_MARKER_RE = /\b(audio|image|video|json):([a-zA-Z0-9_:.-]+)/g;
 
 function normalizeMediaMarkers(text: string): string {
   return text.replace(BARE_MEDIA_MARKER_RE, (match, type, id, offset) => {
@@ -62,7 +61,9 @@ function normalizeMediaMarkers(text: string): string {
 type FieldSegment =
   | { kind: "text"; value: string }
   | { kind: "image"; id: string }
-  | { kind: "audio"; id: string };
+  | { kind: "audio"; id: string }
+  | { kind: "video"; id: string }
+  | { kind: "json"; id: string };
 
 function parseFieldWithMedia(text: string): FieldSegment[] {
   const normalized = normalizeMediaMarkers(text);
@@ -74,9 +75,12 @@ function parseFieldWithMedia(text: string): FieldSegment[] {
     if (m.index > lastIndex) {
       segments.push({ kind: "text", value: normalized.slice(lastIndex, m.index) });
     }
-    const type = m[1] as "image" | "audio";
+    const type = m[1] as "image" | "audio" | "video" | "json";
     const id = m[2];
-    segments.push(type === "image" ? { kind: "image", id } : { kind: "audio", id });
+    if (type === "image") segments.push({ kind: "image", id });
+    else if (type === "audio") segments.push({ kind: "audio", id });
+    else if (type === "video") segments.push({ kind: "video", id });
+    else segments.push({ kind: "json", id });
     lastIndex = MEDIA_MARKER_RE.lastIndex;
   }
   if (lastIndex < normalized.length) {
@@ -105,6 +109,14 @@ function AudioPlayButton({ src }: { src: string }) {
   );
 }
 
+function JsonAttachmentPlaceholder() {
+  return (
+    <span className="text-muted-foreground text-sm" aria-label="JSON attachment">
+      JSON
+    </span>
+  );
+}
+
 function MediaBlock({
   kind,
   id,
@@ -123,6 +135,9 @@ function MediaBlock({
       id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
     let revoked = false;
     let createdUrl: string | null = null;
+    setBlobUrl(null);
+    setError(false);
+
     fetch(fetchUrl, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -180,7 +195,11 @@ export function FieldWithMedia({
   mediaOnly?: boolean;
 }) {
   if (textOnly) {
-    return <>{formatMediaMarkersForDisplay(text)}</>;
+    return (
+      <span className="block max-h-[18rem] overflow-y-auto overflow-x-auto break-words whitespace-pre-wrap">
+        {formatMediaMarkersForDisplay(text)}
+      </span>
+    );
   }
   const segments = useMemo(() => parseFieldWithMedia(text), [text]);
   const hasMedia = segments.some((s) => s.kind !== "text");
@@ -195,7 +214,16 @@ export function FieldWithMedia({
     <>
       {otherSegments.map((seg, i) =>
         seg.kind === "text" ? (
-          mediaOnly ? null : <span key={i}>{seg.value}</span>
+          mediaOnly ? null : (
+            <span
+              key={i}
+              className="break-words whitespace-pre-wrap max-h-[18rem] overflow-y-auto overflow-x-auto"
+            >
+              {seg.value}
+            </span>
+          )
+        ) : seg.kind === "json" ? (
+          <JsonAttachmentPlaceholder key={`json-${seg.id}-${i}`} />
         ) : (
           <MediaBlock key={`${seg.kind}-${seg.id}-${i}`} kind={seg.kind} id={seg.id} token={token} />
         )
@@ -381,13 +409,13 @@ export function CardSection({
   };
 
   const hasContent = (e: Entry) =>
-    (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video;
+    (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video || !!e.json;
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onSaveFact || !editFactId || !deck) return;
     if (editFactEntries.length === 0 || !editFactEntries.every(hasContent)) {
-      setEditError("Each entry must have at least one of text, audio, image, or video.");
+      setEditError("Each entry must have at least one of text, audio, image, video, or JSON.");
       return;
     }
     setEditError("");
@@ -489,6 +517,9 @@ export function CardSection({
                   case "video":
                     if (authToken) content = <MediaBlock kind="video" id={item.value} token={authToken} />;
                     break;
+                  case "json":
+                    content = <JsonAttachmentPlaceholder />;
+                    break;
                   default:
                     content = <span className="text-muted-foreground">{item.value || "—"}</span>;
                 }
@@ -519,7 +550,7 @@ export function CardSection({
                       style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                     >
                       <div
-                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center text-lg [backface-visibility:hidden]"
+                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center text-lg [backface-visibility:hidden] overflow-x-auto overflow-y-auto max-h-[18rem]"
                         style={{ transform: "rotateY(0deg)" }}
                       >
                         {frontEntries.map((entry, entryIdx) => (
@@ -536,7 +567,7 @@ export function CardSection({
                       >
                         {backEntries.length > 0 ? (
                           <>
-                            <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
+                            <div className="flex flex-wrap items-center justify-center gap-3 text-lg overflow-x-auto overflow-y-auto max-h-[18rem]">
                               {cardEntryToRenderItems(backEntries[0]).map((item, i) => renderItem(item, i))}
                             </div>
                             {backEntries.length > 1 && (
@@ -699,7 +730,7 @@ export function CardSection({
                     <Label htmlFor={`card-edit-field-${i}`}>
                       {i < (deck.field?.length ?? 0) ? deck.field![i] : `field ${i + 1}`}
                     </Label>
-                    <Input
+                    <textarea
                       id={`card-edit-field-${i}`}
                       value={entry.text ?? ""}
                       onChange={(e) => {
@@ -709,6 +740,8 @@ export function CardSection({
                         setEditFactEntries(next);
                       }}
                       disabled={editSaving}
+                      rows={4}
+                      className="flex min-h-[4rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
                 ))}

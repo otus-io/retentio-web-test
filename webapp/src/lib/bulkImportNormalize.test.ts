@@ -27,13 +27,15 @@ describe("bulkImportMediaExtOk / bulkImportZipEntryIsMedia", () => {
     expect(bulkImportMediaExtOk(".WEBP")).toBe(true);
     expect(bulkImportMediaExtOk(".m4a")).toBe(true);
     expect(bulkImportMediaExtOk(".webm")).toBe(true);
+    expect(bulkImportMediaExtOk(".json")).toBe(true);
     expect(bulkImportMediaExtOk(".doc")).toBe(false);
   });
 
-  it("detects media paths only under audio/image/video (flat)", () => {
+  it("detects media paths only under audio/image/video/json (flat)", () => {
     expect(bulkImportZipEntryIsMedia("image/苹果.jpg")).toBe(true);
     expect(bulkImportZipEntryIsMedia("audio/зал.mp3")).toBe(true);
     expect(bulkImportZipEntryIsMedia("video/clip.mp4")).toBe(true);
+    expect(bulkImportZipEntryIsMedia("json/data.json")).toBe(true);
     expect(bulkImportZipEntryIsMedia("media/苹果.jpg")).toBe(false);
     expect(bulkImportZipEntryIsMedia("image/sub/x.jpg")).toBe(false);
     expect(bulkImportZipEntryIsMedia("readme.txt")).toBe(false);
@@ -47,8 +49,9 @@ describe("listBulkImportMediaPaths", () => {
         "ignored/__MACOSX/x",
         "audio/a.mp3",
         "image/b.jpg",
+        "json/c.json",
         "facts.csv",
       ])
-    ).toEqual(["audio/a.mp3", "image/b.jpg"]);
+    ).toEqual(["audio/a.mp3", "image/b.jpg", "json/c.json"]);
   });
 });
