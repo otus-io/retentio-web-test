@@ -1,4 +1,4 @@
-🌐 [English](CURSOR_RULES.md) | [中文](CURSOR_RULES_zh.md)
+🌐 [English](cursor_rules.md) | [中文](cursor_rules_zh.md)
 
 ---
 
@@ -62,7 +62,7 @@ Activated when editing files in `frontend/test/`:
 - Never modify test data to work around production code bugs
 - Widget test pattern with ProviderScope wrapping
 - Model test pattern for null/edge case handling
-- Test report format and location (`docs/frontend/test-reports/`)
+- Test report format and location (`docs/`, e.g. dated `*-test-summary.md` files)
 
 ### CI/CD Workflows
 

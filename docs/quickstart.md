@@ -1,4 +1,4 @@
-🌐 [English](QUICKSTART.md) | [中文](QUICKSTART_zh.md)
+🌐 [English](quickstart.md) | [中文](quickstart_zh.md)
 
 ---
 
@@ -56,7 +56,7 @@ This guide walks you through using the Retentio API via Swagger UI.
 
 - Open Swagger UI at:
   - **Local**: <http://localhost:8080/docs>
-  - **Production**: <https://api.wordupx.com:8443/docs>
+  - **Production**: <https://api.retentio.app:8443/docs>
 
 > **Timestamp convention:** All timestamps in the API use **UTC**.
 > ISO 8601 strings use the `Z` suffix (e.g., `2026-02-08T12:00:00Z`).
@@ -651,7 +651,7 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
 
 - `id`: `a1b2c3d4e5f6` (your deck ID)
 
-**Response shape:** `front` and `back` are arrays of **entry objects** in **template order**. Each entry has an optional **`field`** (label) and **`items`**: an array of `{ "type": "text"|"audio"|"image"|"video", "value": string }`. Items per entry are in fixed order: text, then audio, then image, then video (only present types). One entry can have multiple items of different types. For media types, `value` is the **full media URL** when the server can determine a base URL (e.g. `https://api.wordupx.com:8443/api/media/abc123`). Use the URL with the same `Authorization: Bearer <token>` to download the file.
+**Response shape:** `front` and `back` are arrays of **entry objects** in **template order**. Each entry has an optional **`field`** (label) and **`items`**: an array of `{ "type": "text"|"audio"|"image"|"video", "value": string }`. Items per entry are in fixed order: text, then audio, then image, then video (only present types). One entry can have multiple items of different types. For media types, `value` is the **full media URL** when the server can determine a base URL (e.g. `https://api.retentio.app:8443/api/media/abc123`). Use the URL with the same `Authorization: Bearer <token>` to download the file.
 
 **Response (no field names):**
 
@@ -824,11 +824,11 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
       "created_at": 1763269600,
       "front": [
         {"field": "Front", "items": [{"type": "text", "value": "Word"}]},
-        {"field": "Pronunciation", "items": [{"type": "audio", "value": "https://api.wordupx.com:8443/api/media/abc123"}]}
+        {"field": "Pronunciation", "items": [{"type": "audio", "value": "https://api.retentio.app:8443/api/media/abc123"}]}
       ],
       "back": [
-        {"field": "Picture", "items": [{"type": "image", "value": "https://api.wordupx.com:8443/api/media/def456"}]},
-        {"field": "Clip", "items": [{"type": "video", "value": "https://api.wordupx.com:8443/api/media/vid789"}, {"type": "text", "value": "Translation"}]}
+        {"field": "Picture", "items": [{"type": "image", "value": "https://api.retentio.app:8443/api/media/def456"}]},
+        {"field": "Clip", "items": [{"type": "video", "value": "https://api.retentio.app:8443/api/media/vid789"}, {"type": "text", "value": "Translation"}]}
       ]
     },
     "urgency": 1.2
@@ -1082,7 +1082,7 @@ Returns metadata only (id, owner, filename, mime, size, checksum, created_at), n
 
 **Endpoint:** `GET /api/media/{id}`
 
-Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response gives full URLs for audio/image/video segments (e.g. `https://api.wordupx.com:8443/api/media/{id}`); use that URL with the same auth header to load the file.
+Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response gives full URLs for audio/image/video segments (e.g. `https://api.retentio.app:8443/api/media/{id}`); use that URL with the same auth header to load the file.
 
 ### Delete media
 
@@ -1112,7 +1112,7 @@ Returns the media file (binary) for user-owned media by ID. Requires `Authorizat
 
 Each entry is an object with optional `text`, `audio`, `image`, `video`. Use a dedicated entry for media (e.g. `{ "audio": "abc123" }`) or combine with text in one entry (e.g. `{ "text": "Example sentence.", "audio": "ex1id" }`) so the audio is clearly for that sentence. Use optional `template` for custom front/back layout per fact; omit for default (front = first entry, back = rest).
 
-For full design (upload, delete, display, sync), see **[Media Upload design doc](../design-doc/media-upload.md)**.
+For full design (upload, delete, display, sync), see **[Media Upload design doc](design-doc/media-upload.md)**.
 
 ---
 
