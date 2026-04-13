@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AddFactsForm, makeInitialFactRow, type AddFactEntry } from "./AddFactsForm";
 import type { DeckItem } from "@/lib/api";
@@ -83,11 +83,12 @@ describe("AddFactsForm", () => {
     expect(lastCall![0].text).toBe("A");
   });
 
-  it("calls setFactRow when a field name is edited", async () => {
-    const user = userEvent.setup();
+  it("calls setFactRow when a field name is edited", () => {
     const { setFactRow } = renderForm();
     const [firstLabelInput] = screen.getAllByLabelText("Field name");
-    await user.type(firstLabelInput, " Updated");
+    // Controlled inputs: mock setFactRow does not update `factRow` props, so multi-key
+    // user.type() would fight stale state. One change event matches real onChange behavior.
+    fireEvent.change(firstLabelInput, { target: { value: "English Updated" } });
     expect(setFactRow).toHaveBeenCalled();
     const calls = (setFactRow as ReturnType<typeof vi.fn>).mock.calls;
     const lastCall = calls[calls.length - 1]?.[0] as AddFactEntry[] | undefined;

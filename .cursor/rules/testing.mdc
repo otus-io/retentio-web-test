@@ -7,6 +7,7 @@ alwaysApply: false
 # Testing Conventions
 
 ## Blackbox Testing Principle
+
 - Tests are written to **expose bugs**, not to pass
 - NEVER modify test data to work around production code bugs
 - NEVER modify production code to make tests pass
@@ -14,6 +15,7 @@ alwaysApply: false
 - Only modify tests to fix compile errors from API/type changes (e.g., after a model refactor)
 
 ## Test File Organization
+
 ```
 frontend/test/
 ├── models/        # Unit tests for data models (fromJson, toJson, edge cases)
@@ -27,6 +29,7 @@ frontend/test/
 ```
 
 ## Widget Test Pattern
+
 ```dart
 testWidgets('description', (WidgetTester tester) async {
   await tester.pumpWidget(
@@ -42,6 +45,7 @@ testWidgets('description', (WidgetTester tester) async {
 ```
 
 ## Model Test Pattern
+
 ```dart
 test('fromJson handles null values gracefully', () {
   final json = {'name': 'Test'};  // Deliberately missing fields
@@ -52,11 +56,13 @@ test('fromJson handles null values gracefully', () {
 ```
 
 ## Test Reports
-- Failed tests are documented in `docs/frontend/test-reports/`
+
+- Failed tests are documented in `docs/` (e.g. dated `*-test-summary.md` files)
 - Format: `YYYY-MM-DD-test-summary.md` with root cause analysis and fix suggestions
 - Reports include both English and Chinese content
 
 ## Running Tests
+
 ```bash
 cd frontend && flutter test                    # All tests
 cd frontend && flutter test test/models/       # Model tests only

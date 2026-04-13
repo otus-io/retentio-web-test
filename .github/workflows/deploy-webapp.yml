@@ -21,4 +21,4 @@ jobs:
           script: |
             cd "$HOME/otusio/retentio-webapp" || exit 1
             git pull origin main || exit 1
-            (cd webapp && VITE_API_URL=https://api.wordupx.com:8443 npm run build) || exit 1
+            (cd webapp && VITE_API_URL=https://api.retentio.app:8443 npm run build) || exit 1

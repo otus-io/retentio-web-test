@@ -1,4 +1,4 @@
-🌐 [English](QUICKSTART.md) | [中文](QUICKSTART_zh.md)
+🌐 [English](quickstart.md) | [中文](quickstart_zh.md)
 
 ---
 
@@ -56,7 +56,7 @@ This guide walks you through using the Retentio API via Swagger UI.
 
 - Open Swagger UI at:
   - **Local**: <http://localhost:8080/docs>
-  - **Production**: <https://api.wordupx.com:8443/docs>
+  - **Production**: <https://api.retentio.app:8443/docs>
 
 > **Timestamp convention:** All timestamps in the API use **UTC**.
 > ISO 8601 strings use the `Z` suffix (e.g., `2026-02-08T12:00:00Z`).
@@ -677,9 +677,9 @@ By default there is **one card per fact**. To add a second card for a fact (e.g.
 
 - `id`: `a1b2c3d4e5f6` (your deck ID)
 
-**Response shape:** `front` and `back` are arrays of **entry objects** in **template order** (one object per fact entry index on that side). Each object matches a fact **entry**: optional **`field`** (label) and optional **`text`**, **`audio`**, **`image`**, **`video`** string keys (omitted when empty). Text and its pronunciation clip are explicit siblings on the same object (e.g. `"text": "Hello"` and `"audio": "https://…/api/media/…"`). For media keys, values are **full media URLs** when the server can determine a base URL. Use each URL with the same `Authorization: Bearer <token>` to download the file.
+**Response shape:** `front` and `back` are arrays of **entry objects** in **template order** (one object per fact entry index on that side). Each object matches a fact **entry**: optional **`field`** (label) and optional **`text`**, **`audio`**, **`image`**, **`video`** string keys (omitted when empty). Text and its pronunciation clip are explicit siblings on the same object (e.g. `"text": "Hello"` and `"audio": "https://api.retentio.app:8443/api/media/abc123"`). For media keys, values are **full media URLs** when the server can determine a base URL. Use each URL with the same `Authorization: Bearer <token>` to download the file.
 
-Each JSON example below has a matching integration test in [`api/tests/integration/card_test.go`](../../api/tests/integration/card_test.go): `TestGetNextCard` (with field names) and `TestNextCardUrgencySelection` (no field names, text+audio+image, multi-front, front-only, split template `[[0,1],[2,3]]`, and full URL host).
+Each JSON example below has a matching integration test in [`api/tests/integration/card_test.go`](../../retentio-backend/api/tests/integration/card_test.go): `TestGetNextCard` (with field names) and `TestNextCardUrgencySelection` (no field names, text+audio+image, multi-front, front-only, split template `[[0,1],[2,3]]`, and full URL host).
 
 **Response (no field names):**
 
@@ -846,11 +846,11 @@ Each JSON example below has a matching integration test in [`api/tests/integrati
       "created_at": 1763269600,
       "front": [
         {"field": "Front", "text": "Word"},
-        {"field": "Pronunciation", "audio": "https://api.wordupx.com:8443/api/media/abc123"}
+        {"field": "Pronunciation", "audio": "https://api.retentio.app:8443/api/media/abc123"}
       ],
       "back": [
-        {"field": "Picture", "image": "https://api.wordupx.com:8443/api/media/def456"},
-        {"field": "Clip", "video": "https://api.wordupx.com:8443/api/media/vid789", "text": "Translation"}
+        {"field": "Picture", "image": "https://api.retentio.app:8443/api/media/def456"},
+        {"field": "Clip", "video": "https://api.retentio.app:8443/api/media/vid789", "text": "Translation"}
       ]
     },
     "urgency": 1.2
@@ -1104,7 +1104,7 @@ Returns metadata only (id, owner, filename, mime, size, checksum, created_at), n
 
 **Endpoint:** `GET /api/media/{id}`
 
-Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response puts full URLs in the `audio`, `image`, and `video` fields of each front/back entry (e.g. `https://api.wordupx.com:8443/api/media/{id}`); use that URL with the same auth header to load the file.
+Returns the media file (binary) for user-owned media by ID. Requires `Authorization: Bearer <token>`. Response headers include `Content-Type`, `Content-Length`, and `ETag` (same as `checksum`). Send `If-None-Match: <ETag>` to get `304 Not Modified` when the file is unchanged. The **Get Next Card** response puts full URLs in the `audio`, `image`, and `video` fields of each front/back entry (e.g. `https://api.retentio.app:8443/api/media/{id}`); use that URL with the same auth header to load the file.
 
 ### Delete media
 
@@ -1134,7 +1134,7 @@ Returns the media file (binary) for user-owned media by ID. Requires `Authorizat
 
 Each entry is an object with optional `text`, `audio`, `image`, `video`. Use a dedicated entry for media (e.g. `{ "audio": "abc123" }`) or combine with text in one entry (e.g. `{ "text": "Example sentence.", "audio": "ex1id" }`) so the audio is clearly for that sentence. Use optional `template` for custom front/back layout per fact; omit for default (front = first entry, back = rest).
 
-For full design (upload, delete, display, sync), see **[Media Upload design doc](../design-doc/media-upload.md)**.
+For full design (upload, delete, display, sync), see **[Media Upload design doc](design-doc/media-upload.md)**.
 
 ---
 

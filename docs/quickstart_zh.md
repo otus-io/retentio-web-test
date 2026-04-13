@@ -1,4 +1,4 @@
-🌐 [English](QUICKSTART.md) | [中文](QUICKSTART_zh.md)
+🌐 [English](quickstart.md) | [中文](quickstart_zh.md)
 
 ---
 
@@ -57,7 +57,7 @@
 
 - 打开 Swagger UI：
   - **本地**: <http://localhost:8080/docs>
-  - **生产环境**: <https://api.wordupx.com:8443/docs>
+  - **生产环境**: <https://api.retentio.app:8443/docs>
 
 > **时间戳规范：** API 中所有时间戳均使用 **UTC** 时区。
 > ISO 8601 字符串使用 `Z` 后缀（例如 `2026-02-08T12:00:00Z`）。
@@ -684,7 +684,9 @@
 
 - `id`: `a1b2c3d4e5f6`（您的卡组 ID）
 
-**响应结构：** `front` 与 `back` 为**词条对象数组**，顺序按 **template**（每个对象对应 template 在该侧的一个词条索引）。每个对象与事实中的**词条（entry）**一致：可选 **`field`**（标签），以及可选的 **`text`**、**`audio`**、**`image`**、**`video`** 字符串键（无内容则省略）。正文与对应读音音频在同一对象上并列（例如 `"text": "Hello"` 与 `"audio": "https://…/api/media/…"`），对应关系明确。`audio` / `image` / `video` 在服务端能解析 base URL 时为**完整媒体 URL**（如 `https://api.wordupx.com:8443/api/media/abc123`）。使用该 URL 并携带相同 `Authorization: Bearer <token>` 即可下载。
+**响应结构：** `front` 与 `back` 为**词条对象数组**，顺序按 **template**（每个对象对应 template 在该侧的一个词条索引）。每个对象与事实中的**词条（entry）**一致：可选 **`field`**（标签），以及可选的 **`text`**、**`audio`**、**`image`**、**`video`** 字符串键（无内容则省略）。正文与对应读音音频在同一对象上并列（例如 `"text": "Hello"` 与 `"audio": "https://api.retentio.app:8443/api/media/abc123"`），对应关系明确。`audio` / `image` / `video` 在服务端能解析 base URL 时为**完整媒体 URL**（如 `https://api.retentio.app:8443/api/media/abc123`）。使用该 URL 并携带相同 `Authorization: Bearer <token>` 即可下载。
+
+以下各 JSON 示例在 [`api/tests/integration/card_test.go`](../../retentio-backend/api/tests/integration/card_test.go) 中均有对应集成测试：`TestGetNextCard`（含字段名）与 `TestNextCardUrgencySelection`（无字段名、text+audio+image、多正面词条、仅正面、拆分 template `[[0,1],[2,3]]` 及完整 URL 主机）。
 
 **响应（无字段名）：**
 
@@ -851,11 +853,11 @@
       "created_at": 1763269600,
       "front": [
         {"field": "Front", "text": "Word"},
-        {"field": "Pronunciation", "audio": "https://api.wordupx.com:8443/api/media/abc123"}
+        {"field": "Pronunciation", "audio": "https://api.retentio.app:8443/api/media/abc123"}
       ],
       "back": [
-        {"field": "Picture", "image": "https://api.wordupx.com:8443/api/media/def456"},
-        {"field": "Clip", "video": "https://api.wordupx.com:8443/api/media/vid789", "text": "Translation"}
+        {"field": "Picture", "image": "https://api.retentio.app:8443/api/media/def456"},
+        {"field": "Clip", "video": "https://api.retentio.app:8443/api/media/vid789", "text": "Translation"}
       ]
     },
     "urgency": 1.2
@@ -1108,7 +1110,7 @@
 
 **接口：** `GET /api/media/{id}`
 
-按 ID 返回用户拥有的媒体文件（二进制）。需在请求头中携带 `Authorization: Bearer <token>`。响应头包含 `Content-Type`、`Content-Length` 和 `ETag`（与 `checksum` 一致）。请求头中携带 `If-None-Match: <ETag>` 可在文件未变更时获得 `304 Not Modified`。**获取下一张卡片** 接口会在每个正面/背面词条对象的 `audio`、`image`、`video` 字段中给出完整 URL（如 `https://api.wordupx.com:8443/api/media/{id}`）；使用该 URL 并携带相同认证头即可加载文件。
+按 ID 返回用户拥有的媒体文件（二进制）。需在请求头中携带 `Authorization: Bearer <token>`。响应头包含 `Content-Type`、`Content-Length` 和 `ETag`（与 `checksum` 一致）。请求头中携带 `If-None-Match: <ETag>` 可在文件未变更时获得 `304 Not Modified`。**获取下一张卡片** 接口会在每个正面/背面词条对象的 `audio`、`image`、`video` 字段中给出完整 URL（如 `https://api.retentio.app:8443/api/media/{id}`）；使用该 URL 并携带相同认证头即可加载文件。
 
 ### 删除媒体
 
@@ -1138,13 +1140,13 @@
 
 每条 entry 为对象，含可选 `text`、`audio`、`image`、`video`。可选用 `template` 指定每词条的正/背面布局；省略则使用默认（正面第一条、背面其余）。
 
-完整设计（上传、删除、展示、同步）见 **[媒体上传设计文档](../design-doc/media-upload.md)**。
+完整设计（上传、删除、展示、同步）见 **[媒体上传设计文档](design-doc/media-upload.md)**。
 
 ---
 
 ## 响应示例速查
 
-上述各节均包含完整 JSON 示例。接口与响应结构对应关系与 [Response examples reference](QUICKSTART.md#response-examples-reference)（英文版）一致，此处不重复列表。
+上述各节均包含完整 JSON 示例。接口与响应结构对应关系与 [Response examples reference](quickstart.md#response-examples-reference)（英文版）一致，此处不重复列表。
 
 ---
 

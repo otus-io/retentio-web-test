@@ -42,4 +42,4 @@ jobs:
       - name: Production build
         run: npm run build
         env:
-          VITE_API_URL: https://api.wordupx.com:8443
+          VITE_API_URL: https://api.retentio.app:8443

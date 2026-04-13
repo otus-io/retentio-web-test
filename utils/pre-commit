@@ -16,7 +16,8 @@ echo "🔍 Running pre-commit checks..."
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# utils/ lives one level below repo root (retentio-web-test/)
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 WEBAPP_CHANGED=$(git diff --cached --name-only -- 'webapp/' | grep -v '/node_modules/' | head -1)
@@ -83,6 +84,14 @@ fi
 # =============================================================================
 if [ -n "$WEBAPP_CHANGED" ]; then
     echo -e "${YELLOW}━━━ Webapp Checks ━━━${NC}"
+    echo "🧪 Running webapp unit tests..."
+    if (cd webapp && npm run test:run); then
+        echo -e "${GREEN}  ✓ Webapp tests OK${NC}"
+    else
+        echo -e "${RED}  ✗ Webapp tests failed${NC}"
+        FAILED=1
+    fi
+    echo ""
     echo "🔨 Checking webapp build..."
     if (cd webapp && npm run build); then
         echo -e "${GREEN}  ✓ Webapp build OK${NC}"
