@@ -1,15 +1,15 @@
 ---
-name: Deploy Webapp
+name: Deploy Web Test
 
 on:
   push:
     branches: [main]
     paths:
       - 'webapp/**'
-      - '.github/workflows/deploy-webapp.yml'
+      - '.github/workflows/deploy-web-test.yml'
 
 jobs:
-  deploy-webapp:
+  deploy-web-test:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy webapp to server
@@ -19,6 +19,6 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd "$HOME/otusio/retentio-webapp" || exit 1
+            cd "$HOME/otusio/retentio-web-test" || exit 1
             git pull origin main || exit 1
             (cd webapp && VITE_API_URL=https://api.retentio.app:8443 npm run build) || exit 1
