@@ -5,22 +5,36 @@ on:
   push:
     branches: [main]
     paths:
-      - 'webapp/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - '.env.example'
       - '.github/workflows/webapp-ci.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'webapp/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - '.env.example'
       - '.github/workflows/webapp-ci.yml'
 
 jobs:
   test:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: webapp
 
     steps:
       - name: Checkout code
@@ -31,7 +45,7 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: webapp/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci

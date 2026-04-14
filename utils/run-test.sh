@@ -24,7 +24,7 @@ FAILED=0
 # =============================================================================
 # YAML lint (all .yml/.yaml in repo)
 # =============================================================================
-YAML_FILES=$(find . -maxdepth 3 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -path './.git/*' 2>/dev/null || true)
+YAML_FILES=$(find . -maxdepth 3 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -path './.git/*' ! -path '*node_modules*' 2>/dev/null || true)
 if [ -n "$YAML_FILES" ]; then
     echo -e "${YELLOW}━━━ YAML Checks ━━━${NC}"
     echo "📋 Linting YAML files..."
@@ -77,12 +77,12 @@ if [ -n "$MD_FILES" ]; then
 fi
 
 # =============================================================================
-# Webapp build
+# Webapp build (Vite app at repo root)
 # =============================================================================
-if [ -d "webapp" ]; then
+if [ -f vite.config.ts ] && [ -f package.json ]; then
     echo -e "${YELLOW}━━━ Webapp Checks ━━━${NC}"
     echo "🔨 Checking webapp build..."
-    if (cd webapp && npm run build); then
+    if npm run build; then
         echo -e "${GREEN}  ✓ Webapp build OK${NC}"
     else
         echo -e "${RED}  ✗ Webapp build failed${NC}"
