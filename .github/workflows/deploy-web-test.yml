@@ -30,4 +30,5 @@ jobs:
           script: |
             cd "$HOME/otusio/retentio-web-test" || exit 1
             git pull origin main || exit 1
+            npm ci --include=dev || exit 1
             VITE_API_URL=https://api.retentio.app:8443 npm run build || exit 1
