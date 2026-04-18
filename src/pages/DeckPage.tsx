@@ -34,7 +34,14 @@ import {
   DeckInfoCard,
 } from "@/components/deck";
 import { CardSection } from "@/components/card";
-import { AddFactsForm, FactsList, type AddFactEntry, makeInitialFactRow } from "@/components/facts";
+import {
+  AddFactsForm,
+  BulkEditFactsModal,
+  FactsList,
+  type AddFactEntry,
+  makeInitialFactRow,
+} from "@/components/facts";
+import { mergeFactListsPreservingPriorOrder } from "@/lib/existingFactsSpreadsheet";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +83,7 @@ export default function DeckPage() {
   const [cardError, setCardError] = useState("");
   const [cardSuccess, setCardSuccess] = useState("");
   const [addFactsOpen, setAddFactsOpen] = useState(false);
+  const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
 
   useEffect(() => {
     if (!addFactsOpen) return;
@@ -98,6 +106,7 @@ export default function DeckPage() {
     setSuccessMessage("");
     setFactSuccess("");
     setCardSuccess("");
+    setBulkEditFactsOpen(false);
   }, [id]);
 
   const fetchDeck = useCallback(async () => {
@@ -135,7 +144,7 @@ export default function DeckPage() {
     try {
       const res = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
       if (routeDeckIdRef.current !== targetDeckId) return;
-      setFactsList(res.data.facts);
+      setFactsList((prev) => mergeFactListsPreservingPriorOrder(prev, res.data.facts));
     } catch {
       if (routeDeckIdRef.current !== targetDeckId) return;
       setFactsList([]);
@@ -143,6 +152,11 @@ export default function DeckPage() {
       if (routeDeckIdRef.current === targetDeckId) setLoadingFacts(false);
     }
   }, [token, id]);
+
+  useEffect(() => {
+    if (!bulkEditFactsOpen || !token || !id) return;
+    void fetchFacts();
+  }, [bulkEditFactsOpen, token, id, fetchFacts]);
 
   const fetchCards = useCallback(async () => {
     if (!token || !id) return;
@@ -615,11 +629,35 @@ export default function DeckPage() {
                 setEditing(true);
                 setSuccessMessage("");
               }}
+              onBulkEditFacts={() => setBulkEditFactsOpen(true)}
               deleteConfirm={deleteConfirm}
               onDeleteConfirm={() => setDeleteConfirm(true)}
               onDeleteCancel={() => setDeleteConfirm(false)}
               onDelete={handleDelete}
             />
+            {bulkEditFactsOpen && deck && token && (
+              <BulkEditFactsModal
+                open={bulkEditFactsOpen}
+                onClose={() => {
+                  setBulkEditFactsOpen(false);
+                  setEditingFactId(null);
+                  setEditingFactEntries([]);
+                  setFactError("");
+                  setDeleteFactId(null);
+                }}
+                deck={deck}
+                token={token}
+                factsList={factsList}
+                loadingFacts={loadingFacts}
+                onRefreshFacts={async () => {
+                  await fetchFacts();
+                  await fetchDeck();
+                }}
+                onDeleteFact={handleDeleteFact}
+                deleteFactId={deleteFactId}
+                setDeleteFactId={setDeleteFactId}
+              />
+            )}
             {addFactsOpen && deck && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center p-4"

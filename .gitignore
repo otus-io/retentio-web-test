@@ -1,3 +1,6 @@
+# Local Vite env overrides (e.g. .env.development.local)
+.env*.local
+
 # Node / npm
 node_modules/
 **/dist/

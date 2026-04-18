@@ -17,16 +17,21 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   BULK_IMPORT_UPLOAD_TIMEOUT_MS,
+  buildTemplateForRequest,
   getApiBaseUrl,
   request,
   uploadMultipart,
   uploadMultipartWithProgress,
+  type AddFactReq,
+  type AddFactRes,
   type BulkImportRes,
   type Entry,
   type FactItem,
   type GetDeckRes,
   type GetFactsRes,
   type MediaItem,
+  type UpdateDeckReq,
+  type UpdateDeckRes,
   type UpdateFactReq,
   type UploadMediaRes,
   fileLooksLikeJson,
@@ -42,6 +47,22 @@ import {
   normalizeZipPath,
 } from "@/lib/bulkImportNormalize";
 import { cn } from "@/lib/utils";
+import {
+  appendEmptyEntryColumnToAllFacts,
+  clearEntryMediaSlot,
+  existingFactsColumnCount,
+  existingFactsHeaderLabels,
+  factEntryAt,
+  factHasSomeContent,
+  insertEmptyEntryAfter,
+  mergeEntryMediaPatch,
+  mergeFactListsPreservingPriorOrder,
+  mediaSlotForFile,
+  minSpreadsheetColumnCount,
+  removeFactEntryAt,
+  trimAllFactsToEntryCount,
+  updateFactEntryText,
+} from "@/lib/existingFactsSpreadsheet";
 
 type PreviewRow = {
   id: string;
@@ -146,80 +167,6 @@ function duplicatePreviewRowIds(rows: PreviewRow[]): Set<string> {
   return out;
 }
 
-function existingFactsColumnCount(deckFields: string[], facts: FactItem[]): number {
-  const fromFacts = facts.reduce((m, f) => Math.max(m, f.entries?.length ?? 0), 0);
-  return Math.max(deckFields.length, fromFacts, 1);
-}
-
-function existingFactsHeaderLabels(colCount: number, deckFields: string[]): string[] {
-  return Array.from({ length: colCount }, (_, i) =>
-    (deckFields[i] ?? "").trim() !== "" ? deckFields[i]! : `Column ${i + 1}`
-  );
-}
-
-function factEntryAt(fact: FactItem, idx: number): Entry {
-  return fact.entries[idx] ? { ...fact.entries[idx] } : {};
-}
-
-function factHasSomeContent(entries: Entry[]): boolean {
-  return entries.some(
-    (e) =>
-      (e.text?.trim() ?? "") !== "" ||
-      Boolean(e.audio) ||
-      Boolean(e.image) ||
-      Boolean(e.video) ||
-      Boolean(e.json)
-  );
-}
-
-function updateFactEntryText(fact: FactItem, entryIndex: number, text: string): FactItem {
-  const len = Math.max(fact.entries.length, entryIndex + 1);
-  const entries: Entry[] = Array.from({ length: len }, (_, j) => {
-    const base = fact.entries[j] ? { ...fact.entries[j] } : {};
-    if (j === entryIndex) return { ...base, text };
-    return base;
-  });
-  return { ...fact, entries };
-}
-
-function mergeEntryMediaPatch(
-  fact: FactItem,
-  entryIndex: number,
-  patch: Partial<Pick<Entry, "audio" | "image" | "video" | "json">>
-): FactItem {
-  const len = Math.max(fact.entries.length, entryIndex + 1);
-  const entries: Entry[] = Array.from({ length: len }, (_, j) => {
-    const base = fact.entries[j] ? { ...fact.entries[j] } : {};
-    if (j !== entryIndex) return base;
-    return { ...base, ...patch };
-  });
-  return { ...fact, entries };
-}
-
-function clearEntryMediaSlot(
-  fact: FactItem,
-  entryIndex: number,
-  slot: "audio" | "image" | "video" | "json"
-): FactItem {
-  const len = Math.max(fact.entries.length, entryIndex + 1);
-  const entries: Entry[] = Array.from({ length: len }, (_, j) => {
-    const base = fact.entries[j] ? { ...fact.entries[j] } : {};
-    if (j !== entryIndex) return base;
-    const next = { ...base };
-    delete next[slot];
-    return next;
-  });
-  return { ...fact, entries };
-}
-
-function mediaSlotForFile(file: File): "audio" | "image" | "video" | "json" | null {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type.startsWith("video/")) return "video";
-  if (file.type.startsWith("audio/") || file.type === "application/ogg") return "audio";
-  if (fileLooksLikeJson(file)) return "json";
-  return null;
-}
-
 export default function BulkUploadPage() {
   const { id } = useParams<{ id: string }>();
   const { token, logout } = useAuth();
@@ -245,9 +192,13 @@ export default function BulkUploadPage() {
   } | null>(null);
   const [existingSaveError, setExistingSaveError] = useState("");
   const [existingSaveSuccess, setExistingSaveSuccess] = useState("");
+  const [editableColumnNames, setEditableColumnNames] = useState<string[]>([]);
+  const [savingColumnLabels, setSavingColumnLabels] = useState(false);
+  const [addingExistingFactRow, setAddingExistingFactRow] = useState(false);
   /** Selected fact ids on “Facts already in this deck” for bulk delete from server. */
   const [selectedExistingFactIds, setSelectedExistingFactIds] = useState<Set<string>>(() => new Set());
   const [bulkDeletingExisting, setBulkDeletingExisting] = useState(false);
+  const [deletingExistingFactId, setDeletingExistingFactId] = useState<string | null>(null);
   const selectAllExistingCheckboxRef = useRef<HTMLInputElement>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
   /** All CSV data rows from the ZIP (before hiding duplicates vs deck / within file). */
@@ -282,6 +233,15 @@ export default function BulkUploadPage() {
   const routeDeckIdRef = useRef(id);
   routeDeckIdRef.current = id;
 
+  useEffect(() => {
+    setExistingFacts([]);
+    setDirtyFactIds(new Set());
+    setSelectedExistingFactIds(new Set());
+    setExistingFactsError("");
+    setExistingSaveError("");
+    setExistingSaveSuccess("");
+  }, [id]);
+
   const previewTotal = rows.length;
   const previewTotalPages = Math.max(1, Math.ceil(previewTotal / PREVIEW_PAGE_SIZE));
   const previewStart = (previewPage - 1) * PREVIEW_PAGE_SIZE;
@@ -298,10 +258,17 @@ export default function BulkUploadPage() {
     () => existingFactsColumnCount(deckFields, existingFacts),
     [deckFields, existingFacts]
   );
-  const existingLabels = useMemo(
+  const serverColumnHeaderLabels = useMemo(
     () => existingFactsHeaderLabels(existingColCount, deckFields),
     [existingColCount, deckFields]
   );
+  const columnLabelsDirty = useMemo(
+    () =>
+      editableColumnNames.length !== serverColumnHeaderLabels.length ||
+      editableColumnNames.some((s, i) => s !== serverColumnHeaderLabels[i]),
+    [editableColumnNames, serverColumnHeaderLabels]
+  );
+  const minColCountForSpreadsheet = useMemo(() => minSpreadsheetColumnCount(deckFields), [deckFields]);
   const existingTotal = existingFacts.length;
   const existingTotalPages = Math.max(1, Math.ceil(existingTotal / PREVIEW_PAGE_SIZE));
   const existingStart = (existingFactsPage - 1) * PREVIEW_PAGE_SIZE;
@@ -315,6 +282,16 @@ export default function BulkUploadPage() {
     setExistingFactsPage((p) => Math.min(p, existingTotalPages));
   }, [existingTotalPages]);
 
+  useEffect(() => {
+    setEditableColumnNames((prev) => {
+      if (prev.length > existingColCount) return prev.slice(0, existingColCount);
+      if (prev.length >= existingColCount) return prev;
+      const pad = existingFactsHeaderLabels(existingColCount, deckFields);
+      if (prev.length === 0) return pad;
+      return [...prev, ...pad.slice(prev.length)];
+    });
+  }, [existingColCount, deckFields]);
+
   const loadDeckAndFacts = useCallback(async (): Promise<FactItem[]> => {
     if (!token || !id) return [];
     const targetDeckId = id;
@@ -322,7 +299,6 @@ export default function BulkUploadPage() {
     setLoadingDeck(true);
     setLoadingExistingFacts(true);
     setExistingFactsError("");
-    setExistingFacts([]);
     try {
       const deckRes = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       if (routeDeckIdRef.current !== targetDeckId) return [];
@@ -339,7 +315,7 @@ export default function BulkUploadPage() {
       const factsRes = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
       if (routeDeckIdRef.current !== targetDeckId) return [];
       facts = factsRes.data.facts;
-      setExistingFacts(facts);
+      setExistingFacts((prev) => mergeFactListsPreservingPriorOrder(prev, facts));
       setDirtyFactIds(new Set());
       setSelectedExistingFactIds(new Set());
       setExistingSaveError("");
@@ -356,6 +332,72 @@ export default function BulkUploadPage() {
     }
     return facts;
   }, [id, token]);
+
+  async function saveEditableColumnLabels() {
+    if (!token || !id) return;
+    const dfLen = deckFields.length;
+    // PATCH /api/decks/{id}: non-empty name; fields length must match existing schema, or first-time ≥2 when deck has no fields.
+    let outLen: number;
+    if (dfLen >= 1) {
+      outLen = dfLen;
+    } else if (existingColCount >= 2) {
+      outLen = existingColCount;
+    } else {
+      setExistingSaveError(
+        "This deck has no fields yet. Add at least two columns (Add column) or define fields on Edit deck, then save names here."
+      );
+      return;
+    }
+    const out = Array.from({ length: outLen }, (_, i) => editableColumnNames[i] ?? "");
+    setExistingSaveError("");
+    setExistingSaveSuccess("");
+    setSavingColumnLabels(true);
+    try {
+      const body: UpdateDeckReq = { name: (deckName ?? "").trim() || "Deck", fields: out };
+      await request<UpdateDeckRes>(`/api/decks/${id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(body),
+      });
+      setExistingSaveSuccess("Column names saved.");
+      await loadDeckAndFacts();
+    } catch (e) {
+      setExistingSaveError(e instanceof Error ? e.message : "Failed to save column names.");
+    } finally {
+      setSavingColumnLabels(false);
+    }
+  }
+
+  async function appendExistingFactRow() {
+    if (!token || !id) return;
+    if (existingColCount < 1) {
+      setExistingSaveError("Add fields to the deck first (deck page → Edit deck).");
+      return;
+    }
+    setExistingSaveError("");
+    setExistingSaveSuccess("");
+    setAddingExistingFactRow(true);
+    try {
+      const entries: Entry[] = Array.from({ length: existingColCount }, (_, i) =>
+        i === 0 ? { text: "New fact" } : {}
+      );
+      const body: AddFactReq = {
+        facts: [{ entries }],
+        ...buildTemplateForRequest(existingColCount, 1, false),
+      };
+      await request<AddFactRes>(`/api/decks/${id}/facts/append`, {
+        method: "POST",
+        token,
+        body: JSON.stringify(body),
+      });
+      setExistingSaveSuccess("Fact added.");
+      await loadDeckAndFacts();
+    } catch (e) {
+      setExistingSaveError(e instanceof Error ? e.message : "Failed to add fact.");
+    } finally {
+      setAddingExistingFactRow(false);
+    }
+  }
 
   useEffect(() => {
     void loadDeckAndFacts();
@@ -429,6 +471,31 @@ export default function BulkUploadPage() {
     setExistingSaveSuccess("");
   }
 
+  function addColumnToAllExistingFacts() {
+    setExistingFacts((prev) => {
+      if (prev.length === 0) return prev;
+      setDirtyFactIds(new Set(prev.map((f) => f.id)));
+      return appendEmptyEntryColumnToAllFacts(prev);
+    });
+    setExistingSaveSuccess("");
+    setExistingSaveError("");
+  }
+
+  function removeLastColumnFromAllExistingFacts() {
+    if (!confirm("Remove the rightmost column from every fact? Data in that column is discarded until you save.")) {
+      return;
+    }
+    setExistingFacts((prev) => {
+      const wide = existingFactsColumnCount(deckFields, prev);
+      const minC = minSpreadsheetColumnCount(deckFields);
+      if (wide <= minC) return prev;
+      setDirtyFactIds(new Set(prev.map((f) => f.id)));
+      return trimAllFactsToEntryCount(prev, wide - 1);
+    });
+    setExistingSaveSuccess("");
+    setExistingSaveError("");
+  }
+
   function openExistingMediaPicker(target: {
     factId: string;
     entryIndex: number;
@@ -448,6 +515,24 @@ export default function BulkUploadPage() {
     );
     setDirtyFactIds((d) => new Set(d).add(factId));
     setExistingSaveSuccess("");
+  }
+
+  function removeExistingFactCell(factId: string, entryIndex: number) {
+    setExistingFacts((prev) =>
+      prev.map((f) => (f.id === factId ? removeFactEntryAt(f, entryIndex) : f))
+    );
+    setDirtyFactIds((d) => new Set(d).add(factId));
+    setExistingSaveSuccess("");
+    setExistingSaveError("");
+  }
+
+  function insertExistingFactCellAfter(factId: string, entryIndex: number) {
+    setExistingFacts((prev) =>
+      prev.map((f) => (f.id === factId ? insertEmptyEntryAfter(f, entryIndex) : f))
+    );
+    setDirtyFactIds((d) => new Set(d).add(factId));
+    setExistingSaveSuccess("");
+    setExistingSaveError("");
   }
 
   async function handleExistingMediaFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -566,6 +651,34 @@ export default function BulkUploadPage() {
     });
   }
 
+  async function deleteOneExistingFactRow(factId: string) {
+    if (!token || !id) return;
+    if (!confirm("Remove this fact from the deck? This cannot be undone.")) return;
+    setExistingSaveError("");
+    setExistingSaveSuccess("");
+    setDeletingExistingFactId(factId);
+    try {
+      await request<unknown>(`/api/decks/${id}/facts/${factId}`, { method: "DELETE", token });
+      setDirtyFactIds((d) => {
+        const next = new Set(d);
+        next.delete(factId);
+        return next;
+      });
+      setSelectedExistingFactIds((prev) => {
+        const next = new Set(prev);
+        next.delete(factId);
+        return next;
+      });
+      await loadDeckAndFacts();
+      setExistingSaveSuccess("Fact removed.");
+    } catch (e) {
+      setExistingSaveError(e instanceof Error ? e.message : "Failed to delete fact.");
+      await loadDeckAndFacts();
+    } finally {
+      setDeletingExistingFactId(null);
+    }
+  }
+
   async function deleteSelectedExistingFacts() {
     if (!token || !id) return;
     const ids = [...selectedExistingFactIds];
@@ -598,7 +711,12 @@ export default function BulkUploadPage() {
     paginatedExisting.every((f) => selectedExistingFactIds.has(f.id));
   const someExistingPageSelected = paginatedExisting.some((f) => selectedExistingFactIds.has(f.id));
   const existingFactsBusy =
-    bulkDeletingExisting || savingFactId !== null || existingMediaUploadingKey !== null;
+    bulkDeletingExisting ||
+    deletingExistingFactId !== null ||
+    savingFactId !== null ||
+    existingMediaUploadingKey !== null ||
+    savingColumnLabels ||
+    addingExistingFactRow;
 
   useEffect(() => {
     const el = selectAllExistingCheckboxRef.current;
@@ -658,8 +776,8 @@ export default function BulkUploadPage() {
       }
       const maxCols = parsed.reduce((m, row) => Math.max(m, row.length), 0);
       const header = startRow === 1
-        ? Array.from({ length: maxCols }, (_, i) => parsed[0][i] ?? `Column ${i + 1}`)
-        : Array.from({ length: maxCols }, (_, i) => `Column ${i + 1}`);
+        ? Array.from({ length: maxCols }, (_, i) => parsed[0][i] ?? "")
+        : Array.from({ length: maxCols }, (_, i) => "");
 
       const paths = listBulkImportMediaPaths(mediaFiles.map((m) => m.name));
 
@@ -974,22 +1092,73 @@ export default function BulkUploadPage() {
                   <h2 className="text-sm font-medium">Facts already in this deck</h2>
                   {!loadingExistingFacts && existingTotal > 0 && (
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {existingTotal} fact{existingTotal === 1 ? "" : "s"} — each row is one fact; edit text and media, then
-                      save.
+                      {existingTotal} fact{existingTotal === 1 ? "" : "s"} — use Add column for an extra entry on every
+                      row, then Save. Save column names updates deck fields only; extra columns are per-fact.
                     </span>
                   )}
                 </div>
-                {existingTotal > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive border-destructive/50 hover:bg-destructive/10"
-                    disabled={selectedExistingFactIds.size === 0 || existingFactsBusy}
-                    onClick={() => void deleteSelectedExistingFacts()}
-                  >
-                    Delete selected ({selectedExistingFactIds.size})
-                  </Button>
+                {!loadingExistingFacts && !existingFactsError && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      disabled={existingFactsBusy}
+                      onClick={() => void appendExistingFactRow()}
+                    >
+                      {addingExistingFactRow ? "Adding…" : "Add row"}
+                    </Button>
+                    {existingTotal > 0 && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={existingFactsBusy}
+                          onClick={addColumnToAllExistingFacts}
+                          title="Append one empty cell at the end of every fact"
+                        >
+                          Add column
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                          disabled={
+                            existingFactsBusy || existingColCount <= minColCountForSpreadsheet
+                          }
+                          onClick={removeLastColumnFromAllExistingFacts}
+                          title="Remove the rightmost column from every fact (cannot go below deck width)"
+                        >
+                          Delete column
+                        </Button>
+                      </>
+                    )}
+                    {(deckFields.length >= 1 || existingColCount >= 2) && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={!columnLabelsDirty || existingFactsBusy}
+                        onClick={() => void saveEditableColumnLabels()}
+                      >
+                        {savingColumnLabels ? "Saving…" : "Save column names"}
+                      </Button>
+                    )}
+                    {existingTotal > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                        disabled={selectedExistingFactIds.size === 0 || existingFactsBusy}
+                        onClick={() => void deleteSelectedExistingFacts()}
+                      >
+                        Delete selected ({selectedExistingFactIds.size})
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
               {existingSaveError && <p className="text-sm text-destructive">{existingSaveError}</p>}
@@ -997,7 +1166,10 @@ export default function BulkUploadPage() {
               {loadingExistingFacts && <p className="text-sm text-muted-foreground">Loading facts…</p>}
               {existingFactsError && <p className="text-sm text-destructive">{existingFactsError}</p>}
               {!loadingExistingFacts && !existingFactsError && existingTotal === 0 && (
-                <p className="text-sm text-muted-foreground">no facts in this deck yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  No facts in this deck yet. Use Add row to create one, or import a ZIP below. Extra deck fields
+                  (columns) are added from the deck page → Edit deck.
+                </p>
               )}
               {existingTotal > 0 && (
                 <>
@@ -1032,9 +1204,23 @@ export default function BulkUploadPage() {
                             </div>
                           </th>
                           <th className="px-3 py-2 text-left font-medium w-12">#</th>
-                          {existingLabels.map((col, idx) => (
-                            <th key={`ex-${col}-${idx}`} className="px-3 py-2 text-left font-medium min-w-[8rem]">
-                              {col}
+                          {Array.from({ length: existingColCount }, (_, idx) => (
+                            <th key={`ex-h-${idx}`} className="min-w-[7rem] px-2 py-2 text-left">
+                              <Input
+                                value={editableColumnNames[idx] ?? ""}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setEditableColumnNames((prev) => {
+                                    const next = [...prev];
+                                    while (next.length <= idx) next.push("");
+                                    next[idx] = v;
+                                    return next;
+                                  });
+                                }}
+                                className="h-8 min-w-0 text-xs font-medium"
+                                aria-label={`Column ${idx + 1} name`}
+                                disabled={existingFactsBusy}
+                              />
                             </th>
                           ))}
                           <th className="px-3 py-2 text-right font-medium w-28"> </th>
@@ -1071,15 +1257,15 @@ export default function BulkUploadPage() {
                                 Boolean(ent.json);
                               return (
                                 <td key={`${fact.id}-c${idx}`} className="px-3 py-2 max-w-[20rem]">
-                                  <Input
-                                    value={ent.text ?? ""}
-                                    onChange={(e) => updateExistingFactCell(fact.id, idx, e.target.value)}
-                                    className="h-9 min-w-[6rem]"
-                                    aria-label={`${existingLabels[idx] ?? `Column ${idx + 1}`}, row ${existingStart + i + 1}`}
-                                    disabled={existingFactsBusy}
-                                  />
-                                  <div className="group/media mt-1.5 flex items-start gap-1">
-                                    <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-start gap-1.5">
+                                    <div className="min-w-0 flex-1 space-y-1.5">
+                                      <Input
+                                        value={ent.text ?? ""}
+                                        onChange={(e) => updateExistingFactCell(fact.id, idx, e.target.value)}
+                                        className="h-9 min-w-[6rem]"
+                                        aria-label={`${editableColumnNames[idx] ?? `Column ${idx + 1}`}, row ${existingStart + i + 1}`}
+                                        disabled={existingFactsBusy}
+                                      />
                                       {mediaUploading && (
                                         <p className="text-xs text-muted-foreground">Uploading…</p>
                                       )}
@@ -1090,23 +1276,38 @@ export default function BulkUploadPage() {
                                         return (
                                           <div
                                             key={slot}
-                                            className="flex min-w-0 items-center gap-1 text-xs leading-snug"
+                                            className="flex min-w-0 items-center gap-1.5 text-xs leading-snug"
                                           >
                                             <span className="shrink-0 text-[10px] font-medium uppercase text-muted-foreground">
                                               {slotLabel[slot]}
                                             </span>
-                                            <span className="min-w-0 truncate font-medium" title={mid}>
-                                              {fname}
-                                            </span>
+                                            <div className="flex min-w-0 flex-1 justify-start overflow-hidden">
+                                              <div className="flex w-max min-w-0 max-w-full items-center gap-0 overflow-hidden">
+                                                <span
+                                                  className="min-w-0 shrink truncate font-medium"
+                                                  title={mid}
+                                                >
+                                                  {fname}
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  className="shrink-0 rounded p-0 text-sm leading-none text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                  aria-label={`Remove ${slotLabel[slot]}`}
+                                                  title={`Remove ${slotLabel[slot]}`}
+                                                  disabled={existingFactsBusy}
+                                                  onClick={() =>
+                                                    clearExistingFactMediaSlot(fact.id, idx, slot)
+                                                  }
+                                                >
+                                                  ×
+                                                </button>
+                                              </div>
+                                            </div>
                                           </div>
                                         );
                                       })}
                                     </div>
-                                    <DropdownMenu
-                                      trigger="⋯"
-                                      align="end"
-                                      className="shrink-0 opacity-0 transition-opacity group-hover/media:opacity-100 focus-within:opacity-100"
-                                    >
+                                    <DropdownMenu trigger="⋯" align="end" className="shrink-0 self-start">
                                       {!entryMediaFull ? (
                                         <DropdownMenuItem
                                           disabled={existingFactsBusy}
@@ -1120,121 +1321,52 @@ export default function BulkUploadPage() {
                                           Add media…
                                         </DropdownMenuItem>
                                       ) : null}
-                                      {ent.audio ? (
-                                        <>
-                                          <DropdownMenuItem
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              openExistingMediaPicker({
-                                                factId: fact.id,
-                                                entryIndex: idx,
-                                                replaceSlot: "audio",
-                                              })
-                                            }
-                                          >
-                                            Replace audio…
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            variant="destructive"
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              clearExistingFactMediaSlot(fact.id, idx, "audio")
-                                            }
-                                          >
-                                            Remove audio
-                                          </DropdownMenuItem>
-                                        </>
-                                      ) : null}
-                                      {ent.image ? (
-                                        <>
-                                          <DropdownMenuItem
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              openExistingMediaPicker({
-                                                factId: fact.id,
-                                                entryIndex: idx,
-                                                replaceSlot: "image",
-                                              })
-                                            }
-                                          >
-                                            Replace image…
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            variant="destructive"
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              clearExistingFactMediaSlot(fact.id, idx, "image")
-                                            }
-                                          >
-                                            Remove image
-                                          </DropdownMenuItem>
-                                        </>
-                                      ) : null}
-                                      {ent.video ? (
-                                        <>
-                                          <DropdownMenuItem
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              openExistingMediaPicker({
-                                                factId: fact.id,
-                                                entryIndex: idx,
-                                                replaceSlot: "video",
-                                              })
-                                            }
-                                          >
-                                            Replace video…
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            variant="destructive"
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              clearExistingFactMediaSlot(fact.id, idx, "video")
-                                            }
-                                          >
-                                            Remove video
-                                          </DropdownMenuItem>
-                                        </>
-                                      ) : null}
-                                      {ent.json ? (
-                                        <>
-                                          <DropdownMenuItem
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              openExistingMediaPicker({
-                                                factId: fact.id,
-                                                entryIndex: idx,
-                                                replaceSlot: "json",
-                                              })
-                                            }
-                                          >
-                                            Replace JSON…
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            variant="destructive"
-                                            disabled={existingFactsBusy}
-                                            onClick={() =>
-                                              clearExistingFactMediaSlot(fact.id, idx, "json")
-                                            }
-                                          >
-                                            Remove JSON
-                                          </DropdownMenuItem>
-                                        </>
-                                      ) : null}
+                                      <DropdownMenuItem
+                                        disabled={existingFactsBusy}
+                                        onClick={() => insertExistingFactCellAfter(fact.id, idx)}
+                                        title="Insert an empty cell to the right of this column on this row"
+                                      >
+                                        Add cell
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        variant="destructive"
+                                        disabled={
+                                          existingFactsBusy ||
+                                          fact.entries.length <= 1 ||
+                                          idx >= fact.entries.length
+                                        }
+                                        onClick={() => removeExistingFactCell(fact.id, idx)}
+                                        title="Remove this entry from the row (other rows keep their length)"
+                                      >
+                                        Delete cell
+                                      </DropdownMenuItem>
                                     </DropdownMenu>
                                   </div>
                                 </td>
                               );
                             })}
-                            <td className="px-3 py-2 text-right align-middle">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                disabled={!dirtyFactIds.has(fact.id) || existingFactsBusy}
-                                onClick={() => void saveExistingFactRow(fact.id)}
-                              >
-                                {savingFactId === fact.id ? "Saving…" : "Save"}
-                              </Button>
+                            <td className="min-w-[9rem] px-3 py-2 text-right align-middle">
+                              <div className="flex flex-wrap items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={!dirtyFactIds.has(fact.id) || existingFactsBusy}
+                                  onClick={() => void saveExistingFactRow(fact.id)}
+                                >
+                                  {savingFactId === fact.id ? "Saving…" : "Save"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                                  disabled={existingFactsBusy}
+                                  onClick={() => void deleteOneExistingFactRow(fact.id)}
+                                >
+                                  {deletingExistingFactId === fact.id ? "Removing…" : "Delete row"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1408,10 +1540,10 @@ export default function BulkUploadPage() {
                         <th className="px-3 py-2 text-left font-medium w-12">#</th>
                         {columns.map((col, idx) => (
                           <th
-                            key={`${col}-${idx}`}
+                            key={`col-header-${idx}`}
                             className="px-3 py-2 text-left font-medium min-w-[12rem]"
                           >
-                            {col || `Column ${idx + 1}`}
+                            {col}
                           </th>
                         ))}
                       </tr>

@@ -29,6 +29,7 @@ function renderCard(overrides: Partial<Parameters<typeof DeckInfoCard>[0]> = {})
   const props = {
     deck: mockDeck,
     onEdit: vi.fn(),
+    onBulkEditFacts: vi.fn(),
     deleteConfirm: false,
     onDeleteConfirm: vi.fn(),
     onDeleteCancel: vi.fn(),
@@ -77,8 +78,16 @@ describe("DeckInfoCard", () => {
     const user = userEvent.setup();
     const { onEdit } = renderCard();
     await user.click(screen.getByRole("button", { expanded: false }));
-    await user.click(screen.getByRole("menuitem", { name: /edit/i }));
+    await user.click(screen.getByRole("menuitem", { name: /^edit$/i }));
     expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onBulkEditFacts when Bulk edit facts menu item is clicked", async () => {
+    const user = userEvent.setup();
+    const { onBulkEditFacts } = renderCard();
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /bulk edit facts/i }));
+    expect(onBulkEditFacts).toHaveBeenCalledTimes(1);
   });
 
   it("calls onDeleteConfirm when Delete deck menu item is clicked", async () => {

@@ -22,6 +22,7 @@ function formatLastReview(unixSec: number): string {
 interface DeckInfoCardProps {
   deck: DeckItem;
   onEdit: () => void;
+  onBulkEditFacts: () => void;
   deleteConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
@@ -31,6 +32,7 @@ interface DeckInfoCardProps {
 export function DeckInfoCard({
   deck,
   onEdit,
+  onBulkEditFacts,
   deleteConfirm,
   onDeleteConfirm,
   onDeleteCancel,
@@ -43,6 +45,7 @@ export function DeckInfoCard({
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu align="end">
           <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={onBulkEditFacts}>Bulk edit facts</DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate(`/decks/${deck.id}/bulk-upload`)}>
             Bulk Upload (ZIP)
           </DropdownMenuItem>
