@@ -32,7 +32,7 @@ function getMediaType(file: File): "image" | "audio" | "video" | "json" {
 }
 
 function factToRow(fact: FactItem, deck: DeckItem): AddCardCell[] {
-  const fields = deck.field ?? [];
+  const fields = deck.fields ?? [];
   return fact.entries.map((entry: Entry, i) => {
     if (entry.audio)
       return {
@@ -107,7 +107,7 @@ export function AddCardFromFactModal({
   onSuccess,
 }: AddCardFromFactModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fieldNames = deck.field ?? [];
+  const fieldNames = deck.fields ?? [];
   const [row, setRow] = useState<AddCardCell[]>(() => factToRow(fact, deck));
   const [split, setSplit] = useState(1);
   const [sibling, setSibling] = useState(false);

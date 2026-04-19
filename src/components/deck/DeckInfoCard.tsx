@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -38,17 +38,12 @@ export function DeckInfoCard({
   onDeleteCancel,
   onDelete,
 }: DeckInfoCardProps) {
-  const navigate = useNavigate();
-
   return (
     <Card className="relative">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu align="end">
           <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
           <DropdownMenuItem onClick={onBulkEditFacts}>Bulk edit facts</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate(`/decks/${deck.id}/bulk-upload`)}>
-            Bulk Upload (ZIP)
-          </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDeleteConfirm}>
             Delete deck
           </DropdownMenuItem>
@@ -71,12 +66,12 @@ export function DeckInfoCard({
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         <Button variant="default" className="w-full" asChild>
-          <Link to={`/decks/${deck.id}/bulk-upload`}>Bulk Upload (ZIP)</Link>
+          <Link to={`/decks/${deck.id}/bulk-upload`}>Bulk upload</Link>
         </Button>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Fields</dt>
-            <dd className="mt-0.5">{deck.field.join(", ")}</dd>
+            <dd className="mt-0.5">{deck.fields.join(", ")}</dd>
           </div>
           <div>
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Rate</dt>

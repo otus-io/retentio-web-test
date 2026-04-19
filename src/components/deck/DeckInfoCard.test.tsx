@@ -9,7 +9,7 @@ const mockDeck: DeckItem = {
   id: "deck123",
   name: "My Vocab",
   owner: "alice",
-  field: ["English", "Chinese"],
+  fields: ["English", "Chinese"],
   rate: 10,
   created_at: "2024-01-01",
   updated_at: "2024-01-01",
@@ -68,9 +68,9 @@ describe("DeckInfoCard", () => {
     expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
   });
 
-  it("links Bulk Upload to this deck", () => {
+  it("links Bulk upload to this deck’s import page", () => {
     renderCard();
-    const link = screen.getByRole("link", { name: /Bulk Upload \(ZIP\)/i });
+    const link = screen.getByRole("link", { name: /^bulk upload$/i });
     expect(link).toHaveAttribute("href", "/decks/deck123/bulk-upload");
   });
 

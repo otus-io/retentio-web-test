@@ -107,7 +107,7 @@ export default function MediaPage() {
               <p className="text-muted-foreground">Loading…</p>
             ) : items.length === 0 ? (
               <p className="text-muted-foreground">
-                No files yet. Media you attach when adding facts or via bulk upload on a deck appears here.
+                No files yet. Media you attach when adding facts or via deck bulk upload appears here.
               </p>
             ) : (
               <div className="overflow-x-auto">

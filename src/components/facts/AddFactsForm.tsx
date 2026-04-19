@@ -16,7 +16,7 @@ export type AddFactEntry = {
 };
 
 export function makeInitialFactRow(deck: DeckItem): AddFactEntry[] {
-  const fields = deck.field ?? [];
+  const fields = deck.fields ?? [];
   if (fields.length === 0) return [{ label: "", text: "", media: [] }];
   return fields.map((label) => ({ label, text: "", media: [] }));
 }
@@ -83,7 +83,7 @@ export function AddFactsForm({
     setFactRow(next);
   };
   const addField = () => {
-    const label = (deck.field ?? [])[row.length] ?? "";
+    const label = (deck.fields ?? [])[row.length] ?? "";
     setFactRow([...row, { label, text: "", media: [] }]);
     setAddFactSplit((prev) => Math.min(prev, row.length + 1));
   };

@@ -106,7 +106,7 @@ export function BulkEditFactsModal({
 
   const deckId = deck.id;
   /** API may omit `field`; treat as [] so column math matches PATCH rules. */
-  const deckFieldsSafe = Array.isArray(deck.field) ? deck.field : NO_DECK_FIELDS;
+  const deckFieldsSafe = Array.isArray(deck.fields) ? deck.fields : NO_DECK_FIELDS;
   const colCount = existingFactsColumnCount(deckFieldsSafe, localFacts);
   const total = localFacts.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -162,7 +162,7 @@ export function BulkEditFactsModal({
       if (prev.length === 0) return pad;
       return [...prev, ...pad.slice(prev.length)];
     });
-  }, [open, localFacts, deck.field]);
+  }, [open, localFacts, deck.fields]);
 
   useEffect(() => {
     if (!open || !token) return;
@@ -255,7 +255,7 @@ export function BulkEditFactsModal({
     } finally {
       setSavingColumns(false);
     }
-  }, [token, deckId, deck.name, columnNames, deck.field, localFacts, onRefreshFacts]);
+  }, [token, deckId, deck.name, columnNames, deck.fields, localFacts, onRefreshFacts]);
 
   const addEntryColumnToAllFacts = useCallback(() => {
     setLocalFacts((prev) => {

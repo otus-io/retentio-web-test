@@ -120,7 +120,7 @@ export default function DeckPage() {
       const data = res.data;
       setDeck(data);
       setName(data.name);
-      setFieldNames([...data.field]);
+      setFieldNames([...data.fields]);
       setRate(data.rate);
       setFactRow(makeInitialFactRow(data));
       setAddFactSplit(1);

@@ -8,7 +8,7 @@ const mockDeck: DeckItem = {
   id: "d1",
   name: "Vocab",
   owner: "alice",
-  field: ["English", "Chinese"],
+  fields: ["English", "Chinese"],
   rate: 10,
   created_at: "2024-01-01",
   updated_at: "2024-01-01",
@@ -19,7 +19,7 @@ const mockDeck: DeckItem = {
 };
 
 function factRowFromValues(values: string[]): AddFactEntry[] {
-  const fields = mockDeck.field ?? [];
+  const fields = mockDeck.fields ?? [];
   return values.map((text, i) => ({
     label: fields[i] ?? `Field ${i + 1}`,
     text,

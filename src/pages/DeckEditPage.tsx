@@ -27,7 +27,7 @@ export default function DeckEditPage() {
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       setName(res.data.name);
-      setFieldNames(res.data.field.length > 0 ? [...res.data.field] : ["", ""]);
+      setFieldNames(res.data.fields.length > 0 ? [...res.data.fields] : ["", ""]);
       setRate(res.data.rate);
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load deck");

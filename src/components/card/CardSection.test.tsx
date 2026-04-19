@@ -7,7 +7,7 @@ const mockDeck: DeckItem = {
   id: "deck1",
   name: "Test Deck",
   owner: "user",
-  field: ["Front", "Back"],
+  fields: ["Front", "Back"],
   rate: 10,
   created_at: "2024-01-01",
   updated_at: "2024-01-01",

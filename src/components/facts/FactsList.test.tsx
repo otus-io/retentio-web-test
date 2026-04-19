@@ -8,7 +8,7 @@ const mockDeck: DeckItem = {
   id: "d1",
   name: "Vocab",
   owner: "alice",
-  field: ["English", "Chinese"],
+  fields: ["English", "Chinese"],
   rate: 10,
   created_at: "2024-01-01",
   updated_at: "2024-01-01",

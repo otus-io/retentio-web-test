@@ -728,7 +728,7 @@ export function CardSection({
                 {editFactEntries.map((entry, i) => (
                   <div key={i} className="space-y-1">
                     <Label htmlFor={`card-edit-field-${i}`}>
-                      {i < (deck.field?.length ?? 0) ? deck.field![i] : `field ${i + 1}`}
+                      {i < (deck.fields?.length ?? 0) ? deck.fields![i] : `field ${i + 1}`}
                     </Label>
                     <textarea
                       id={`card-edit-field-${i}`}

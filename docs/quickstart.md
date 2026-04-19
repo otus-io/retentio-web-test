@@ -514,11 +514,13 @@ A **template** defines how a card shows a fact’s entries: **front** (question)
   Example: three cards per fact (entry 0→rest, entry 1→rest, entry 2→rest) for 3-entry facts:
 
 ```json
-"template": [
-  [[0], [1, 2]],
-  [[1], [0, 2]],
-  [[2], [0, 1]]
-]
+{
+  "template": [
+    [[0], [1, 2]],
+    [[1], [0, 2]],
+    [[2], [0, 1]]
+  ]
+}
 ```
 
 So: **2D** = one card (one front/back split); **3D** = multiple cards per fact (sibling cards). If you send a single 2D template (e.g. `[[1], [0]]` for reversed only), the API also accepts it: it is treated as an array of one template, so every fact gets one reversed card.
@@ -526,7 +528,12 @@ So: **2D** = one card (one front/back split); **3D** = multiple cards per fact (
 Example — every fact gets two sibling cards (normal and reversed):
 
 ```json
-"template": [ [[0], [1]], [[1], [0]] ]
+{
+  "template": [
+    [[0], [1]],
+    [[1], [0]]
+  ]
+}
 ```
 
 Each fact gets one card with front=0/back=1 and one with front=1/back=0. To add a reversed card only for some facts, add those extra cards later with `POST /api/decks/{id}/card`.

@@ -30,8 +30,6 @@ export default function DecksListPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
-  /** When set, field inputs are hidden; deck is created with placeholders then we open Bulk Upload. */
-  const [createWithBulkUpload, setCreateWithBulkUpload] = useState(false);
 
   const fetchDecks = useCallback(async () => {
     if (!token) return;
@@ -58,10 +56,8 @@ export default function DecksListPage() {
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    const fields = createWithBulkUpload
-      ? []
-      : createFieldNames.map((s) => s.trim()).filter(Boolean);
-    if (!createWithBulkUpload && fields.length < 2) {
+    const fields = createFieldNames.map((s) => s.trim()).filter(Boolean);
+    if (fields.length < 2) {
       setCreateError("at least two fields required");
       return;
     }
@@ -79,14 +75,9 @@ export default function DecksListPage() {
       setCreateName("");
       setCreateFieldNames(["", ""]);
       setCreateRate(20);
-      setCreateWithBulkUpload(false);
       setDeleteSuccess("");
       await fetchDecks();
-      if (createWithBulkUpload) {
-        navigate(`/decks/${deckId}/bulk-upload`);
-      } else {
-        setCreateSuccess("Deck created.");
-      }
+      setCreateSuccess("Deck created.");
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "create failed");
       setCreateSuccess("");
@@ -148,7 +139,6 @@ export default function DecksListPage() {
                       setCreateOpen(false);
                       setCreateError("");
                       setCreateSuccess("");
-                      setCreateWithBulkUpload(false);
                     }}
                   >
                     Cancel
@@ -159,7 +149,6 @@ export default function DecksListPage() {
                       setCreateOpen(true);
                       setCreateError("");
                       setCreateSuccess("");
-                      setCreateWithBulkUpload(false);
                     }}
                   >
                     Create deck
@@ -177,55 +166,38 @@ export default function DecksListPage() {
                   <Label htmlFor="create-name">Name</Label>
                   <Input id="create-name" value={createName} onChange={(e) => setCreateName(e.target.value)} required placeholder="My deck" />
                 </div>
-                <div className="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-2">
-                  <input
-                    id="create-bulk-upload"
-                    type="checkbox"
-                    checked={createWithBulkUpload}
-                    onChange={(e) => {
-                      setCreateWithBulkUpload(e.target.checked);
-                      setCreateError("");
-                    }}
-                    className="mt-1 h-4 w-4 shrink-0 rounded border border-input"
-                  />
-                  <Label htmlFor="create-bulk-upload" className="font-normal text-sm leading-snug cursor-pointer">
-                    Add facts with <strong>Bulk upload</strong> (ZIP). Field names are set from your CSV when you import; you only need deck name and rate here.
-                  </Label>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Fields</p>
+                  <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
+                  {createFieldNames.map((value, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Label htmlFor={`create-field-${i}`} className="sr-only">Field {i + 1}</Label>
+                      <Input
+                        id={`create-field-${i}`}
+                        value={value}
+                        onChange={(e) => {
+                          const next = [...createFieldNames];
+                          next[i] = e.target.value;
+                          setCreateFieldNames(next);
+                        }}
+                        placeholder={`Field ${i + 1}`}
+                      />
+                      {createFieldNames.length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-destructive shrink-0"
+                          onClick={() => setCreateFieldNames(createFieldNames.filter((_, j) => j !== i))}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={() => setCreateFieldNames([...createFieldNames, ""])}>
+                    Add field
+                  </Button>
                 </div>
-                {!createWithBulkUpload && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Fields</p>
-                    <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
-                    {createFieldNames.map((value, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Label htmlFor={`create-field-${i}`} className="sr-only">Field {i + 1}</Label>
-                        <Input
-                          id={`create-field-${i}`}
-                          value={value}
-                          onChange={(e) => {
-                            const next = [...createFieldNames];
-                            next[i] = e.target.value;
-                            setCreateFieldNames(next);
-                          }}
-                          placeholder={`Field ${i + 1}`}
-                        />
-                        {createFieldNames.length > 2 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="text-destructive shrink-0"
-                            onClick={() => setCreateFieldNames(createFieldNames.filter((_, j) => j !== i))}
-                          >
-                            Remove
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <Button type="button" variant="outline" onClick={() => setCreateFieldNames([...createFieldNames, ""])}>
-                      Add field
-                    </Button>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="create-rate">Rate (1–1000)</Label>
                   <Input id="create-rate" type="number" min={1} max={1000} value={createRate} onChange={(e) => setCreateRate(parseInt(e.target.value, 10) || 20)} />

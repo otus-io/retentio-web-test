@@ -11,7 +11,7 @@ import { entryToDisplayString } from "@/lib/api";
 const DEFAULT_PAGE_SIZE = 5;
 
 function getFieldLabel(deck: DeckItem, entryIndex: number): string {
-  const fieldNames = deck.field ?? [];
+  const fieldNames = deck.fields ?? [];
   if (entryIndex < fieldNames.length) return fieldNames[entryIndex];
   return "";
 }

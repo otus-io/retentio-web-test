@@ -188,9 +188,6 @@ export async function request<T>(
 
 const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — backend may run ffmpeg/cwebp
 
-/** Long timeout for bulk ZIP import (~500MB transfer + many media files on server). */
-export const BULK_IMPORT_UPLOAD_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
-
 /** Optional client_id enables idempotent uploads (backend returns existing media if already uploaded). */
 export async function uploadMultipart(
   path: string,
@@ -315,7 +312,7 @@ export function uploadMultipartWithProgress(
         ? "XHR onerror after upload finished (awaiting response)"
         : "XHR onerror (TLS/CORS/DNS/connection drop)";
       const failureHint = afterFullUpload
-        ? "Upload progress reported 100% of the body sent; failure likely while waiting for HTTP response — e.g. API/proxy timeout, max body/time limit, server OOM/crash during bulk-import, or connection reset. Check API and reverse-proxy logs."
+        ? "Upload progress reported 100% of the body sent; failure likely while waiting for HTTP response — e.g. API/proxy timeout, max body/time limit, server OOM/crash while processing the upload, or connection reset. Check API and reverse-proxy logs."
         : "JS cannot read net::ERR_* (e.g. ERR_CONNECTION_REFUSED). DevTools → Network → select this request → read the Status / error text.";
       logUploadFailure(
         afterFullUpload ? "H_xhr_after_upload" : "H_xhr_network",
@@ -404,11 +401,6 @@ export interface UploadMediaRes {
   meta: { msg: string };
 }
 
-export interface BulkImportRes {
-  data: { facts_added: number; media_uploaded: number };
-  meta: { msg: string };
-}
-
 export interface ProfileRes {
   data: { username: string; email: string };
   meta?: { created_at: string };
@@ -429,7 +421,7 @@ export interface DeckItem {
   id: string;
   name: string;
   owner: string;
-  field: string[];
+  fields: string[];
   rate: number;
   stats: DeckStats;
   created_at: string;
@@ -443,7 +435,7 @@ export interface GetDecksRes {
 
 export interface CreateDeckReq {
   name: string;
-  /** Omit or use [] for an empty deck; field names can be set later (e.g. Bulk Upload CSV header). */
+  /** Omit or use [] for an empty deck; field names can be set later (e.g. deck edit or import). */
   fields?: string[];
   rate?: number;
 }
