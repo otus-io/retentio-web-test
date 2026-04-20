@@ -5,7 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { request, getApiBaseUrl, type ListMediaRes, type MediaItem } from "@/lib/api";
+import { request, getApiBaseUrl, fetchAllUserMedia, type MediaItem } from "@/lib/api";
 
 export default function MediaPage() {
   const { token, logout } = useAuth();
@@ -20,8 +20,8 @@ export default function MediaPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await request<ListMediaRes>("/api/media?limit=50&offset=0", { token });
-      setItems(res.data);
+      const items = await fetchAllUserMedia(token);
+      setItems(items);
     } catch {
       setItems([]);
     } finally {

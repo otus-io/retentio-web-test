@@ -84,7 +84,7 @@
 | `/api/decks/{id}` | PATCH | 更新卡组 |
 | `/api/decks/{id}` | DELETE | 删除卡组 |
 | `/api/decks/{id}/facts/{operation}` | POST | 添加词条：operation 为 append/prepend/shuffle/spread。请求体：facts（必填）及可选 template。为已有词条添加一张卡请使用 POST `/api/decks/{id}/card`。 |
-| `/api/decks/{id}/facts` | GET | 获取所有词条 |
+| `/api/decks/{id}/facts` | GET | 列出词条（可选 `limit`/`offset`；本应用按最大 `limit` 200 分页拉全量） |
 | `/api/decks/{id}/facts/{factId}` | GET | 获取单个词条 |
 | `/api/decks/{id}/facts/{factId}` | PATCH | 更新词条 |
 | `/api/decks/{id}/facts/{factId}` | DELETE | 删除词条 |
@@ -567,6 +567,8 @@
 ### 获取所有词条
 
 **接口：** `GET /api/decks/{id}/facts`
+
+本 Web 应用通过 **`limit=200`**（服务端上限）与递增的 **`offset`** 循环请求，直到 **`meta.has_more`** 为假，再合并各页（见 `src/lib/api.ts` 中的 `fetchAllDeckFacts`）。服务端不传查询参数时仍可在一次响应中返回全部词条；客户端采用分页以适配大卡组。
 
 **响应示例：**
 
@@ -1082,10 +1084,12 @@
 
 **接口：** `GET /api/media` — 返回当前用户的媒体（分页）。
 
+媒体页通过 **`limit=200`** 分页请求直至 **`meta.has_more`** 为假，合并结果（`src/lib/api.ts` 中的 `fetchAllUserMedia`）。
+
 | 查询参数   | 说明 |
 | ---------- | ---- |
 | `since`    | 可选。Unix 时间戳；仅返回该时间之后创建的媒体。 |
-| `limit`    | 可选。每页条数（默认 200，最大 1000）。 |
+| `limit`    | 可选。每页条数（默认 50，最大 200）。   |
 | `offset`   | 可选。跳过条数（默认 0）。 |
 
 **响应：**

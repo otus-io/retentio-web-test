@@ -35,6 +35,8 @@ interface FactsListProps {
   setDeleteFactId: (id: string | null) => void;
   /** Opens the Add facts form (e.g. in a modal). When provided, header shows a dropdown with "Add facts". */
   onOpenAddFacts?: () => void;
+  /** When set, overrides `deck.stats.facts_count` for “shown of N” (from GET /facts `meta.total`). */
+  factsTotal?: number | null;
 }
 
 export function FactsList({
@@ -55,11 +57,14 @@ export function FactsList({
   deleteFactId,
   setDeleteFactId,
   onOpenAddFacts,
+  factsTotal: factsTotalProp,
 }: FactsListProps) {
   const [page, setPage] = useState(1);
   const pageSize = DEFAULT_PAGE_SIZE;
 
   const total = factsList.length;
+  const totalInDeck =
+    factsTotalProp != null && factsTotalProp >= 0 ? factsTotalProp : (deck.stats?.facts_count ?? total);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = (page - 1) * pageSize;
   const paginatedFacts = factsList.slice(start, start + pageSize);
@@ -75,7 +80,9 @@ export function FactsList({
         <div className="flex items-center gap-2">
           {!loadingFacts && total > 0 && (
             <span className="text-sm text-muted-foreground">
-              {total} fact{total !== 1 ? "s" : ""}
+              {total < totalInDeck
+                ? `${total} shown of ${totalInDeck} fact${totalInDeck !== 1 ? "s" : ""}`
+                : `${total} fact${total !== 1 ? "s" : ""}`}
             </span>
           )}
           {onOpenAddFacts && (

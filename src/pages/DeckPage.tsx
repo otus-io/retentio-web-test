@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
+  fetchDeckFactsPage,
   uploadMultipart,
   buildTemplateForRequest,
   validateAddFactBody,
@@ -14,7 +15,6 @@ import {
   type Entry,
   type FactItem,
   type GetDeckRes,
-  type GetFactsRes,
   type GetNextCardRes,
   type NextCardItem,
   type GetCardsRes,
@@ -41,7 +41,6 @@ import {
   type AddFactEntry,
   makeInitialFactRow,
 } from "@/components/facts";
-import { mergeFactListsPreservingPriorOrder } from "@/lib/existingFactsSpreadsheet";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +66,8 @@ export default function DeckPage() {
   const [addFactsError, setAddFactsError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [factsList, setFactsList] = useState<FactItem[]>([]);
+  const [factsHasMore, setFactsHasMore] = useState(false);
+  const [factsTotal, setFactsTotal] = useState<number | null>(null);
   const [loadingFacts, setLoadingFacts] = useState(false);
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
   const [editingFactEntries, setEditingFactEntries] = useState<Entry[]>([]);
@@ -107,6 +108,8 @@ export default function DeckPage() {
     setFactSuccess("");
     setCardSuccess("");
     setBulkEditFactsOpen(false);
+    setFactsHasMore(false);
+    setFactsTotal(null);
   }, [id]);
 
   const fetchDeck = useCallback(async () => {
@@ -142,21 +145,20 @@ export default function DeckPage() {
     const targetDeckId = id;
     setLoadingFacts(true);
     try {
-      const res = await request<GetFactsRes>(`/api/decks/${id}/facts`, { token });
+      const res = await fetchDeckFactsPage(id, token);
       if (routeDeckIdRef.current !== targetDeckId) return;
-      setFactsList((prev) => mergeFactListsPreservingPriorOrder(prev, res.data.facts));
+      setFactsList(res.data.facts);
+      setFactsHasMore(res.meta.has_more === true);
+      setFactsTotal(typeof res.meta.total === "number" && res.meta.total >= 0 ? res.meta.total : null);
     } catch {
       if (routeDeckIdRef.current !== targetDeckId) return;
       setFactsList([]);
+      setFactsHasMore(false);
+      setFactsTotal(null);
     } finally {
       if (routeDeckIdRef.current === targetDeckId) setLoadingFacts(false);
     }
   }, [token, id]);
-
-  useEffect(() => {
-    if (!bulkEditFactsOpen || !token || !id) return;
-    void fetchFacts();
-  }, [bulkEditFactsOpen, token, id, fetchFacts]);
 
   const fetchCards = useCallback(async () => {
     if (!token || !id) return;
@@ -648,10 +650,11 @@ export default function DeckPage() {
                 deck={deck}
                 token={token}
                 factsList={factsList}
-                loadingFacts={loadingFacts}
+                factsHasMore={factsHasMore}
+                factsTotal={factsTotal}
                 onRefreshFacts={async () => {
-                  await fetchFacts();
                   await fetchDeck();
+                  await fetchFacts();
                 }}
                 onDeleteFact={handleDeleteFact}
                 deleteFactId={deleteFactId}
@@ -695,6 +698,7 @@ export default function DeckPage() {
             <FactsList
               deck={deck}
               factsList={factsList}
+              factsTotal={factsTotal}
               loadingFacts={loadingFacts}
               factError={factError}
               factSuccess={factSuccess}

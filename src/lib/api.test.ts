@@ -8,6 +8,11 @@ import {
   entryToDisplayString,
   cardEntryToRenderItems,
   fileLooksLikeJson,
+  fetchAllDeckFacts,
+  fetchAllUserMedia,
+  fetchDeckFactsPage,
+  fetchDeckFactsUnpaginated,
+  LIST_PAGINATION_DEFAULT_LIMIT,
   type GetNextCardRes,
 } from "./api";
 
@@ -382,5 +387,144 @@ describe("cardEntryToRenderItems", () => {
     });
     expect(items.map((x) => x.type)).toEqual(["text", "audio", "image", "video", "json"]);
     expect(items.map((x) => x.value)).toEqual(["T", "a", "i", "v", "j"]);
+  });
+});
+
+describe("fetchDeckFactsUnpaginated", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("requests facts without limit or offset", async () => {
+    const deckId = "deck1";
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        data: { facts: [{ id: "f1", entries: [] }] },
+        meta: { msg: "ok" },
+      })
+    );
+    const res = await fetchDeckFactsUnpaginated(deckId, "tok");
+    expect(res.data.facts).toHaveLength(1);
+    const url = String(mockFetch.mock.calls[0][0]);
+    expect(url).toContain(`/api/decks/${deckId}/facts`);
+    expect(url).not.toContain("limit=");
+  });
+});
+
+describe("fetchDeckFactsPage", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("requests default limit and offset", async () => {
+    const deckId = "deck1";
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        data: { facts: [{ id: "f1", entries: [] }] },
+        meta: { msg: "ok", has_more: false, count: 1, limit: 50, offset: 0, total: 1 },
+      })
+    );
+    const res = await fetchDeckFactsPage(deckId, "tok");
+    expect(res.data.facts).toHaveLength(1);
+    expect(res.meta.total).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const url = String(mockFetch.mock.calls[0][0]);
+    expect(url).toContain(`/api/decks/${deckId}/facts?limit=${LIST_PAGINATION_DEFAULT_LIMIT}&offset=0`);
+  });
+});
+
+describe("fetchAllDeckFacts", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("aggregates pages while meta.has_more is true", async () => {
+    const deckId = "deck1";
+    const token = "tok";
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).toContain(`/api/decks/${deckId}/facts?limit=${LIST_PAGINATION_DEFAULT_LIMIT}&`);
+      if (url.includes("offset=0")) {
+        return Promise.resolve(
+          makeResponse({
+            data: {
+              facts: [
+                { id: "f1", entries: [{ text: "a" }] },
+                { id: "f2", entries: [{ text: "b" }] },
+              ],
+            },
+            meta: { msg: "ok", has_more: true, count: 2 },
+          })
+        );
+      }
+      if (url.includes("offset=2")) {
+        return Promise.resolve(
+          makeResponse({
+            data: { facts: [{ id: "f3", entries: [{ text: "c" }] }] },
+            meta: { msg: "ok", has_more: false, count: 1 },
+          })
+        );
+      }
+      return Promise.reject(new Error(`unexpected fetch url: ${url}`));
+    });
+
+    const facts = await fetchAllDeckFacts(deckId, token);
+    expect(facts.map((f) => f.id)).toEqual(["f1", "f2", "f3"]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops after one page when has_more is absent or false", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        data: { facts: [{ id: "x", entries: [] }] },
+        meta: { msg: "ok" },
+      })
+    );
+    const facts = await fetchAllDeckFacts("d", "t");
+    expect(facts).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fetchAllUserMedia", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("aggregates media pages until has_more is false", async () => {
+    const row = {
+      id: "m1",
+      owner: "u",
+      filename: "a.png",
+      mime: "image/png",
+      size: 10,
+      checksum: "sha:x",
+      created_at: 100,
+    };
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).toContain(`/api/media?limit=${LIST_PAGINATION_DEFAULT_LIMIT}&`);
+      if (url.includes("offset=0")) {
+        return Promise.resolve(
+          makeResponse({
+            data: [row],
+            meta: { count: 1, has_more: true },
+          })
+        );
+      }
+      if (url.includes("offset=1")) {
+        return Promise.resolve(
+          makeResponse({
+            data: [{ ...row, id: "m2", filename: "b.png" }],
+            meta: { count: 1, has_more: false },
+          })
+        );
+      }
+      return Promise.reject(new Error(`unexpected fetch url: ${url}`));
+    });
+
+    const items = await fetchAllUserMedia("tok");
+    expect(items.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

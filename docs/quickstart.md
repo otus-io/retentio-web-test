@@ -84,7 +84,7 @@ This guide walks you through using the Retentio API via Swagger UI.
 | `/api/decks/{id}` | PATCH | Update deck |
 | `/api/decks/{id}` | DELETE | Delete deck |
 | `/api/decks/{id}/facts/{operation}` | POST | Add facts (operation: `append`, `prepend`, `shuffle`, `spread`). Body: `facts` (required) and optional `template`. To add a card for an existing fact, use POST `/api/decks/{id}/card` instead. |
-| `/api/decks/{id}/facts` | GET | Get all facts |
+| `/api/decks/{id}/facts` | GET | List facts (optional `limit`/`offset`; app loads all pages with max `limit` 200) |
 | `/api/decks/{id}/facts/{factId}` | GET | Get a specific fact |
 | `/api/decks/{id}/facts/{factId}` | PATCH | Update a fact |
 | `/api/decks/{id}/facts/{factId}` | DELETE | Delete a fact |
@@ -560,6 +560,8 @@ Each fact gets one card with front=0/back=1 and one with front=1/back=0. To add 
 ### Get all facts
 
 **Endpoint:** `GET /api/decks/{id}/facts`
+
+This web app loads the full deck by calling the API with **`limit=200`** (server max) and **`offset`** in a loop until **`meta.has_more`** is false, then merges pages (see `fetchAllDeckFacts` in `src/lib/api.ts`). Omitting query params still returns every fact in one response on the server; the client uses paging to stay aligned with large decks.
 
 **Response:**
 
@@ -1076,10 +1078,12 @@ You can attach audio, images, and video to facts. Fact fields reference media by
 
 **Endpoint:** `GET /api/media` — returns the current user's media (paginated).
 
+The Media page loads the full library by paging with **`limit=200`** until **`meta.has_more`** is false (`fetchAllUserMedia` in `src/lib/api.ts`).
+
 | Query   | Description |
 | ------- | ----------- |
 | `since` | Optional. Unix timestamp (number); return only media created after this time. |
-| `limit` | Optional. Max items (default 200, max 1000). |
+| `limit` | Optional. Max items (default 50, max 200). |
 | `offset`| Optional. Number of items to skip (default 0). |
 
 **Response:**
@@ -1162,7 +1166,7 @@ For full design (upload, delete, display, sync), see **[Media Upload design doc]
 | `/api/decks/{id}` | DELETE | `{ "data": { "deck_id" }, "meta": { "msg" } }` |
 | `/api/decks/{id}/facts/{op}` | POST | Add facts: `{ "data": { "fact_length" }, "meta": { "msg" } }` |
 | `/api/decks/{id}/card` | POST | Add card from existing fact: `{ "data": { "card_id" }, "meta": { "msg" } }` |
-| `/api/decks/{id}/facts` | GET | `{ "data": { "facts": [ … ] }, "meta": { "msg" } }` |
+| `/api/decks/{id}/facts` | GET | `{ "data": { "facts": [ … ] }, "meta": { "msg" } }` or paginated: `meta` adds `count`, `has_more`, `limit`, `offset` |
 | `/api/decks/{id}/facts/{factId}` | GET | `{ "data": { "fact": { … } } }` |
 | `/api/decks/{id}/facts/{factId}` | PATCH | `{ "data": { "fact_id" }, "meta": { "msg" } }` |
 | `/api/decks/{id}/facts/{factId}` | DELETE | `{ "data": { "fact_id" }, "meta": { "msg" } }` |

@@ -69,9 +69,23 @@ describe("FactsList", () => {
     expect(screen.getByText(/Word2/)).toBeInTheDocument();
   });
 
-  it("shows total fact count", () => {
+  it("shows total fact count when all loaded facts are shown", () => {
     renderList(makeFacts(3));
     expect(screen.getByText("3 facts")).toBeInTheDocument();
+  });
+
+  it("shows loaded vs deck total when fewer facts are loaded than deck stats", () => {
+    const deck: DeckItem = {
+      ...mockDeck,
+      stats: { ...mockDeck.stats, facts_count: 100 },
+    };
+    renderList(makeFacts(2), { deck });
+    expect(screen.getByText("2 shown of 100 facts")).toBeInTheDocument();
+  });
+
+  it("prefers factsTotal prop over deck stats for shown count", () => {
+    renderList(makeFacts(2), { factsTotal: 99 });
+    expect(screen.getByText("2 shown of 99 facts")).toBeInTheDocument();
   });
 
   it("shows factSuccess message", () => {

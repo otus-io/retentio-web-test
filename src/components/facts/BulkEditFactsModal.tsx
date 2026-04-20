@@ -20,6 +20,7 @@ import {
   factHasSomeContent,
   insertEmptyEntryAfter,
   mergeEntryMediaPatch,
+  mergeParentFirstPagePreservingTail,
   mergeServerFactsPreservingDirty,
   mediaSlotForFile,
   minSpreadsheetColumnCount,
@@ -32,6 +33,8 @@ import {
   entryToDisplayString,
   fileLooksLikeJson,
   request,
+  fetchDeckFactsPage,
+  fetchDeckFactsUnpaginated,
   uploadMultipart,
   type AddFactReq,
   type AddFactRes,
@@ -61,7 +64,10 @@ export interface BulkEditFactsModalProps {
   deck: DeckItem;
   token: string | null;
   factsList: FactItem[];
-  loadingFacts: boolean;
+  /** True when the API reports more facts beyond `factsList` (same as GET /facts first page). */
+  factsHasMore: boolean;
+  /** `meta.total` from GET /facts (total facts in deck); drives page count. */
+  factsTotal: number | null;
   onRefreshFacts: () => Promise<void>;
   onDeleteFact: (factId: string) => void | Promise<void>;
   deleteFactId: string | null;
@@ -74,7 +80,8 @@ export function BulkEditFactsModal({
   deck,
   token,
   factsList,
-  loadingFacts,
+  factsHasMore,
+  factsTotal,
   onRefreshFacts,
   onDeleteFact,
   deleteFactId,
@@ -103,6 +110,11 @@ export function BulkEditFactsModal({
   const [savingColumns, setSavingColumns] = useState(false);
   const [addingFactRow, setAddingFactRow] = useState(false);
   const [goToLastPageAfterAdd, setGoToLastPageAfterAdd] = useState(false);
+  const [serverHasMore, setServerHasMore] = useState(false);
+  const [serverNextOffset, setServerNextOffset] = useState(0);
+  const [loadingMoreFacts, setLoadingMoreFacts] = useState(false);
+  /** Synced from GET /facts `meta.total` (prop + each paged fetch + full fetch after add). */
+  const [factsTotalFromApi, setFactsTotalFromApi] = useState<number | null>(null);
 
   const deckId = deck.id;
   /** API may omit `field`; treat as [] so column math matches PATCH rules. */
@@ -110,6 +122,11 @@ export function BulkEditFactsModal({
   const colCount = existingFactsColumnCount(deckFieldsSafe, localFacts);
   const total = localFacts.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const apiFactTotal = factsTotalFromApi ?? factsTotal;
+  const pageCountTotal =
+    apiFactTotal != null && apiFactTotal > 0
+      ? Math.max(Math.ceil(apiFactTotal / PAGE_SIZE), totalPages)
+      : totalPages;
   const start = (factPage - 1) * PAGE_SIZE;
   const pageRows = localFacts.slice(start, start + PAGE_SIZE);
 
@@ -118,10 +135,14 @@ export function BulkEditFactsModal({
   }, [totalPages]);
 
   useEffect(() => {
-    if (!goToLastPageAfterAdd || loadingFacts) return;
+    if (!goToLastPageAfterAdd || addingFactRow) return;
     setFactPage(totalPages);
     setGoToLastPageAfterAdd(false);
-  }, [goToLastPageAfterAdd, loadingFacts, totalPages]);
+  }, [goToLastPageAfterAdd, addingFactRow, totalPages]);
+
+  useEffect(() => {
+    if (factsTotal != null) setFactsTotalFromApi(factsTotal);
+  }, [factsTotal]);
 
   useEffect(() => {
     if (!open) {
@@ -132,6 +153,9 @@ export function BulkEditFactsModal({
       wasOpenRef.current = true;
       const initialFacts = cloneFactsList(factsList);
       setLocalFacts(initialFacts);
+      setServerHasMore(factsHasMore);
+      setServerNextOffset(initialFacts.length);
+      setFactsTotalFromApi(factsTotal);
       const cc0 = existingFactsColumnCount(deckFieldsSafe, initialFacts);
       const labels0 = existingFactsHeaderLabels(cc0, deckFieldsSafe);
       setColumnNames(labels0);
@@ -142,8 +166,8 @@ export function BulkEditFactsModal({
       setFactPage(1);
       return;
     }
-    setLocalFacts((prev) => mergeServerFactsPreservingDirty(prev, factsList, dirtyFactIdsRef.current));
-  }, [open, factsList]);
+    setLocalFacts((prev) => mergeParentFirstPagePreservingTail(prev, factsList, dirtyFactIdsRef.current));
+  }, [open, factsList, factsHasMore, factsTotal]);
 
   useEffect(() => {
     if (!open) return;
@@ -209,7 +233,51 @@ export function BulkEditFactsModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose, deleteFactId]);
 
-  const busy = savingFactId !== null || mediaUploadingKey !== null || savingColumns || addingFactRow;
+  /** Appends the next GET /facts page when paginating past loaded rows. Returns whether new rows were added. */
+  const fetchNextServerPage = useCallback(async (): Promise<boolean> => {
+    if (!token || !serverHasMore || loadingMoreFacts) return false;
+    setSaveError("");
+    setLoadingMoreFacts(true);
+    try {
+      const res = await fetchDeckFactsPage(deckId, token, { offset: serverNextOffset });
+      const batch = res.data.facts;
+      if (batch.length === 0) {
+        setServerHasMore(false);
+        return false;
+      }
+      setLocalFacts((prev) => {
+        const seen = new Set(prev.map((f) => f.id));
+        const toAdd = batch.filter((f) => !seen.has(f.id));
+        return [
+          ...prev,
+          ...toAdd.map((f) => ({ ...f, entries: f.entries.map((e) => ({ ...e })) })),
+        ];
+      });
+      setServerNextOffset((o) => o + batch.length);
+      setServerHasMore(res.meta.has_more === true);
+      if (typeof res.meta.total === "number" && res.meta.total >= 0) {
+        setFactsTotalFromApi(res.meta.total);
+      }
+      return true;
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to load more facts.");
+      return false;
+    } finally {
+      setLoadingMoreFacts(false);
+    }
+  }, [token, deckId, serverHasMore, serverNextOffset, loadingMoreFacts]);
+
+  const handleNextPage = useCallback(async () => {
+    if (factPage < totalPages) {
+      setFactPage((p) => p + 1);
+      return;
+    }
+    const added = await fetchNextServerPage();
+    if (added) setFactPage((p) => p + 1);
+  }, [factPage, totalPages, fetchNextServerPage]);
+
+  const busy =
+    savingFactId !== null || mediaUploadingKey !== null || savingColumns || addingFactRow || loadingMoreFacts;
 
   const columnsDirty = useMemo(
     () =>
@@ -310,6 +378,13 @@ export function BulkEditFactsModal({
       setSaveSuccess("Fact added.");
       setGoToLastPageAfterAdd(true);
       await onRefreshFacts();
+      const full = await fetchDeckFactsUnpaginated(deckId, token);
+      setLocalFacts((prev) => mergeServerFactsPreservingDirty(prev, full.data.facts, dirtyFactIdsRef.current));
+      setServerHasMore(false);
+      setServerNextOffset(full.data.facts.length);
+      if (typeof full.meta.total === "number" && full.meta.total >= 0) {
+        setFactsTotalFromApi(full.meta.total);
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Failed to add fact.");
     } finally {
@@ -476,9 +551,7 @@ export function BulkEditFactsModal({
         <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
           {saveError && <p className="mb-2 text-sm text-destructive">{saveError}</p>}
           {saveSuccess && <p className="mb-2 text-sm text-green-600">{saveSuccess}</p>}
-          {loadingFacts && localFacts.length === 0 ? (
-            <p className="text-muted-foreground">Loading facts…</p>
-          ) : localFacts.length === 0 ? (
+          {localFacts.length === 0 ? (
             <div className="space-y-3">
               <p className="text-muted-foreground">No facts in this deck yet.</p>
               <Button type="button" size="sm" disabled={busy} onClick={() => void addFactRow()}>
@@ -698,9 +771,12 @@ export function BulkEditFactsModal({
               {total > 0 && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
                   <p className="text-xs text-muted-foreground">
-                    Showing {start + 1}–{Math.min(start + PAGE_SIZE, total)} of {total} rows · {PAGE_SIZE} per page
+                    Showing {start + 1}–{Math.min(start + PAGE_SIZE, total)} of {total} rows in this editor ·{" "}
+                    {PAGE_SIZE} per page
+                    {apiFactTotal != null && apiFactTotal > total ? ` · ${apiFactTotal} in deck` : ""}
+                    {serverHasMore ? " · more on server — use Next" : ""}
                   </p>
-                  {totalPages > 1 && (
+                  {(totalPages > 1 || serverHasMore) && (
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
@@ -712,16 +788,16 @@ export function BulkEditFactsModal({
                         Previous
                       </Button>
                       <span className="px-2 text-sm text-muted-foreground tabular-nums">
-                        page {factPage} of {totalPages}
+                        page {factPage} of {pageCountTotal}
                       </span>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setFactPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={factPage >= totalPages}
+                        disabled={busy || (factPage >= totalPages && !serverHasMore) || !token}
+                        onClick={() => void handleNextPage()}
                       >
-                        Next
+                        {loadingMoreFacts && factPage >= totalPages ? "Loading…" : "Next"}
                       </Button>
                     </div>
                   )}

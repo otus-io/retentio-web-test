@@ -4,6 +4,7 @@ import {
   cloneFactsList,
   existingFactsHeaderLabels,
   mergeFactListsPreservingPriorOrder,
+  mergeParentFirstPagePreservingTail,
   mergeServerFactsPreservingDirty,
   insertEmptyEntryAfter,
   removeFactEntryAt,
@@ -81,6 +82,26 @@ describe("existingFactsHeaderLabels", () => {
 
   it("pads with empty strings past deck length", () => {
     expect(existingFactsHeaderLabels(3, ["A"])).toEqual(["A", "", ""]);
+  });
+});
+
+describe("mergeParentFirstPagePreservingTail", () => {
+  it("updates first page from server and keeps tail rows", () => {
+    const prev = [
+      { id: "a", entries: [{ text: "dirty-a" }] },
+      { id: "b", entries: [{ text: "b" }] },
+      { id: "c", entries: [{ text: "tail" }] },
+    ];
+    const serverFirst = [
+      { id: "a", entries: [{ text: "server-a" }] },
+      { id: "b", entries: [{ text: "server-b" }] },
+    ];
+    const dirty = new Set<string>(["a"]);
+    const out = mergeParentFirstPagePreservingTail(prev, serverFirst, dirty);
+    expect(out.map((f) => f.id)).toEqual(["a", "b", "c"]);
+    expect(out[0]?.entries[0]?.text).toBe("dirty-a");
+    expect(out[1]?.entries[0]?.text).toBe("server-b");
+    expect(out[2]?.entries[0]?.text).toBe("tail");
   });
 });
 

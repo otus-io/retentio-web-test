@@ -570,7 +570,85 @@ export interface FactItem {
 
 export interface GetFactsRes {
   data: { facts: FactItem[] };
-  meta: { msg: string };
+  meta: {
+    msg: string;
+    count?: number;
+    has_more?: boolean;
+    limit?: number;
+    offset?: number;
+    /** Total facts in the deck for this list (paged GET /facts). */
+    total?: number;
+  };
+}
+
+/** Matches retentio-backend `api/helpers/list_pagination.go`. */
+export const LIST_PAGINATION_DEFAULT_LIMIT = 50;
+export const LIST_PAGINATION_MAX_LIMIT = 200;
+
+const MAX_LIST_PAGES_SAFETY = 100_000;
+
+/**
+ * One page of facts from GET /api/decks/{id}/facts (default limit 50, offset 0).
+ */
+export async function fetchDeckFactsPage(
+  deckId: string,
+  token: string,
+  opts?: { limit?: number; offset?: number }
+): Promise<GetFactsRes> {
+  const limit = opts?.limit ?? LIST_PAGINATION_DEFAULT_LIMIT;
+  const offset = opts?.offset ?? 0;
+  return request<GetFactsRes>(
+    `/api/decks/${encodeURIComponent(deckId)}/facts?limit=${limit}&offset=${offset}`,
+    { token }
+  );
+}
+
+/** Full deck facts in one response (omit limit/offset). Prefer paging for large decks. */
+export async function fetchDeckFactsUnpaginated(deckId: string, token: string): Promise<GetFactsRes> {
+  return request<GetFactsRes>(`/api/decks/${encodeURIComponent(deckId)}/facts`, { token });
+}
+
+/**
+ * Loads every fact in a deck using GET /api/decks/{id}/facts with limit/offset paging
+ * (page size {@link LIST_PAGINATION_DEFAULT_LIMIT}, same as list media). Safe for large decks; stops when meta.has_more is not true.
+ */
+export async function fetchAllDeckFacts(deckId: string, token: string): Promise<FactItem[]> {
+  const pageSize = LIST_PAGINATION_DEFAULT_LIMIT;
+  const out: FactItem[] = [];
+  let offset = 0;
+  for (let page = 0; ; page += 1) {
+    if (page > MAX_LIST_PAGES_SAFETY) {
+      throw new Error("facts list: exceeded maximum pages");
+    }
+    const res = await fetchDeckFactsPage(deckId, token, { limit: pageSize, offset });
+    const batch = res.data.facts;
+    out.push(...batch);
+    if (res.meta.has_more !== true) break;
+    offset += batch.length;
+    if (batch.length === 0) break;
+  }
+  return out;
+}
+
+/**
+ * Loads all user-owned media via GET /api/media with limit/offset until has_more is false.
+ */
+export async function fetchAllUserMedia(token: string): Promise<MediaItem[]> {
+  const pageSize = LIST_PAGINATION_DEFAULT_LIMIT;
+  const out: MediaItem[] = [];
+  let offset = 0;
+  for (let page = 0; ; page += 1) {
+    if (page > MAX_LIST_PAGES_SAFETY) {
+      throw new Error("media list: exceeded maximum pages");
+    }
+    const res = await request<ListMediaRes>(`/api/media?limit=${pageSize}&offset=${offset}`, { token });
+    const batch = res.data;
+    out.push(...batch);
+    if (res.meta.has_more !== true) break;
+    offset += batch.length;
+    if (batch.length === 0) break;
+  }
+  return out;
 }
 
 export interface GetFactRes {

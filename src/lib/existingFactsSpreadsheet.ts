@@ -115,7 +115,7 @@ export function insertEmptyEntryAfter(fact: FactItem, entryIndex: number): FactI
 }
 
 /**
- * GET /facts order is undefined (Redis set). Keep prior list order for ids that still exist, then append
+ * GET /facts order is stable when paging (sorted by fact id on the server). Keep prior list order for ids that still exist, then append
  * any new ids in `incoming` order so "add row" / append results show up at the bottom.
  */
 export function mergeFactListsPreservingPriorOrder(prior: FactItem[], incoming: FactItem[]): FactItem[] {
@@ -151,4 +151,25 @@ export function mergeServerFactsPreservingDirty(
     }
     return { ...sf, entries: sf.entries.map((e) => ({ ...e })) };
   });
+}
+
+/**
+ * Merges a refreshed first API page into local bulk-edit state: updates rows whose id is on that page
+ * (preserving dirty), and keeps tail rows not on the first page (e.g. facts loaded with a larger offset).
+ */
+export function mergeParentFirstPagePreservingTail(
+  prev: FactItem[],
+  serverFirst: FactItem[],
+  dirty: Set<string>
+): FactItem[] {
+  const firstPageIds = new Set(serverFirst.map((f) => f.id));
+  const prevById = new Map(prev.map((f) => [f.id, f]));
+  const mergedFirst = serverFirst.map((sf) => {
+    if (dirty.has(sf.id)) {
+      return prevById.get(sf.id) ?? { ...sf, entries: sf.entries.map((e) => ({ ...e })) };
+    }
+    return { ...sf, entries: sf.entries.map((e) => ({ ...e })) };
+  });
+  const tail = prev.filter((f) => !firstPageIds.has(f.id));
+  return [...mergedFirst, ...tail];
 }
