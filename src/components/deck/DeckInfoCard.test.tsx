@@ -37,7 +37,7 @@ function renderCard(overrides: Partial<Parameters<typeof DeckInfoCard>[0]> = {})
     ...overrides,
   };
   render(
-    <MemoryRouter>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <DeckInfoCard {...props} />
     </MemoryRouter>
   );
