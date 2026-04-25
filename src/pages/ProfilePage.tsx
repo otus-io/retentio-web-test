@@ -36,6 +36,7 @@ export default function ProfilePage() {
   function formatDate(s: string) {
     try {
       return new Date(s).toLocaleDateString(undefined, {
+        timeZone: "UTC",
         year: "numeric",
         month: "short",
         day: "numeric",

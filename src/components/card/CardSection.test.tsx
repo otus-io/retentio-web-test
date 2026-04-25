@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CardSection } from "./CardSection";
-import type { DeckItem, GetCardsRes, GetNextCardRes } from "@/lib/api";
+import type { DeckItem, GetNextCardRes } from "@/lib/api";
 
 const mockDeck: DeckItem = {
   id: "deck1",
@@ -44,8 +44,6 @@ function makeNextCard(overrides: Partial<GetNextCardRes["data"]> = {}): GetNextC
 
 const defaultProps = {
   deck: mockDeck,
-  cardStats: null as GetCardsRes["data"] | null,
-  loadingCards: false,
   nextCardFact: null,
   loadingNextCard: false,
   cardError: "",
@@ -66,6 +64,24 @@ describe("CardSection", () => {
     expect(screen.getByText(/Due:/)).toBeInTheDocument();
     expect(screen.getByText("Apple")).toBeInTheDocument();
     expect(screen.getByText("Click to flip")).toBeInTheDocument();
+  });
+
+  it("renders wiki-style [[main|reading]] markup as HTML ruby on card text", () => {
+    const base = makeNextCard();
+    const nextCard = {
+      ...base,
+      card: {
+        ...base.card,
+        front: [{ field: "Word", text: "[[皆|みな]]さん" }],
+      },
+    };
+    render(<CardSection {...defaultProps} nextCard={nextCard} />);
+    expect(screen.getByText("皆")).toBeInTheDocument();
+    expect(screen.getByText("みな")).toBeInTheDocument();
+    expect(screen.getByText("さん")).toBeInTheDocument();
+    const ruby = document.querySelector("ruby");
+    expect(ruby).toBeTruthy();
+    expect(ruby?.querySelector("rt")).toHaveTextContent("みな");
   });
 
   it("renders card when front has text and audio siblings", () => {

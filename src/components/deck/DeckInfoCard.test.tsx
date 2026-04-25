@@ -68,25 +68,73 @@ describe("DeckInfoCard", () => {
     expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
   });
 
-  it("links Bulk upload to this deck’s import page", () => {
+  it("links Upload to this deck’s import page", () => {
     renderCard();
-    const link = screen.getByRole("link", { name: /^bulk upload$/i });
+    const link = screen.getByRole("link", { name: /^upload$/i });
     expect(link).toHaveAttribute("href", "/decks/deck123/bulk-upload");
   });
 
-  it("calls onEdit when Edit menu item is clicked", async () => {
+  it("calls onEdit when Edit Deck menu item is clicked", async () => {
     const user = userEvent.setup();
     const { onEdit } = renderCard();
     await user.click(screen.getByRole("button", { expanded: false }));
-    await user.click(screen.getByRole("menuitem", { name: /^edit$/i }));
+    await user.click(screen.getByRole("menuitem", { name: /^edit deck$/i }));
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onBulkEditFacts when Bulk edit facts menu item is clicked", async () => {
+  it("does not show Change Font when onOpenCardFonts is omitted", async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.queryByRole("menuitem", { name: /^change font$/i })).not.toBeInTheDocument();
+  });
+
+  it("calls onOpenCardFonts when Change Font menu item is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenCardFonts = vi.fn();
+    renderCard({ onOpenCardFonts });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /^change font$/i }));
+    expect(onOpenCardFonts).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show Add Facts when onOpenAddFacts is omitted", async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.queryByRole("menuitem", { name: /^add facts$/i })).not.toBeInTheDocument();
+  });
+
+  it("calls onOpenAddFacts when Add Facts menu item is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenAddFacts = vi.fn();
+    renderCard({ onOpenAddFacts });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /^add facts$/i }));
+    expect(onOpenAddFacts).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show Get All Cards when onOpenAllCards is omitted", async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.queryByRole("menuitem", { name: /get all cards/i })).not.toBeInTheDocument();
+  });
+
+  it("calls onOpenAllCards when Get All Cards menu item is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenAllCards = vi.fn();
+    renderCard({ onOpenAllCards });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /get all cards/i }));
+    expect(onOpenAllCards).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onBulkEditFacts when Edit Facts menu item is clicked", async () => {
     const user = userEvent.setup();
     const { onBulkEditFacts } = renderCard();
     await user.click(screen.getByRole("button", { expanded: false }));
-    await user.click(screen.getByRole("menuitem", { name: /bulk edit facts/i }));
+    await user.click(screen.getByRole("menuitem", { name: /^edit facts$/i }));
     expect(onBulkEditFacts).toHaveBeenCalledTimes(1);
   });
 

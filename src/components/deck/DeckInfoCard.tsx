@@ -16,13 +16,24 @@ function formatLastReview(unixSec: number): string {
   if (diffM < 60) return `${diffM}m ago`;
   if (diffH < 24) return `${diffH}h ago`;
   if (diffD < 7) return `${diffD}d ago`;
-  return d.toLocaleDateString();
+  return d.toLocaleDateString(undefined, {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 interface DeckInfoCardProps {
   deck: DeckItem;
   onEdit: () => void;
   onBulkEditFacts: () => void;
+  /** Opens font settings for study cards (main + ruby, front + back). */
+  onOpenCardFonts?: () => void;
+  /** Opens the add-facts flow (e.g. modal on the deck page). */
+  onOpenAddFacts?: () => void;
+  /** Opens full card list (filter by unseen / overdue / seen / hidden). */
+  onOpenAllCards?: () => void;
   deleteConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
@@ -33,6 +44,9 @@ export function DeckInfoCard({
   deck,
   onEdit,
   onBulkEditFacts,
+  onOpenCardFonts,
+  onOpenAddFacts,
+  onOpenAllCards,
   deleteConfirm,
   onDeleteConfirm,
   onDeleteCancel,
@@ -42,8 +56,17 @@ export function DeckInfoCard({
     <Card className="relative">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu align="end">
-          <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={onBulkEditFacts}>Bulk edit facts</DropdownMenuItem>
+          <DropdownMenuItem onClick={onEdit}>Edit Deck</DropdownMenuItem>
+          {onOpenCardFonts && (
+            <DropdownMenuItem onClick={onOpenCardFonts}>Change Font</DropdownMenuItem>
+          )}
+          {onOpenAddFacts && (
+            <DropdownMenuItem onClick={onOpenAddFacts}>Add Facts</DropdownMenuItem>
+          )}
+          {onOpenAllCards && (
+            <DropdownMenuItem onClick={onOpenAllCards}>Get All Cards</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={onBulkEditFacts}>Edit Facts</DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDeleteConfirm}>
             Delete deck
           </DropdownMenuItem>
@@ -66,7 +89,7 @@ export function DeckInfoCard({
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         <Button variant="default" className="w-full" asChild>
-          <Link to={`/decks/${deck.id}/bulk-upload`}>Bulk upload</Link>
+          <Link to={`/decks/${deck.id}/bulk-upload`}>Upload</Link>
         </Button>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>

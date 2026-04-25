@@ -697,6 +697,7 @@ export function cardEntryToRenderItems(entry: CardEntry): CardEntryItem[] {
 }
 
 // Cards: template = [[front indices], [back indices]]; front/back are arrays of CardEntry (back may be []).
+// Scheduling numbers (last_review, due_date, created_at; deck stats last_reviewed_at) are Unix seconds since UTC epoch.
 export interface NextCardItem {
   id: string;
   fact_id: string;
@@ -720,14 +721,32 @@ export interface GetNextCardRes {
   };
 }
 
+/** Card row from `GET /api/decks/{id}/cards` (same shape as stored card, no front/back). */
+export interface DeckCardListItem {
+  id: string;
+  fact_id: string;
+  template: number[][];
+  last_review: number;
+  due_date: number;
+  hidden: boolean;
+  created_at: number;
+}
+
+/** Response from `GET /api/decks/{id}/cards` — full card list plus aggregate counts and filter lists (server-derived). */
 export interface GetCardsRes {
   data: {
     total_cards: number;
-    hidden_count: number;
-    hidden_facts: FactItem[];
+    hidden_cards_count: number;
+    due_cards: number;
+    due_cards_list: DeckCardListItem[];
+    unseen_cards: number;
+    hidden_cards_list: DeckCardListItem[];
+    unseen_cards_list: DeckCardListItem[];
+    seen_cards_list: DeckCardListItem[];
+    cards: DeckCardListItem[];
     orphaned_hidden_cards?: number;
   };
-  meta: { msg: string };
+  meta: { msg?: string };
 }
 
 export interface UpdateCardReq {

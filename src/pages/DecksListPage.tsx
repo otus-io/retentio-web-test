@@ -229,7 +229,7 @@ export default function DecksListPage() {
                       </div>
                       <DropdownMenu align="end">
                         <DropdownMenuItem onClick={() => navigate(`/decks/${d.id}/edit`)}>
-                          Edit
+                          Edit Deck
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           variant="destructive"

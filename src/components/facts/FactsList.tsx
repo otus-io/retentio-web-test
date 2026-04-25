@@ -33,7 +33,7 @@ interface FactsListProps {
   onDeleteFact: (factId: string) => void;
   deleteFactId: string | null;
   setDeleteFactId: (id: string | null) => void;
-  /** Opens the Add facts form (e.g. in a modal). When provided, header shows a dropdown with "Add facts". */
+  /** Opens the Add Facts form (e.g. in a modal). When provided, header shows a dropdown with "Add Facts". */
   onOpenAddFacts?: () => void;
   /** When set, overrides `deck.stats.facts_count` for “shown of N” (from GET /facts `meta.total`). */
   factsTotal?: number | null;
@@ -92,7 +92,7 @@ export function FactsList({
               className="shrink-0"
             >
               <DropdownMenuItem onClick={onOpenAddFacts}>
-                Add facts
+                Add Facts
               </DropdownMenuItem>
             </DropdownMenu>
           )}

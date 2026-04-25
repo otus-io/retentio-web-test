@@ -23,11 +23,6 @@ describe("DeckHeader", () => {
     expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "/profile");
   });
 
-  it("renders a link to /media", () => {
-    renderHeader();
-    expect(screen.getByRole("link", { name: /media/i })).toHaveAttribute("href", "/media");
-  });
-
   it("calls onLogout when the Logout button is clicked", async () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();

@@ -17,7 +17,6 @@ import {
   type GetDeckRes,
   type GetNextCardRes,
   type NextCardItem,
-  type GetCardsRes,
   type RescheduleReq,
   type RescheduleRes,
   type UpdateDeckReq,
@@ -32,12 +31,20 @@ import {
   DeckHeader,
   DeckEditForm,
   DeckInfoCard,
+  DeckCardFontDialog,
+  DeckAllCardsModal,
 } from "@/components/deck";
+import {
+  DECK_CARD_TYPOGRAPHY_DEFAULTS,
+  loadDeckCardSidesTypography,
+  saveDeckCardSidesTypography,
+  type DeckCardSidesTypography,
+} from "@/lib/deckCardTypography";
+import { nowUnixSecondsUtc } from "@/lib/unixTime";
 import { CardSection } from "@/components/card";
 import {
   AddFactsForm,
   BulkEditFactsModal,
-  FactsList,
   type AddFactEntry,
   makeInitialFactRow,
 } from "@/components/facts";
@@ -68,15 +75,7 @@ export default function DeckPage() {
   const [factsList, setFactsList] = useState<FactItem[]>([]);
   const [factsHasMore, setFactsHasMore] = useState(false);
   const [factsTotal, setFactsTotal] = useState<number | null>(null);
-  const [loadingFacts, setLoadingFacts] = useState(false);
-  const [editingFactId, setEditingFactId] = useState<string | null>(null);
-  const [editingFactEntries, setEditingFactEntries] = useState<Entry[]>([]);
-  const [editingFactSplit, setEditingFactSplit] = useState(1);
-  const [factError, setFactError] = useState("");
-  const [factSuccess, setFactSuccess] = useState("");
   const [deleteFactId, setDeleteFactId] = useState<string | null>(null);
-  const [cardStats, setCardStats] = useState<GetCardsRes["data"] | null>(null);
-  const [loadingCards, setLoadingCards] = useState(false);
   const [nextCard, setNextCard] = useState<GetNextCardRes["data"] | null>(null);
   const [nextCardMeta, setNextCardMeta] = useState<GetNextCardRes["meta"] | null>(null);
   const [nextCardFact, setNextCardFact] = useState<FactItem | null>(null);
@@ -85,6 +84,11 @@ export default function DeckPage() {
   const [cardSuccess, setCardSuccess] = useState("");
   const [addFactsOpen, setAddFactsOpen] = useState(false);
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
+  const [cardFontsOpen, setCardFontsOpen] = useState(false);
+  const [allCardsOpen, setAllCardsOpen] = useState(false);
+  const [cardTypography, setCardTypography] = useState<DeckCardSidesTypography>(() =>
+    id ? loadDeckCardSidesTypography(id) : DECK_CARD_TYPOGRAPHY_DEFAULTS
+  );
 
   useEffect(() => {
     if (!addFactsOpen) return;
@@ -98,19 +102,32 @@ export default function DeckPage() {
   useEffect(() => {
     setDeck(null);
     setFactsList([]);
-    setCardStats(null);
     setNextCard(null);
     setNextCardFact(null);
     setNextCardMeta(null);
     setError("");
     setEditing(false);
     setSuccessMessage("");
-    setFactSuccess("");
     setCardSuccess("");
     setBulkEditFactsOpen(false);
+    setAllCardsOpen(false);
     setFactsHasMore(false);
     setFactsTotal(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setCardTypography(loadDeckCardSidesTypography(id));
+    setCardFontsOpen(false);
+  }, [id]);
+
+  const handleCardTypographyChange = useCallback(
+    (next: DeckCardSidesTypography) => {
+      setCardTypography(next);
+      if (id) saveDeckCardSidesTypography(id, next);
+    },
+    [id]
+  );
 
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
@@ -143,7 +160,6 @@ export default function DeckPage() {
   const fetchFacts = useCallback(async () => {
     if (!token || !id) return;
     const targetDeckId = id;
-    setLoadingFacts(true);
     try {
       const res = await fetchDeckFactsPage(id, token);
       if (routeDeckIdRef.current !== targetDeckId) return;
@@ -155,24 +171,6 @@ export default function DeckPage() {
       setFactsList([]);
       setFactsHasMore(false);
       setFactsTotal(null);
-    } finally {
-      if (routeDeckIdRef.current === targetDeckId) setLoadingFacts(false);
-    }
-  }, [token, id]);
-
-  const fetchCards = useCallback(async () => {
-    if (!token || !id) return;
-    const targetDeckId = id;
-    setLoadingCards(true);
-    try {
-      const res = await request<GetCardsRes>(`/api/decks/${id}/cards`, { token });
-      if (routeDeckIdRef.current !== targetDeckId) return;
-      setCardStats(res.data);
-    } catch {
-      if (routeDeckIdRef.current !== targetDeckId) return;
-      setCardStats(null);
-    } finally {
-      if (routeDeckIdRef.current === targetDeckId) setLoadingCards(false);
     }
   }, [token, id]);
 
@@ -247,9 +245,8 @@ export default function DeckPage() {
   useEffect(() => {
     if (deck && !editing) {
       fetchFacts();
-      fetchCards();
     }
-  }, [deck, editing, fetchFacts, fetchCards]);
+  }, [deck, editing, fetchFacts]);
 
   useEffect(() => {
     if (deck && !editing && token && id) {
@@ -385,39 +382,10 @@ export default function DeckPage() {
       await fetchDeck();
       await fetchFacts();
     } catch (e) {
-      setAddFactsError(e instanceof Error ? e.message : "Add facts failed");
+      setAddFactsError(e instanceof Error ? e.message : "Add Facts failed");
       setSuccessMessage("");
     } finally {
       setAddingFacts(false);
-    }
-  }
-
-  async function handleUpdateFact(e: React.FormEvent) {
-    e.preventDefault();
-    if (!token || !id || !editingFactId || !deck) return;
-    const entries = editingFactEntries;
-    const hasContent = (e: Entry) =>
-      (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video || !!e.json;
-    if (entries.length === 0 || !entries.every(hasContent)) {
-      setFactError("Each entry must have at least one of text, audio, image, video, or JSON.");
-      return;
-    }
-    setFactError("");
-    setFactSuccess("");
-    try {
-      const body: UpdateFactReq = { entries };
-      await request<unknown>(`/api/decks/${id}/facts/${editingFactId}`, {
-        method: "PATCH",
-        token,
-        body: JSON.stringify(body),
-      });
-      setEditingFactId(null);
-      setEditingFactEntries([]);
-      setFactSuccess("Fact updated.");
-      await fetchFacts();
-      await fetchDeck();
-    } catch (e) {
-      setFactError(e instanceof Error ? e.message : "Update failed");
     }
   }
 
@@ -434,23 +402,23 @@ export default function DeckPage() {
       token,
       body: JSON.stringify(body),
     });
-    setFactSuccess("Fact updated.");
+    setSuccessMessage("Fact updated.");
     await fetchFacts();
     await fetchDeck();
   }
 
   async function handleDeleteFact(factId: string) {
     if (!token || !id) return;
-    setFactError("");
-    setFactSuccess("");
+    setError("");
+    setSuccessMessage("");
     try {
       await request(`/api/decks/${id}/facts/${factId}`, { method: "DELETE", token });
       setDeleteFactId(null);
-      setFactSuccess("Fact deleted.");
+      setSuccessMessage("Fact deleted.");
       await fetchFacts();
       await fetchDeck();
     } catch (e) {
-      setFactError(e instanceof Error ? e.message : "Delete failed");
+      setError(e instanceof Error ? e.message : "Delete failed");
       setDeleteFactId(null);
     }
   }
@@ -459,7 +427,7 @@ export default function DeckPage() {
     if (!token || !id || !nextCard) return;
     setCardError("");
     try {
-      const lastReview = Math.floor(Date.now() / 1000);
+      const lastReview = nowUnixSecondsUtc();
       const body: UpdateCardReq = { card_id: nextCard.card.id, last_review: lastReview, interval: intervalSeconds };
       await request<UpdateCardRes>(`/api/decks/${id}/card`, {
         method: "PATCH",
@@ -467,7 +435,6 @@ export default function DeckPage() {
         body: JSON.stringify(body),
       });
       setCardSuccess("Card reviewed.");
-      await fetchCards();
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Update failed");
@@ -485,7 +452,6 @@ export default function DeckPage() {
       });
       setCardSuccess("Card hidden.");
       await fetchDeck();
-      await fetchCards();
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Hide failed");
@@ -498,7 +464,6 @@ export default function DeckPage() {
     try {
       await request(`/api/decks/${id}/cards/${cardId}`, { method: "DELETE", token });
       setCardSuccess("Card deleted.");
-      await fetchCards();
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Delete failed");
@@ -508,7 +473,6 @@ export default function DeckPage() {
   async function handleAddCardSuccess() {
     setCardSuccess("Card added.");
     await fetchFacts();
-    await fetchCards();
     await handleGetNextCard(false);
   }
 
@@ -524,7 +488,6 @@ export default function DeckPage() {
       setCardSuccess(`Schedule shifted by ${days} days.`);
       setNextCardMeta(null);
       await fetchDeck();
-      await fetchCards();
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Reschedule failed");
@@ -541,9 +504,6 @@ export default function DeckPage() {
             </Link>
             <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
               Profile
-            </Link>
-            <Link to="/media" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Media
             </Link>
             <Button variant="outline" onClick={handleLogout}>
               Logout
@@ -565,9 +525,6 @@ export default function DeckPage() {
             </Link>
             <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
               Profile
-            </Link>
-            <Link to="/media" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Media
             </Link>
             <Button variant="outline" onClick={handleLogout}>
               Logout
@@ -607,8 +564,7 @@ export default function DeckPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full min-w-0 [&>*]:min-w-0">
             <CardSection
               deck={deck}
-              cardStats={cardStats}
-              loadingCards={loadingCards}
+              cardTypography={cardTypography}
               nextCard={nextCard}
               nextCardFact={nextCardFact}
               loadingNextCard={loadingNextCard}
@@ -631,20 +587,35 @@ export default function DeckPage() {
                 setEditing(true);
                 setSuccessMessage("");
               }}
+              onOpenCardFonts={() => setCardFontsOpen(true)}
+              onOpenAddFacts={() => setAddFactsOpen(true)}
+              onOpenAllCards={() => setAllCardsOpen(true)}
               onBulkEditFacts={() => setBulkEditFactsOpen(true)}
               deleteConfirm={deleteConfirm}
               onDeleteConfirm={() => setDeleteConfirm(true)}
               onDeleteCancel={() => setDeleteConfirm(false)}
               onDelete={handleDelete}
             />
+            <DeckCardFontDialog
+              open={cardFontsOpen}
+              onOpenChange={setCardFontsOpen}
+              value={cardTypography}
+              onChange={handleCardTypographyChange}
+            />
+            {deck && token && (
+              <DeckAllCardsModal
+                open={allCardsOpen}
+                onOpenChange={setAllCardsOpen}
+                deckId={deck.id}
+                deckName={deck.name}
+                token={token}
+              />
+            )}
             {bulkEditFactsOpen && deck && token && (
               <BulkEditFactsModal
                 open={bulkEditFactsOpen}
                 onClose={() => {
                   setBulkEditFactsOpen(false);
-                  setEditingFactId(null);
-                  setEditingFactEntries([]);
-                  setFactError("");
                   setDeleteFactId(null);
                 }}
                 deck={deck}
@@ -675,7 +646,7 @@ export default function DeckPage() {
                 />
                 <div className="relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg">
                   <h2 id="add-facts-modal-title" className="text-lg font-semibold mb-4">
-                    Add facts
+                    Add Facts
                   </h2>
                   <AddFactsForm
                     deck={deck}
@@ -695,26 +666,6 @@ export default function DeckPage() {
                 </div>
               </div>
             )}
-            <FactsList
-              deck={deck}
-              factsList={factsList}
-              factsTotal={factsTotal}
-              loadingFacts={loadingFacts}
-              factError={factError}
-              factSuccess={factSuccess}
-              editingFactId={editingFactId}
-              editingFactEntries={editingFactEntries}
-              editingFactSplit={editingFactSplit}
-              setEditingFactId={setEditingFactId}
-              setEditingFactEntries={setEditingFactEntries}
-              setEditingFactSplit={setEditingFactSplit}
-              setFactError={setFactError}
-              onUpdateFact={handleUpdateFact}
-              onDeleteFact={handleDeleteFact}
-              deleteFactId={deleteFactId}
-              setDeleteFactId={setDeleteFactId}
-              onOpenAddFacts={() => setAddFactsOpen(true)}
-            />
           </div>
         )}
       </div>

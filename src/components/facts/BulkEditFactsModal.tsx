@@ -542,7 +542,7 @@ export function BulkEditFactsModal({
       <div className="relative z-50 flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border bg-card shadow-lg">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b px-6 py-4">
           <h2 id="bulk-edit-facts-title" className="text-lg font-semibold">
-            Bulk edit facts
+            Edit Facts
           </h2>
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Close

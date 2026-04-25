@@ -8,7 +8,7 @@ import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
 import { buildSiblingTemplate, buildTemplateWithSplit, fileLooksLikeJson } from "@/lib/api";
 
-/** One entry in the Add facts row: label, text value, and optional media files. Type is derived from file when uploading. */
+/** One entry in the Add Facts row: label, text value, and optional media files. Type is derived from file when uploading. */
 export type AddFactEntry = {
   label: string;
   text: string;
@@ -436,7 +436,7 @@ export function AddFactsForm({
             !row.some((e) => e.text.trim() !== "" || e.media.length > 0)
           }
         >
-          {addingFacts ? "Adding…" : "Add facts"}
+          {addingFacts ? "Adding…" : "Add Facts"}
         </Button>
       </div>
     </form>
@@ -455,7 +455,7 @@ export function AddFactsForm({
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle>Add facts</CardTitle>
+        <CardTitle>Add Facts</CardTitle>
         <p className="text-sm font-normal text-muted-foreground">
           Enter one fact. Add fields and media; drag the cut line to set front vs back.
         </p>

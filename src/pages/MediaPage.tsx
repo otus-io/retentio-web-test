@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { request, getApiBaseUrl, fetchAllUserMedia, type MediaItem } from "@/lib/api";
+import { formatUnixSecondsUtc } from "@/lib/unixTime";
 
 export default function MediaPage() {
   const { token, logout } = useAuth();
@@ -75,7 +76,7 @@ export default function MediaPage() {
   }
 
   function formatDate(ts: number) {
-    return new Date(ts * 1000).toLocaleString();
+    return formatUnixSecondsUtc(ts);
   }
 
   return (
@@ -107,7 +108,7 @@ export default function MediaPage() {
               <p className="text-muted-foreground">Loading…</p>
             ) : items.length === 0 ? (
               <p className="text-muted-foreground">
-                No files yet. Media you attach when adding facts or via deck bulk upload appears here.
+                No files yet. Media you attach when adding facts or via deck upload appears here.
               </p>
             ) : (
               <div className="overflow-x-auto">

@@ -49,9 +49,9 @@ function renderForm(overrides: Partial<Parameters<typeof AddFactsForm>[0]> = {})
 }
 
 describe("AddFactsForm", () => {
-  it("renders the add facts heading", () => {
+  it("renders the Add Facts heading", () => {
     renderForm();
-    expect(screen.getByText("Add facts", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Add Facts", { selector: "p" })).toBeInTheDocument();
   });
 
   it("renders one value input per factRow text cell", () => {
@@ -119,17 +119,17 @@ describe("AddFactsForm", () => {
     expect(lastRow[0].text).toBe("你好");
   });
 
-  it("disables the Add facts submit button when all fields are empty", () => {
+  it("disables the Add Facts submit button when all fields are empty", () => {
     renderForm();
     expect(screen.getByRole("button", { name: /add facts/i })).toBeDisabled();
   });
 
-  it("enables the Add facts submit button when at least one field has a value", () => {
+  it("enables the Add Facts submit button when at least one field has a value", () => {
     renderForm({ factRow: factRowFromValues(["Hello", ""]) });
     expect(screen.getByRole("button", { name: /add facts/i })).not.toBeDisabled();
   });
 
-  it("calls onSubmit when Add facts is clicked with a non-empty value", async () => {
+  it("calls onSubmit when Add Facts is clicked with a non-empty value", async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderForm({ factRow: factRowFromValues(["Hello", "你好"]) });
     await user.click(screen.getByRole("button", { name: /add facts/i }));

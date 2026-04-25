@@ -1,14 +1,18 @@
-import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, Entry, FactItem } from "@/lib/api";
-import { cardEntryToRenderItems, type CardEntryItem, type GetCardsRes, type GetNextCardRes } from "@/lib/api";
+import { cardEntryToRenderItems, type CardEntryItem, type GetNextCardRes } from "@/lib/api";
+import type { DeckCardSidesTypography } from "@/lib/deckCardTypography";
+import { DECK_CARD_TYPOGRAPHY_DEFAULTS } from "@/lib/deckCardTypography";
 import { getApiBaseUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
+import { looksLikeWikiRubyMarkup, parseWikiRubyMarkup } from "@/lib/wikiRubyMarkup";
+import { formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
@@ -20,7 +24,7 @@ function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
     60,
     lastReview === 0 ? 60 : Math.max(60, dueDate - lastReview)
   );
-  const nowSec = Math.floor(Date.now() / 1000);
+  const nowSec = nowUnixSecondsUtc();
   const denom = Math.max(60, dueDate - lastReview);
   const urgency = (nowSec - lastReview) / denom;
 
@@ -64,6 +68,68 @@ type FieldSegment =
   | { kind: "audio"; id: string }
   | { kind: "video"; id: string }
   | { kind: "json"; id: string };
+
+type CardFontSizes = { basePx: number; rubyPx: number };
+
+/** Renders `[[kanji|reading]]` wiki markup as HTML ruby (same convention as Retentio mobile). */
+function WikiRubyInline({
+  text,
+  fontSizes,
+}: {
+  text: string;
+  fontSizes?: CardFontSizes;
+}): ReactNode {
+  const basePx = fontSizes?.basePx;
+  const rubyPx = fontSizes?.rubyPx;
+  const baseClass = "font-semibold tracking-wide";
+  const baseStyle = basePx != null ? ({ fontSize: basePx } as const) : undefined;
+  /** Space between furigana (rt) and base line. */
+  const rtStyle =
+    rubyPx != null
+      ? ({ fontSize: rubyPx, paddingBottom: "4mm" } as const)
+      : ({ paddingBottom: "4mm" } as const);
+
+  if (!looksLikeWikiRubyMarkup(text)) {
+    if (basePx != null) {
+      return (
+        <span style={baseStyle} className={baseClass}>
+          {text}
+        </span>
+      );
+    }
+    return text;
+  }
+
+  return (
+    <>
+      {parseWikiRubyMarkup(text).map((seg, i) =>
+        seg.type === "plain" ? (
+          basePx != null ? (
+            <span key={i} style={baseStyle} className={baseClass}>
+              {seg.text}
+            </span>
+          ) : (
+            <Fragment key={i}>{seg.text}</Fragment>
+          )
+        ) : (
+          <ruby key={i} className={`[ruby-align:center] ${baseClass}`} style={baseStyle}>
+            {seg.main}
+            <rt
+              className={
+                rubyPx != null
+                  ? "font-normal text-muted-foreground tracking-tight"
+                  : "text-[0.65em] font-normal text-muted-foreground tracking-tight"
+              }
+              style={rtStyle}
+            >
+              {seg.reading}
+            </rt>
+          </ruby>
+        )
+      )}
+    </>
+  );
+}
 
 function parseFieldWithMedia(text: string): FieldSegment[] {
   const normalized = normalizeMediaMarkers(text);
@@ -180,6 +246,7 @@ function MediaBlock({
 export function FieldWithMedia({
   text,
   token,
+  fontSizes,
   imageRevealed = false,
   onRevealImage,
   hideImages = false,
@@ -188,6 +255,8 @@ export function FieldWithMedia({
 }: {
   text: string;
   token: string | null;
+  /** When set, main line and ruby use these pixel sizes (per card side). */
+  fontSizes?: CardFontSizes;
   imageRevealed?: boolean;
   onRevealImage?: () => void;
   hideImages?: boolean;
@@ -195,16 +264,21 @@ export function FieldWithMedia({
   mediaOnly?: boolean;
 }) {
   if (textOnly) {
+    const display = formatMediaMarkersForDisplay(text);
     return (
       <span className="block max-h-[18rem] overflow-y-auto overflow-x-auto break-words whitespace-pre-wrap">
-        {formatMediaMarkersForDisplay(text)}
+        <WikiRubyInline text={display} fontSizes={fontSizes} />
       </span>
     );
   }
   const segments = useMemo(() => parseFieldWithMedia(text), [text]);
   const hasMedia = segments.some((s) => s.kind !== "text");
   if (!token || !hasMedia) {
-    return <>{mediaOnly ? null : (text || " ")}</>;
+    return (
+      <>
+        {mediaOnly ? null : text ? <WikiRubyInline text={text} fontSizes={fontSizes} /> : " "}
+      </>
+    );
   }
   const imageSegments = segments.filter((s): s is Extract<FieldSegment, { kind: "image" }> => s.kind === "image");
   const otherSegments = segments.filter((s) => s.kind !== "image");
@@ -219,7 +293,7 @@ export function FieldWithMedia({
               key={i}
               className="break-words whitespace-pre-wrap max-h-[18rem] overflow-y-auto overflow-x-auto"
             >
-              {seg.value}
+              <WikiRubyInline text={seg.value} fontSizes={fontSizes} />
             </span>
           )
         ) : seg.kind === "json" ? (
@@ -285,8 +359,8 @@ export function FieldWithMedia({
 
 interface CardSectionProps {
   deck: DeckItem | null;
-  cardStats: GetCardsRes["data"] | null;
-  loadingCards: boolean;
+  /** Main and ruby font sizes for front vs back; defaults match the Retentio app. */
+  cardTypography?: DeckCardSidesTypography;
   nextCard: GetNextCardRes["data"] | null;
   nextCardFact: FactItem | null;
   loadingNextCard: boolean;
@@ -309,8 +383,7 @@ const SLIDER_DEFAULT = 0.5;
 
 export function CardSection({
   deck,
-  cardStats,
-  loadingCards: _loadingCards,
+  cardTypography = DECK_CARD_TYPOGRAPHY_DEFAULTS,
   nextCard,
   nextCardFact,
   loadingNextCard,
@@ -411,6 +484,15 @@ export function CardSection({
   const hasContent = (e: Entry) =>
     (e.text?.trim() ?? "") !== "" || !!e.audio || !!e.image || !!e.video || !!e.json;
 
+  const fontFront: CardFontSizes = {
+    basePx: cardTypography.front.baseFontSize,
+    rubyPx: cardTypography.front.rubyFontSize,
+  };
+  const fontBack: CardFontSizes = {
+    basePx: cardTypography.back.baseFontSize,
+    rubyPx: cardTypography.back.rubyFontSize,
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onSaveFact || !editFactId || !deck) return;
@@ -452,13 +534,6 @@ export function CardSection({
         )}
         {!nextCard && loadingNextCard ? (
           <p className="text-muted-foreground">Loading next card…</p>
-        ) : cardStats !== null ? (
-          <p className="text-sm text-muted-foreground">
-            Total: {cardStats.total_cards} · Hidden: {cardStats.hidden_count}
-            {cardStats.orphaned_hidden_cards != null &&
-              cardStats.orphaned_hidden_cards > 0 &&
-              ` · Orphaned: ${cardStats.orphaned_hidden_cards}`}
-          </p>
         ) : null}
         {nextCard && deck && (nextCardFact || (Array.isArray(nextCard.card.front) && Array.isArray(nextCard.card.back))) && (
           <div className="relative rounded-lg border p-4 space-y-3">
@@ -495,18 +570,21 @@ export function CardSection({
               </DropdownMenu>
             </div>
             <p className="text-xs text-muted-foreground">
-              Due: {new Date(nextCard.card.due_date * 1000).toLocaleString()}
+              Due: {formatUnixSecondsUtc(nextCard.card.due_date)}
             </p>
             {(() => {
               const frontEntries = Array.isArray(nextCard.card.front) ? nextCard.card.front : null;
               const backEntries = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
               const useEntries = frontEntries && backEntries;
 
-              const renderItem = (item: CardEntryItem, key: number) => {
+              const renderItem = (item: CardEntryItem, key: number, isFront: boolean) => {
+                const fontSizes = isFront ? fontFront : fontBack;
                 let content: ReactNode = null;
                 switch (item.type) {
                   case "text":
-                    content = <FieldWithMedia text={item.value} token={authToken ?? null} />;
+                    content = (
+                      <FieldWithMedia text={item.value} token={authToken ?? null} fontSizes={fontSizes} />
+                    );
                     break;
                   case "audio":
                     if (authToken) content = <MediaBlock kind="audio" id={item.value} token={authToken} />;
@@ -521,7 +599,11 @@ export function CardSection({
                     content = <JsonAttachmentPlaceholder />;
                     break;
                   default:
-                    content = <span className="text-muted-foreground">{item.value || "—"}</span>;
+                    content = (
+                      <span className="text-muted-foreground" style={{ fontSize: fontSizes.basePx }}>
+                        {item.value || "—"}
+                      </span>
+                    );
                 }
                 return (
                   <span key={key} className="inline-flex flex-col items-center gap-0.5">
@@ -550,33 +632,33 @@ export function CardSection({
                       style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                     >
                       <div
-                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center text-lg [backface-visibility:hidden] overflow-x-auto overflow-y-auto max-h-[18rem]"
+                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center font-card [backface-visibility:hidden] overflow-x-auto overflow-y-auto max-h-[18rem]"
                         style={{ transform: "rotateY(0deg)" }}
                       >
                         {frontEntries.map((entry, entryIdx) => (
                           <div key={entryIdx} className="flex flex-wrap items-center justify-center gap-3">
                             {cardEntryToRenderItems(entry).map((item, i) =>
-                              renderItem(item, entryIdx * 1000 + i)
+                              renderItem(item, entryIdx * 1000 + i, true)
                             )}
                           </div>
                         ))}
                       </div>
                       <div
-                        className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center [backface-visibility:hidden]"
+                        className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center font-card [backface-visibility:hidden]"
                         style={{ transform: "rotateY(180deg)" }}
                       >
                         {backEntries.length > 0 ? (
                           <>
-                            <div className="flex flex-wrap items-center justify-center gap-3 text-lg overflow-x-auto overflow-y-auto max-h-[18rem]">
-                              {cardEntryToRenderItems(backEntries[0]).map((item, i) => renderItem(item, i))}
+                            <div className="flex flex-wrap items-center justify-center gap-3 font-card overflow-x-auto overflow-y-auto max-h-[18rem]">
+                              {cardEntryToRenderItems(backEntries[0]).map((item, i) => renderItem(item, i, false))}
                             </div>
                             {backEntries.length > 1 && (
                               examplesRevealed ? (
                                 <div className="mt-3 space-y-2 text-left">
                                   {backEntries.slice(1).map((entry, entryIdx) => (
-                                    <p key={entryIdx} className="text-base">
+                                    <p key={entryIdx} className="font-card">
                                       {cardEntryToRenderItems(entry).map((item, i) =>
-                                        renderItem(item, entryIdx * 1000 + i)
+                                        renderItem(item, entryIdx * 1000 + i, false)
                                       )}
                                     </p>
                                   ))}
@@ -597,7 +679,9 @@ export function CardSection({
                             )}
                           </>
                         ) : (
-                          <p className="text-lg text-muted-foreground">—</p>
+                          <p className="font-card text-muted-foreground" style={{ fontSize: fontBack.basePx }}>
+                            —
+                          </p>
                         )}
                       </div>
                     </div>
@@ -631,15 +715,16 @@ export function CardSection({
                     style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                   >
                     <div
-                      className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border bg-card p-4 text-center [backface-visibility:hidden]"
+                      className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border bg-card p-4 text-center font-card [backface-visibility:hidden]"
                       style={{ transform: "rotateY(0deg)" }}
                     >
-                      <div className="flex flex-wrap items-center justify-center gap-3 text-lg">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
                         {frontFields.map((fieldText, i) => (
                           <FieldWithMedia
                             key={i}
-                            text={fieldText ?? ""}
+                            text={typeof fieldText === "string" ? fieldText : ""}
                             token={authToken ?? null}
+                            fontSizes={fontFront}
                             imageRevealed={imageRevealed}
                             onRevealImage={() => setImageRevealed(true)}
                           />
@@ -647,21 +732,29 @@ export function CardSection({
                       </div>
                     </div>
                     <div
-                      className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center [backface-visibility:hidden]"
+                      className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center font-card [backface-visibility:hidden]"
                       style={{ transform: "rotateY(180deg)" }}
                     >
                       {backFieldsList.length > 0 ? (
                         <>
-                          <p className="text-lg">
-                            <FieldWithMedia text={backFieldsList[0] ?? ""} token={authToken ?? null} />
+                          <p className="font-card">
+                            <FieldWithMedia
+                              text={typeof backFieldsList[0] === "string" ? backFieldsList[0] : ""}
+                              token={authToken ?? null}
+                              fontSizes={fontBack}
+                            />
                           </p>
                           {backFieldsList.length > 1 && (
                             <>
                               {examplesRevealed ? (
                                 <div className="mt-3 space-y-2 text-left">
                                   {backFieldsList.slice(1).map((text, i) => (
-                                    <p key={i} className="text-base">
-                                      <FieldWithMedia text={text ?? ""} token={authToken ?? null} />
+                                    <p key={i} className="font-card">
+                                      <FieldWithMedia
+                                        text={typeof text === "string" ? text : ""}
+                                        token={authToken ?? null}
+                                        fontSizes={fontBack}
+                                      />
                                     </p>
                                   ))}
                                 </div>
@@ -682,7 +775,9 @@ export function CardSection({
                           )}
                         </>
                       ) : (
-                        <p className="text-lg text-muted-foreground">—</p>
+                        <p className="font-card text-muted-foreground" style={{ fontSize: fontBack.basePx }}>
+                          —
+                        </p>
                       )}
                     </div>
                   </div>

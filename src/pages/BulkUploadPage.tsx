@@ -155,7 +155,7 @@ export default function BulkUploadPage() {
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Bulk upload{deck?.name ? ` — ${deck.name}` : ""}</h1>
+          <h1 className="text-2xl font-semibold">Upload{deck?.name ? ` — ${deck.name}` : ""}</h1>
           {id && (
             <Button variant="outline" asChild>
               <Link to={`/decks/${id}`}>Back to deck</Link>
