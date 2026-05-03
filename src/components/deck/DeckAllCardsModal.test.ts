@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { categoryLabelForGetCardsRow, pickCardsForFilter, type GetCardsData } from "./DeckAllCardsModal";
+import {
+  buildGetAllCardsPath,
+  categoryLabelForGetCardsRow,
+  pickCardsForFilter,
+  type GetCardsData,
+} from "./DeckAllCardsModal";
 import type { DeckCardListItem } from "@/lib/api";
 
 function card(id: string, p: Partial<DeckCardListItem> = {}): DeckCardListItem {
@@ -62,6 +67,19 @@ describe("pickCardsForFilter", () => {
     expect(pickCardsForFilter(data, "Unseen")).toEqual([]);
     expect(pickCardsForFilter(data, "Due")).toEqual([]);
     expect(pickCardsForFilter(data, "Seen")).toEqual([]);
+  });
+});
+
+describe("buildGetAllCardsPath", () => {
+  it("returns base cards path when tag_id is blank", () => {
+    expect(buildGetAllCardsPath("deck-1", "   ")).toBe("/api/decks/deck-1/cards");
+  });
+
+  it("adds encoded tag_id query when provided", () => {
+    expect(buildGetAllCardsPath("deck-1", "Kt8QmNz2")).toBe("/api/decks/deck-1/cards?tag_id=Kt8QmNz2");
+    expect(buildGetAllCardsPath("deck 1", "tag with space")).toBe(
+      "/api/decks/deck%201/cards?tag_id=tag%20with%20space"
+    );
   });
 });
 

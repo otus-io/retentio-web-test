@@ -30,6 +30,22 @@ describe("parseExportBundleFromZip", () => {
     expect(bundlePathPrefixFromZip(z)).toBe("");
   });
 
+  it("preserves fact tags from facts.jsonl", async () => {
+    const z = new JSZip();
+    z.file("export_meta.json", JSON.stringify({ model: "Test", facts_written: 1, media_files: 0 }));
+    z.file("media_manifest.json", JSON.stringify({}));
+    z.file(
+      "facts.jsonl",
+      `${JSON.stringify({
+        entries: [{ text: "hello" }],
+        fields: ["Front"],
+        tags: ["lesson 1", "noun"],
+      })}\n`
+    );
+    const parsed = await parseExportBundleFromZip(z);
+    expect(parsed.facts[0]?.tags).toEqual(["lesson 1", "noun"]);
+  });
+
   it("accepts a single top-level folder", async () => {
     const z = await minimalBundleZip({ prefix: "export" });
     const parsed = await parseExportBundleFromZip(z);

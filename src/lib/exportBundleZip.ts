@@ -106,6 +106,13 @@ function parseFactsJsonl(text: string): AddFactItemReq[] {
         }
         out.fields = fields as string[];
       }
+      const tags = (row as { tags?: unknown }).tags;
+      if (tags !== undefined) {
+        if (!Array.isArray(tags) || !tags.every((t) => typeof t === "string")) {
+          throw new Error(`Line ${i + 1}: "tags" must be an array of strings when present`);
+        }
+        out.tags = tags as string[];
+      }
       facts.push(out);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -140,6 +147,13 @@ function parseFactsJson(text: string): AddFactItemReq[] {
         throw new Error(`facts[${i}]: "fields" must be an array of strings when present`);
       }
       out.fields = fields as string[];
+    }
+    const tags = (row as { tags?: unknown }).tags;
+    if (tags !== undefined) {
+      if (!Array.isArray(tags) || !tags.every((t) => typeof t === "string")) {
+        throw new Error(`facts[${i}]: "tags" must be an array of strings when present`);
+      }
+      out.tags = tags as string[];
     }
     facts.push(out);
   }

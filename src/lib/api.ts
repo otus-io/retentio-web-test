@@ -486,6 +486,8 @@ export interface AddFactItemReq {
   entries: Entry[];
   /** Optional column names; length must equal entries. When omitted, deck default fields are used. */
   fields?: string[];
+  /** Optional fact tag names (server resolves/creates and associates to the fact). */
+  tags?: string[];
 }
 
 /**

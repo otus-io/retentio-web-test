@@ -8,6 +8,13 @@ export type DeckAllCardsFilter = "all" | "Hidden" | "Unseen" | "Due" | "Seen";
 
 export type GetCardsData = GetCardsRes["data"];
 
+export function buildGetAllCardsPath(deckId: string, tagId: string): string {
+  const deckPath = `/api/decks/${encodeURIComponent(deckId)}/cards`;
+  const trimmedTagId = tagId.trim();
+  if (!trimmedTagId) return deckPath;
+  return `${deckPath}?tag_id=${encodeURIComponent(trimmedTagId)}`;
+}
+
 function idSet(list: DeckCardListItem[] | undefined): Set<string> {
   return new Set((list ?? []).map((c) => c.id));
 }
@@ -61,18 +68,40 @@ interface DeckAllCardsModalProps {
   token: string | null;
 }
 
+interface DeckTagItem {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface GetDeckTagsRes {
+  data: { tags: DeckTagItem[] };
+  meta?: { msg?: string };
+}
+
+interface GetUserTagsRes {
+  data: { tags: DeckTagItem[] };
+  meta?: { msg?: string };
+}
+
 export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token }: DeckAllCardsModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState<GetCardsData | null>(null);
   const [filter, setFilter] = useState<DeckAllCardsFilter>("all");
+  const [tagId, setTagId] = useState("");
+  const [deckTags, setDeckTags] = useState<DeckTagItem[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState("");
+  const [tagSource, setTagSource] = useState<"deck" | "user">("deck");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (tagIdOverride?: string) => {
     if (!token || !deckId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await request<GetCardsRes>(`/api/decks/${deckId}/cards`, { token });
+      const effectiveTagId = tagIdOverride ?? tagId;
+      const res = await request<GetCardsRes>(buildGetAllCardsPath(deckId, effectiveTagId), { token });
       setData(res.data);
     } catch (e) {
       setData(null);
@@ -80,13 +109,39 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
     } finally {
       setLoading(false);
     }
+  }, [deckId, tagId, token]);
+
+  const loadDeckTags = useCallback(async () => {
+    if (!token || !deckId) return;
+    setTagsLoading(true);
+    setTagsError("");
+    try {
+      const deckRes = await request<GetDeckTagsRes>(`/api/decks/${encodeURIComponent(deckId)}/tags`, { token });
+      const tags = deckRes.data.tags ?? [];
+      if (tags.length > 0) {
+        setDeckTags(tags);
+        setTagSource("deck");
+      } else {
+        const userRes = await request<GetUserTagsRes>("/api/tags", { token });
+        setDeckTags(userRes.data.tags ?? []);
+        setTagSource("user");
+      }
+    } catch (e) {
+      setDeckTags([]);
+      setTagSource("deck");
+      setTagsError(e instanceof Error ? e.message : "Failed to load tags");
+    } finally {
+      setTagsLoading(false);
+    }
   }, [deckId, token]);
 
   useEffect(() => {
     if (!open) return;
     setFilter("all");
+    setTagId("");
     void load();
-  }, [open, load]);
+    void loadDeckTags();
+  }, [open, load, loadDeckTags]);
 
   const filteredRows = useMemo(() => {
     if (!data) return [];
@@ -158,9 +213,42 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
                 ))}
               </select>
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="deck-all-cards-tag-filter">Tags</Label>
+              <select
+                id="deck-all-cards-tag-filter"
+                value={tagId}
+                onChange={(e) => {
+                  const nextTagId = e.target.value;
+                  setTagId(nextTagId);
+                  void load(nextTagId);
+                }}
+                className="h-9 min-w-64 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={loading || tagsLoading}
+              >
+                <option value="">All tags</option>
+                {deckTags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name} ({tag.id})
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="text-sm text-muted-foreground pb-1">
               {loading ? "Loading…" : `${filteredRows.length} row${filteredRows.length === 1 ? "" : "s"}`}
             </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {tagSource === "deck"
+                ? "Deck tags loaded in the dropdown."
+                : "No deck tags yet; dropdown shows all your tags."}
+            </p>
+            {tagsError && <p className="text-sm text-destructive">{tagsError}</p>}
+            {!tagsLoading && deckTags.length === 0 && (
+              <p className="text-sm text-muted-foreground">No tags found.</p>
+            )}
+            {tagsLoading && <p className="text-sm text-muted-foreground">Loading tags…</p>}
           </div>
 
           {loading ? (
