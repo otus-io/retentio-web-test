@@ -6,36 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  request,
-  uploadMultipart,
-  validateAddFactBody,
-  type AddFactOperation,
-  type AddFactReq,
-  type AddFactRes,
-  type DeckItem,
-  type GetDeckRes,
-  type UploadMediaRes,
-} from "@/lib/api";
-import {
-  mediaJobsFromBundle,
-  parseExportBundleFromZip,
-  type ParsedExportBundle,
-} from "@/lib/exportBundleZip";
-
-const DEFAULT_FACT_BATCH = 80;
-const MEDIA_CONCURRENCY = 4;
-
-async function mapInChunks<T>(
-  items: T[],
-  chunkSize: number,
-  fn: (item: T, globalIndex: number) => Promise<void>
-): Promise<void> {
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    await Promise.all(chunk.map((item, j) => fn(item, i + j)));
-  }
-}
+import { request, type AddFactOperation, type DeckItem, type GetDeckRes } from "@/lib/api";
+import { parseExportBundleFromZip, type ParsedExportBundle } from "@/lib/exportBundleZip";
+import { importExportBundleIntoDeck } from "@/lib/importExportBundle";
 
 export default function BulkUploadPage() {
   const { id } = useParams<{ id: string }>();
@@ -98,50 +71,26 @@ export default function BulkUploadPage() {
     setSuccess("");
     setPhase("uploading-media");
     setMediaDone(0);
-    const jobs = mediaJobsFromBundle(parsed.manifest, parsed.pathPrefix);
-    setMediaTotal(jobs.length);
+    setMediaTotal(0);
+    setFactBatchLabel("");
 
     try {
       const buf = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(buf);
 
-      let uploaded = 0;
-      await mapInChunks(jobs, MEDIA_CONCURRENCY, async (job) => {
-        const entry = zip.file(job.zipPath);
-        if (!entry) throw new Error(`ZIP entry missing: ${job.zipPath}`);
-        const blob = await entry.async("blob");
-        const fobj = new File([blob], job.filename, { type: blob.type || undefined });
-        const form = new FormData();
-        form.set("file", fobj);
-        const res = (await uploadMultipart("/api/media", form, token, job.clientId)) as UploadMediaRes;
-        if (!res?.data?.id) throw new Error(`Upload failed for media ${job.clientId}`);
-        uploaded += 1;
-        setMediaDone(uploaded);
+      const { factCount, mediaCount } = await importExportBundleIntoDeck(token, id, parsed, zip, addOp, {
+        onMediaProgress: (done, total) => {
+          setMediaTotal(total);
+          setMediaDone(done);
+        },
+        onFactBatch: (label) => {
+          setPhase("posting-facts");
+          setFactBatchLabel(label);
+        },
       });
 
-      setPhase("posting-facts");
-      const batchSize = DEFAULT_FACT_BATCH;
-      const nBatches = Math.ceil(parsed.facts.length / batchSize);
-      const err = validateAddFactBody({ hasFacts: true });
-      if (err) throw new Error(err);
-
-      for (let b = 0; b < nBatches; b++) {
-        const offset = b * batchSize;
-        const chunk = parsed.facts.slice(offset, offset + batchSize);
-        setFactBatchLabel(`batch ${b + 1} / ${nBatches} (facts ${offset + 1}–${offset + chunk.length})`);
-        const body: AddFactReq = { facts: chunk };
-        await request<AddFactRes>(`/api/decks/${id}/facts/${addOp}`, {
-          method: "POST",
-          token,
-          body: JSON.stringify(body),
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
       setPhase("done");
-      setSuccess(
-        `Imported ${parsed.facts.length} fact(s) and ${jobs.length} media file(s). You can return to the deck to study.`
-      );
+      setSuccess(`Imported ${factCount} fact(s) and ${mediaCount} media file(s). You can return to the deck to study.`);
     } catch (e) {
       setPhase("idle");
       setRunError(e instanceof Error ? e.message : String(e));

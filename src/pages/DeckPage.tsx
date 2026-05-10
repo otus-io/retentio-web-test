@@ -270,8 +270,8 @@ export default function DeckPage() {
     e.preventDefault();
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
-    if (fields.length < 2) {
-      setError("At least two fields are required");
+    if (fields.length < 1) {
+      setError("At least one field name is required");
       return;
     }
     if (rate < 1 || rate > 1000) {
@@ -355,7 +355,6 @@ export default function DeckPage() {
         if (jsonId) out.json = jsonId;
         entries.push(out);
       }
-      const fields = row.map((e) => e.label);
       const err = validateAddFactBody({ hasFacts: true });
       if (err) {
         setAddFactsError(err);
@@ -363,10 +362,7 @@ export default function DeckPage() {
         return;
       }
       const body: AddFactReq = {
-        facts: [{
-          entries,
-          ...(fields.some((f) => f !== "") ? { fields } : {}),
-        }],
+        facts: [{ entries }],
         ...buildTemplateForRequest(row.length, addFactSplit, sibling),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {

@@ -68,12 +68,6 @@ describe("DeckInfoCard", () => {
     expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
   });
 
-  it("links Upload to this deck’s import page", () => {
-    renderCard();
-    const link = screen.getByRole("link", { name: /^upload$/i });
-    expect(link).toHaveAttribute("href", "/decks/deck123/bulk-upload");
-  });
-
   it("calls onEdit when Edit Deck menu item is clicked", async () => {
     const user = userEvent.setup();
     const { onEdit } = renderCard();

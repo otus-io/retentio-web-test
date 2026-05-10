@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import JSZip from "jszip";
-import { bundlePathPrefixFromZip, mediaJobsFromBundle, parseExportBundleFromZip } from "./exportBundleZip";
+import {
+  bundlePathPrefixFromZip,
+  mediaJobsFromBundle,
+  mimeHintFromManifestKind,
+  parseExportBundleFromZip,
+  referencedMediaIdsInFacts,
+} from "./exportBundleZip";
+import type { AddFactItemReq } from "@/lib/api";
 
 async function minimalBundleZip(opts: { prefix?: string } = {}) {
   const { prefix = "" } = opts;
@@ -52,6 +59,16 @@ describe("parseExportBundleFromZip", () => {
     expect(parsed.pathPrefix).toBe("export");
     const jobs = mediaJobsFromBundle(parsed.manifest, parsed.pathPrefix);
     expect(jobs[0]?.zipPath).toBe("export/media/x1.mp3");
+    expect(jobs[0]?.kind).toBe("audio");
+  });
+
+  it("rejects facts that reference a media id missing from the manifest", async () => {
+    const z = new JSZip();
+    z.file("export_meta.json", "{}");
+    z.file("media_manifest.json", JSON.stringify({ x1: { path: "media/x1.mp3", kind: "audio" } }));
+    z.file("facts.jsonl", `${JSON.stringify({ entries: [{ text: "a", audio: "not_in_manifest" }] })}\n`);
+    z.file("media/x1.mp3", new Uint8Array([0x49, 0x44, 0x33]));
+    await expect(parseExportBundleFromZip(z)).rejects.toThrow(/missing from media_manifest/);
   });
 
   it("rejects missing media file", async () => {
@@ -66,5 +83,34 @@ describe("parseExportBundleFromZip", () => {
     const z = await minimalBundleZip();
     z.file("facts.json", "[]");
     await expect(parseExportBundleFromZip(z)).rejects.toThrow(/not both/);
+  });
+});
+
+describe("referencedMediaIdsInFacts", () => {
+  it("collects unique ids from entries", () => {
+    const facts: AddFactItemReq[] = [
+      {
+        entries: [
+          { text: "a", audio: "a1", image: "i1" },
+          { video: "v1", json: "j1" },
+        ],
+      },
+      { entries: [{ audio: "a1" }] },
+    ];
+    expect(referencedMediaIdsInFacts(facts).sort()).toEqual(["a1", "i1", "j1", "v1"]);
+  });
+});
+
+describe("mimeHintFromManifestKind", () => {
+  it("maps common extensions for audio", () => {
+    expect(mimeHintFromManifestKind("audio", "x.mp3")).toBe("audio/mpeg");
+    expect(mimeHintFromManifestKind("audio", "x.m4a")).toBe("audio/mp4");
+    expect(mimeHintFromManifestKind("audio", "x.wav")).toBe("audio/wav");
+  });
+
+  it("maps image and video kinds", () => {
+    expect(mimeHintFromManifestKind("image", "p.png")).toBe("image/png");
+    expect(mimeHintFromManifestKind("video", "c.mov")).toBe("video/quicktime");
+    expect(mimeHintFromManifestKind("json", "d.json")).toBe("application/json");
   });
 });

@@ -289,16 +289,15 @@ export function BulkEditFactsModal({
   const saveDeckColumnNames = useCallback(async () => {
     if (!token) return;
     const deckFieldLen = deckFieldsSafe.length;
-    // PATCH /api/decks/{id}: `name` is required (non-empty). `fields` length must match existing schema,
-    // or if the deck has zero fields, backend accepts a first-time list with at least two names.
+    // PATCH /api/decks/{id}: when the body includes `fields`, the list replaces deck column names (one or more).
     let outLen: number;
     if (deckFieldLen >= 1) {
       outLen = deckFieldLen;
-    } else if (colCount >= 2) {
+    } else if (colCount >= 1) {
       outLen = colCount;
     } else {
       setSaveError(
-        "This deck has no fields yet. Add at least two columns (Add column), or define fields on Edit deck, then save names."
+        "This deck has no fields yet. Add at least one column (Add column), or define fields on Edit deck, then save names."
       );
       return;
     }

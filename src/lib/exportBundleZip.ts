@@ -21,6 +21,57 @@ export interface MediaManifestEntry {
 
 export type MediaManifest = Record<string, MediaManifestEntry>;
 
+/** Collect media ids referenced by fact entries (audio / image / video / json). */
+export function referencedMediaIdsInFacts(facts: AddFactItemReq[]): string[] {
+  const out = new Set<string>();
+  for (const f of facts) {
+    for (const e of f.entries) {
+      const a = e.audio?.trim();
+      const i = e.image?.trim();
+      const v = e.video?.trim();
+      const j = e.json?.trim();
+      if (a) out.add(a);
+      if (i) out.add(i);
+      if (v) out.add(v);
+      if (j) out.add(j);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * Suggested MIME for the multipart `File` when JSZip yields an empty or generic `Blob.type`
+ * (browser often sends `application/octet-stream`). Aligns with retentio-backend `allowedMIMEs`.
+ */
+export function mimeHintFromManifestKind(kind: string, filename: string): string | undefined {
+  const m = filename.toLowerCase().match(/\.[^./\\]+$/);
+  const ext = m ? m[0] : "";
+  switch (kind) {
+    case "audio":
+      if (ext === ".wav") return "audio/wav";
+      if (ext === ".ogg" || ext === ".oga") return "audio/ogg";
+      if (ext === ".m4a" || ext === ".aac" || ext === ".mp4") return "audio/mp4";
+      return "audio/mpeg";
+    case "image":
+      if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+      if (ext === ".png") return "image/png";
+      if (ext === ".gif") return "image/gif";
+      if (ext === ".webp") return "image/webp";
+      if (ext === ".heic") return "image/heic";
+      if (ext === ".heif") return "image/heif";
+      return undefined;
+    case "video":
+      if (ext === ".mp4") return "video/mp4";
+      if (ext === ".mov") return "video/quicktime";
+      if (ext === ".webm") return "video/webm";
+      return undefined;
+    case "json":
+      return "application/json";
+    default:
+      return undefined;
+  }
+}
+
 export interface ParsedExportBundle {
   exportMeta: unknown;
   manifest: MediaManifest;
@@ -99,13 +150,7 @@ function parseFactsJsonl(text: string): AddFactItemReq[] {
       const entries = (row as { entries: unknown }).entries;
       if (!Array.isArray(entries)) throw new Error(`Line ${i + 1}: "entries" must be an array`);
       const out: AddFactItemReq = { entries: entries as AddFactItemReq["entries"] };
-      const fields = (row as { fields?: unknown }).fields;
-      if (fields !== undefined) {
-        if (!Array.isArray(fields) || !fields.every((f) => typeof f === "string")) {
-          throw new Error(`Line ${i + 1}: "fields" must be an array of strings when present`);
-        }
-        out.fields = fields as string[];
-      }
+      // Legacy bundles may include per-fact "fields"; the API uses deck fields only (PATCH /api/decks/{id}).
       const tags = (row as { tags?: unknown }).tags;
       if (tags !== undefined) {
         if (!Array.isArray(tags) || !tags.every((t) => typeof t === "string")) {
@@ -141,13 +186,6 @@ function parseFactsJson(text: string): AddFactItemReq[] {
     const entries = (row as { entries: unknown }).entries;
     if (!Array.isArray(entries)) throw new Error(`facts[${i}]: "entries" must be an array`);
     const out: AddFactItemReq = { entries: entries as AddFactItemReq["entries"] };
-    const fields = (row as { fields?: unknown }).fields;
-    if (fields !== undefined) {
-      if (!Array.isArray(fields) || !fields.every((f) => typeof f === "string")) {
-        throw new Error(`facts[${i}]: "fields" must be an array of strings when present`);
-      }
-      out.fields = fields as string[];
-    }
     const tags = (row as { tags?: unknown }).tags;
     if (tags !== undefined) {
       if (!Array.isArray(tags) || !tags.every((t) => typeof t === "string")) {
@@ -208,9 +246,20 @@ export async function parseExportBundleFromZip(zip: JSZip): Promise<ParsedExport
   const facts = factsJsonl ? parseFactsJsonl(factsText) : parseFactsJson(factsText);
   if (facts.length === 0) throw new Error("No facts found in facts file.");
 
+  for (const refId of referencedMediaIdsInFacts(facts)) {
+    if (!Object.prototype.hasOwnProperty.call(manifest, refId)) {
+      throw new Error(
+        `Facts reference media id ${JSON.stringify(refId)} but it is missing from media_manifest.json.`
+      );
+    }
+  }
+
   for (const [mid, meta] of Object.entries(manifest)) {
     if (!mid.trim()) throw new Error("media_manifest.json contains an empty media id key.");
     if (!meta || typeof meta !== "object") throw new Error(`Manifest entry for ${JSON.stringify(mid)} must be an object.`);
+    if (typeof (meta as MediaManifestEntry).kind !== "string" || !(meta as MediaManifestEntry).kind.trim()) {
+      throw new Error(`Manifest entry for ${JSON.stringify(mid)} must include a non-empty "kind".`);
+    }
     const path = typeof meta.path === "string" ? meta.path : "";
     if (!safeMediaManifestPath(path)) {
       throw new Error(
@@ -231,6 +280,8 @@ export interface MediaUploadJob {
   /** Path inside ZIP (normalized, includes optional folder prefix). */
   zipPath: string;
   filename: string;
+  /** From manifest; used as a MIME hint for the upload `File` when the ZIP blob has no type. */
+  kind: string;
 }
 
 export function mediaJobsFromBundle(manifest: MediaManifest, pathPrefix: string): MediaUploadJob[] {
@@ -239,7 +290,8 @@ export function mediaJobsFromBundle(manifest: MediaManifest, pathPrefix: string)
     const rel = normalizeBundleZipPath(meta.path);
     const zipPath = manifestPathToZipKey(rel, pathPrefix);
     const filename = rel.split("/").pop() || clientId;
-    jobs.push({ clientId, zipPath, filename });
+    const kind = typeof meta.kind === "string" ? meta.kind : "";
+    jobs.push({ clientId, zipPath, filename, kind });
   }
   jobs.sort((a, b) => a.zipPath.localeCompare(b.zipPath));
   return jobs;

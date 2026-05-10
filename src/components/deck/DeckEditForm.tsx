@@ -39,7 +39,7 @@ export function DeckEditForm({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Fields</p>
-            <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
+            <p className="text-xs text-muted-foreground">One box per column (at least 1).</p>
             {fieldNames.map((value, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Label htmlFor={`edit-field-${i}`} className="sr-only">Field {i + 1}</Label>
@@ -53,7 +53,7 @@ export function DeckEditForm({
                   }}
                   placeholder={`Field ${i + 1}`}
                 />
-                {fieldNames.length > 2 && (
+                {fieldNames.length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"

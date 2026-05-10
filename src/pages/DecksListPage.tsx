@@ -57,8 +57,8 @@ export default function DecksListPage() {
     e.preventDefault();
     if (!token) return;
     const fields = createFieldNames.map((s) => s.trim()).filter(Boolean);
-    if (fields.length < 2) {
-      setCreateError("at least two fields required");
+    if (fields.length < 1) {
+      setCreateError("at least one field name is required");
       return;
     }
     if (createRate < 1 || createRate > 1000) {
@@ -144,15 +144,21 @@ export default function DecksListPage() {
                     Cancel
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setCreateOpen(true);
-                      setCreateError("");
-                      setCreateSuccess("");
-                    }}
-                  >
-                    Create deck
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setCreateOpen(true);
+                        setCreateError("");
+                        setCreateSuccess("");
+                        setCreateName("");
+                        setCreateFieldNames(["", ""]);
+                        setCreateRate(20);
+                      }}
+                    >
+                      Create deck
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/decks/upload")}>Upload deck</DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenu>
             </div>
@@ -168,7 +174,7 @@ export default function DecksListPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Fields</p>
-                  <p className="text-xs text-muted-foreground">One box per field (at least 2).</p>
+                  <p className="text-xs text-muted-foreground">One box per field (at least 1).</p>
                   {createFieldNames.map((value, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <Label htmlFor={`create-field-${i}`} className="sr-only">Field {i + 1}</Label>

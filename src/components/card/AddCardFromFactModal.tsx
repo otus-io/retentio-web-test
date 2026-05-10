@@ -351,18 +351,13 @@ export function AddCardFromFactModal({
                 ? { json: m.id }
                 : { image: m.id };
         });
-        const fields = row.map((c) => {
-          if (c.type === "text") return c.label;
-          if (c.type === "existing_media") return c.fieldName;
-          return c.entry.fieldName;
-        });
         const templateOpt = sibling
           ? { template: buildSiblingTemplate(row.length, splitVal) }
           : splitVal !== 1
             ? { template: [buildTemplateWithSplit(row.length, splitVal)] }
             : {};
         const body: AddFactReq = {
-          facts: [{ entries, fields }],
+          facts: [{ entries }],
           ...templateOpt,
         };
         await request<AddFactRes>(`/api/decks/${deckId}/facts/append`, {

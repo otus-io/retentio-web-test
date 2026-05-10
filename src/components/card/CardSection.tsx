@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Fragment, type ReactNode } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 import { looksLikeWikiRubyMarkup, parseWikiRubyMarkup } from "@/lib/wikiRubyMarkup";
 import { formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
+import { decompressApkgMediaMemberIfZstd } from "@/lib/apkgMediaBytes";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
@@ -152,19 +153,60 @@ function parseFieldWithMedia(text: string): FieldSegment[] {
   if (lastIndex < normalized.length) {
     segments.push({ kind: "text", value: normalized.slice(lastIndex) });
   }
-    return segments.length > 0 ? segments : [{ kind: "text", value: normalized }];
+  return segments.length > 0 ? segments : [{ kind: "text", value: normalized }];
 }
 
-function AudioPlayButton({ src }: { src: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+function AudioPlayButton({ mediaBlob }: { mediaBlob: Blob }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  const bindAudioRef = useCallback(
+    (el: HTMLAudioElement | null) => {
+      if (audioRef.current && audioRef.current !== el) {
+        const prev = audioRef.current;
+        prev.srcObject = null;
+        prev.removeAttribute("src");
+      }
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      audioRef.current = el;
+      if (!el) return;
+
+      el.removeAttribute("src");
+      try {
+        el.srcObject = mediaBlob;
+        el.load();
+      } catch {
+        try {
+          const u = URL.createObjectURL(mediaBlob);
+          blobUrlRef.current = u;
+          el.srcObject = null;
+          el.src = u;
+          el.load();
+        } catch {
+          /* leave element without playable source */
+        }
+      }
+    },
+    [mediaBlob]
+  );
+
   return (
     <>
-      <audio ref={audioRef} src={src} className="hidden" />
+      <audio ref={bindAudioRef} preload="none" className="hidden" />
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          audioRef.current?.play();
+          const el = audioRef.current;
+          if (!el) return;
+          const canPlay = Boolean(el.srcObject || el.src || el.currentSrc);
+          if (!canPlay) {
+            return;
+          }
+          void el.play().catch(() => {});
         }}
         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-input bg-muted/50 hover:bg-muted text-foreground"
         aria-label="Play audio"
@@ -193,40 +235,101 @@ function MediaBlock({
   token: string;
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  /** Fetched bytes for audio only — played via `audio.srcObject` (avoids `blob:` URL decode issues). */
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState(false);
+  /** Last fetch error message from API (e.g. 401/403 JSON `msg`). */
+  const [loadErrMsg, setLoadErrMsg] = useState("");
   const baseUrl = getApiBaseUrl();
 
   useEffect(() => {
     const fetchUrl =
       id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
-    let revoked = false;
-    let createdUrl: string | null = null;
+    const ac = new AbortController();
+    let objectUrl: string | null = null;
     setBlobUrl(null);
+    setAudioBlob(null);
     setError(false);
+    setLoadErrMsg("");
 
-    fetch(fetchUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("Failed to load"))))
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        if (!revoked) {
-          createdUrl = url;
-          setBlobUrl(url);
-        } else {
-          URL.revokeObjectURL(url);
+    void (async () => {
+      try {
+        const init: RequestInit = {
+          signal: ac.signal,
+          headers: { Authorization: `Bearer ${token}` },
+        };
+        const res = await fetch(fetchUrl, init);
+        const ct = res.headers.get("content-type") ?? "";
+        if (!res.ok) {
+          let serverMsg = "";
+          try {
+            const j = (await res.clone().json()) as { msg?: string };
+            if (typeof j.msg === "string") serverMsg = j.msg;
+          } catch {
+            /* ignore */
+          }
+          throw new Error(serverMsg || `Failed to load: ${res.status}`);
         }
-      })
-      .catch(() => {
-        if (!revoked) setError(true);
-      });
+        let blob = await res.blob();
+        const headerMime = ct.split(";")[0]?.trim() ?? "";
+        const fallbackMime =
+          kind === "audio"
+            ? "audio/mpeg"
+            : kind === "video"
+              ? "video/mp4"
+              : kind === "image"
+                ? "image/png"
+                : "application/json";
+        const mime =
+          (headerMime && headerMime !== "application/octet-stream" ? headerMime : "") ||
+          (blob.type && blob.type !== "application/octet-stream" ? blob.type : "") ||
+          fallbackMime;
+        if (ac.signal.aborted) return;
+        let buf = await blob.arrayBuffer();
+        if (ac.signal.aborted) return;
+        buf = decompressApkgMediaMemberIfZstd(buf);
+        if (ac.signal.aborted) return;
+        blob = new Blob([buf], { type: mime });
+        if (ac.signal.aborted) return;
+        if (kind === "audio") {
+          setAudioBlob(blob);
+        } else {
+          const url = URL.createObjectURL(blob);
+          objectUrl = url;
+          setBlobUrl(url);
+        }
+      } catch (err: unknown) {
+        if (ac.signal.aborted) return;
+        const name = err instanceof Error ? err.name : "";
+        if (name === "AbortError") return;
+        setLoadErrMsg(err instanceof Error ? err.message : String(err));
+        setError(true);
+      }
+    })();
     return () => {
-      revoked = true;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
+      ac.abort();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+      // Do not call setBlobUrl/setAudioBlob here: effect re-runs clear state at the top;
+      // setState in cleanup causes extra renders and pairs with Strict Mode so DevTools
+      // often shows the first /api/media request as (canceled) while the second succeeds.
     };
-  }, [id, token, baseUrl]);
+  }, [id, token, baseUrl, kind]);
 
-  if (error) return <span className="text-muted-foreground text-sm">[media unavailable]</span>;
+  if (error) {
+    const hint = loadErrMsg.trim() || "media unavailable";
+    return (
+      <span className="text-muted-foreground text-sm" title={loadErrMsg}>
+        [{hint}]
+      </span>
+    );
+  }
+  if (kind === "audio") {
+    if (!audioBlob) return <span className="text-muted-foreground text-sm">…</span>;
+    return <AudioPlayButton mediaBlob={audioBlob} />;
+  }
   if (!blobUrl) return <span className="text-muted-foreground text-sm">…</span>;
   if (kind === "image") {
     return <img src={blobUrl} alt="" className="max-h-32 max-w-full rounded object-contain" />;
@@ -238,9 +341,7 @@ function MediaBlock({
       </video>
     );
   }
-  return (
-    <AudioPlayButton src={blobUrl} />
-  );
+  return null;
 }
 
 export function FieldWithMedia({

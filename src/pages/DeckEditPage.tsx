@@ -44,8 +44,8 @@ export default function DeckEditPage() {
     e.preventDefault();
     if (!token || !id) return;
     const fields = fieldNames.map((s) => s.trim()).filter(Boolean);
-    if (fields.length < 2) {
-      setError("at least two fields required");
+    if (fields.length < 1) {
+      setError("at least one field name is required");
       return;
     }
     if (rate < 1 || rate > 1000) {

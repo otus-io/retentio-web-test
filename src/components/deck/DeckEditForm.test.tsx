@@ -56,12 +56,17 @@ describe("DeckEditForm", () => {
     expect(setFieldNames).toHaveBeenCalled();
   });
 
-  it("does not show Remove buttons when there are exactly 2 fields", () => {
-    renderForm();
+  it("does not show Remove buttons when there is exactly 1 field", () => {
+    renderForm({ fieldNames: ["Only"] });
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
   });
 
-  it("shows Remove buttons for every field when there are more than 2", () => {
+  it("shows Remove buttons for every field when there are 2 fields", () => {
+    renderForm();
+    expect(screen.getAllByRole("button", { name: /remove/i })).toHaveLength(2);
+  });
+
+  it("shows Remove buttons for every field when there are 3 fields", () => {
     renderForm({ fieldNames: ["A", "B", "C"] });
     expect(screen.getAllByRole("button", { name: /remove/i })).toHaveLength(3);
   });

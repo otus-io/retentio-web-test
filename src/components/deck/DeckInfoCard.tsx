@@ -1,7 +1,5 @@
-import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem } from "@/lib/api";
 
@@ -88,9 +86,6 @@ export function DeckInfoCard({
         <p className="text-xs text-muted-foreground font-mono">ID: {deck.id}</p>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <Button variant="default" className="w-full" asChild>
-          <Link to={`/decks/${deck.id}/bulk-upload`}>Upload</Link>
-        </Button>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Fields</dt>
