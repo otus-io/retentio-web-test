@@ -115,12 +115,6 @@ Card PATCH: frontend sends exactly one of (interval+last_review) or hidden, plus
 
 ---
 
-## 10. Not Implemented (By Design)
-
-- **Admin**: POST /api/admin/media/shared, DELETE /api/admin/media/shared/{id}, POST /api/admin/decks/import — not in frontend. Documented as admin-only; add when building admin UI.
-
----
-
 ## Changes Made
 
 1. **create_deck_provider.dart**

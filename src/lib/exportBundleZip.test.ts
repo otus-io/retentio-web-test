@@ -13,7 +13,15 @@ async function minimalBundleZip(opts: { prefix?: string } = {}) {
   const { prefix = "" } = opts;
   const p = (name: string) => (prefix ? `${prefix}/${name}` : name);
   const z = new JSZip();
-  z.file(p("export_meta.json"), JSON.stringify({ model: "Test", facts_written: 1, media_files: 1 }));
+  z.file(
+    p("export_meta.json"),
+    JSON.stringify({
+      model: "Test",
+      facts_written: 1,
+      media_files: 1,
+      deck: { name: "Test Deck", fields: ["Front", "Back"], rate: 20 },
+    })
+  );
   z.file(p("media_manifest.json"), JSON.stringify({ x1: { path: "media/x1.mp3", kind: "audio" } }));
   z.file(
     p("facts.jsonl"),
@@ -34,12 +42,22 @@ describe("parseExportBundleFromZip", () => {
     expect(parsed.facts).toHaveLength(1);
     expect(parsed.facts[0]?.entries[0]?.text).toBe("hello");
     expect(parsed.facts[0]?.entries[0]?.audio).toBe("x1");
+    expect(parsed.deck.name).toBe("Test Deck");
+    expect(parsed.deck.fields).toEqual(["Front", "Back"]);
     expect(bundlePathPrefixFromZip(z)).toBe("");
   });
 
   it("preserves fact tags from facts.jsonl", async () => {
     const z = new JSZip();
-    z.file("export_meta.json", JSON.stringify({ model: "Test", facts_written: 1, media_files: 0 }));
+    z.file(
+      "export_meta.json",
+      JSON.stringify({
+        model: "Test",
+        facts_written: 1,
+        media_files: 0,
+        deck: { name: "Tagged Deck", fields: ["Front"], rate: 10 },
+      })
+    );
     z.file("media_manifest.json", JSON.stringify({}));
     z.file(
       "facts.jsonl",
@@ -64,7 +82,7 @@ describe("parseExportBundleFromZip", () => {
 
   it("rejects facts that reference a media id missing from the manifest", async () => {
     const z = new JSZip();
-    z.file("export_meta.json", "{}");
+    z.file("export_meta.json", JSON.stringify({ deck: { name: "D", fields: ["A"], rate: 10 } }));
     z.file("media_manifest.json", JSON.stringify({ x1: { path: "media/x1.mp3", kind: "audio" } }));
     z.file("facts.jsonl", `${JSON.stringify({ entries: [{ text: "a", audio: "not_in_manifest" }] })}\n`);
     z.file("media/x1.mp3", new Uint8Array([0x49, 0x44, 0x33]));
@@ -73,10 +91,18 @@ describe("parseExportBundleFromZip", () => {
 
   it("rejects missing media file", async () => {
     const z = new JSZip();
-    z.file("export_meta.json", "{}");
+    z.file("export_meta.json", JSON.stringify({ deck: { name: "D", fields: ["A"], rate: 10 } }));
     z.file("media_manifest.json", JSON.stringify({ a: { path: "media/missing.mp3", kind: "audio" } }));
     z.file("facts.jsonl", `${JSON.stringify({ entries: [{ text: "x" }], fields: ["A", "B"] })}\n`);
     await expect(parseExportBundleFromZip(z)).rejects.toThrow(/missing media file/);
+  });
+
+  it("rejects export_meta without deck object", async () => {
+    const z = new JSZip();
+    z.file("export_meta.json", JSON.stringify({ model: "Test" }));
+    z.file("media_manifest.json", JSON.stringify({}));
+    z.file("facts.jsonl", `${JSON.stringify({ entries: [{ text: "x" }] })}\n`);
+    await expect(parseExportBundleFromZip(z)).rejects.toThrow(/deck/i);
   });
 
   it("rejects both facts.json and facts.jsonl", async () => {

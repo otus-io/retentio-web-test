@@ -9,7 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { request, type AddFactOperation, type CreateDeckReq, type CreateDeckRes } from "@/lib/api";
 import { parseExportBundleFromZip, type ParsedExportBundle } from "@/lib/exportBundleZip";
 import { importExportBundleIntoDeck } from "@/lib/importExportBundle";
-import { parseExportMetaDeck } from "@/lib/parseExportMetaDeck";
 
 type Phase = "idle" | "creating-deck" | "uploading-media" | "posting-facts";
 
@@ -19,7 +18,7 @@ export default function UploadDeckPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedExportBundle | null>(null);
-  const [deckFromMeta, setDeckFromMeta] = useState<ReturnType<typeof parseExportMetaDeck> | null>(null);
+  const [deckFromMeta, setDeckFromMeta] = useState<ParsedExportBundle["deck"] | null>(null);
   const [parseError, setParseError] = useState("");
   const [addOp, setAddOp] = useState<AddFactOperation>("append");
 
@@ -49,9 +48,8 @@ export default function UploadDeckPage() {
       const buf = await f.arrayBuffer();
       const zip = await JSZip.loadAsync(buf);
       const p = await parseExportBundleFromZip(zip);
-      const deck = parseExportMetaDeck(p.exportMeta);
       setParsed(p);
-      setDeckFromMeta(deck);
+      setDeckFromMeta(p.deck);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setParseError(msg);
@@ -135,8 +133,8 @@ export default function UploadDeckPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
             <p>
               Zip the folder produced by{" "}
-              <code className="text-xs bg-muted px-1 rounded">anki_export_retentio_facts.py</code> (same layout as bulk
-              upload): <code className="text-xs bg-muted px-1 rounded">export_meta.json</code> must include a{" "}
+              <code className="text-xs bg-muted px-1 rounded">anki_export_retentio_facts.py</code>:{" "}
+              <code className="text-xs bg-muted px-1 rounded">export_meta.json</code> must include a{" "}
               <code className="text-xs bg-muted px-1 rounded">deck</code> object with{" "}
               <code className="text-xs bg-muted px-1 rounded">name</code>,{" "}
               <code className="text-xs bg-muted px-1 rounded">fields</code>, and{" "}

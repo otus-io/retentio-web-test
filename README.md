@@ -16,22 +16,35 @@ npm install
 ## Run in development
 
 ```bash
-npm run dev
+npm run dev          # release API (default)
+npm run dev:local    # local backend
 ```
 
-The app uses `VITE_API_URL` for backend requests. If not set, it falls back to `http://localhost:8080`.
+The app uses `VITE_API_URL` for backend requests. `npm run dev` defaults to the release API; use `dev:local` for `http://localhost:8080`.
 
 ## Configure backend URL
 
 Use one of these options:
 
-1. One-off value for a single run:
+1. Helper script (default: release API):
+
+```bash
+./utils/run-dev.sh            # https://api.retentio.app:8443 (default)
+./utils/run-dev.sh local      # http://localhost:8080
+
+# or:
+npm run dev                   # release (default)
+npm run dev:local
+npm run dev:release
+```
+
+2. One-off value for a single run:
 
 ```bash
 VITE_API_URL=http://localhost:8080 npm run dev
 ```
 
-2. Local persistent override (recommended):
+3. Local persistent override:
 
 - Create `.env.development.local` in this folder.
 - Add:

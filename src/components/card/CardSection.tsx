@@ -8,7 +8,7 @@ import type { DeckItem, Entry, FactItem } from "@/lib/api";
 import { cardEntryToRenderItems, type CardEntryItem, type GetNextCardRes } from "@/lib/api";
 import type { DeckCardSidesTypography } from "@/lib/deckCardTypography";
 import { DECK_CARD_TYPOGRAPHY_DEFAULTS } from "@/lib/deckCardTypography";
-import { getApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl, resolveMediaFetchUrl } from "@/lib/api";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 import { looksLikeWikiRubyMarkup, parseWikiRubyMarkup } from "@/lib/wikiRubyMarkup";
@@ -243,8 +243,7 @@ function MediaBlock({
   const baseUrl = getApiBaseUrl();
 
   useEffect(() => {
-    const fetchUrl =
-      id.startsWith("http://") || id.startsWith("https://") ? id : `${baseUrl}/api/media/${id}`;
+    const fetchUrl = resolveMediaFetchUrl(id, baseUrl);
     const ac = new AbortController();
     let objectUrl: string | null = null;
     setBlobUrl(null);

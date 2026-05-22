@@ -7,7 +7,20 @@ This app reads backend base URL from `VITE_API_URL` (Vite env var).
 - Source reference: `src/lib/api.ts`
 - Default when unset: `http://localhost:8080`
 
-### Option A: one-off command
+### Option A: helper script (recommended for toggling)
+
+```bash
+./utils/run-dev.sh            # release API (default)
+./utils/run-dev.sh local      # http://localhost:8080
+./utils/run-dev.sh release    # https://api.retentio.app:8443
+
+# or via npm:
+npm run dev                   # release (default)
+npm run dev:local
+npm run dev:release
+```
+
+### Option B: one-off command
 
 Use this when you want a temporary value:
 
@@ -15,7 +28,7 @@ Use this when you want a temporary value:
 VITE_API_URL=http://localhost:8080 npm run dev
 ```
 
-### Option B: local file override (recommended)
+### Option C: local file override
 
 Create `.env.development.local` in project root:
 

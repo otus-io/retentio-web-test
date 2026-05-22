@@ -9,11 +9,16 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
+  importDeck,
+  isImportedDeck,
+  isPublishedSourceDeck,
   type CreateDeckReq,
   type CreateDeckRes,
   type DeckItem,
   type GetDecksRes,
 } from "@/lib/api";
+import { useImportedDeckUpdates } from "@/hooks/useImportedDeckUpdates";
+import { DeckUpdatesAlertBanner } from "@/components/deck";
 
 export default function DecksListPage() {
   const { token, logout } = useAuth();
@@ -30,6 +35,20 @@ export default function DecksListPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importSourceId, setImportSourceId] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [updatesBannerDismissed, setUpdatesBannerDismissed] = useState(false);
+
+  const {
+    updateAvailableByDeckId,
+    anyUpdateAvailable,
+    updateCount,
+    refresh: refreshDeckUpdates,
+  } = useImportedDeckUpdates(decks, token);
+
+  const firstDeckWithUpdate = decks.find((d) => updateAvailableByDeckId[d.id]);
 
   const fetchDecks = useCallback(async () => {
     if (!token) return;
@@ -47,6 +66,10 @@ export default function DecksListPage() {
   useEffect(() => {
     void fetchDecks();
   }, [fetchDecks]);
+
+  useEffect(() => {
+    if (anyUpdateAvailable) setUpdatesBannerDismissed(false);
+  }, [anyUpdateAvailable, updateCount]);
 
   async function handleLogout() {
     await logout();
@@ -83,6 +106,32 @@ export default function DecksListPage() {
       setCreateSuccess("");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleImportDeck(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    const sourceId = importSourceId.trim();
+    if (!sourceId) {
+      setImportError("Source deck ID is required");
+      return;
+    }
+    setImportError("");
+    setImporting(true);
+    try {
+      const res = await importDeck({ source_deck_id: sourceId }, token);
+      setImportOpen(false);
+      setImportSourceId("");
+      setCreateSuccess("");
+      setDeleteSuccess("");
+      await fetchDecks();
+      void refreshDeckUpdates();
+      navigate(`/decks/${res.data.id}`);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "import failed");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -127,18 +176,28 @@ export default function DecksListPage() {
           </nav>
         </div>
 
+        {!updatesBannerDismissed && (
+          <DeckUpdatesAlertBanner
+            updateCount={updateCount}
+            firstDeckId={firstDeckWithUpdate?.id}
+            onDismiss={() => setUpdatesBannerDismissed(true)}
+          />
+        )}
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div className="flex-1" />
             <CardTitle className="text-center flex-1">List of decks</CardTitle>
             <div className="flex-1 flex justify-end">
               <DropdownMenu align="end">
-                {createOpen ? (
+                {createOpen || importOpen ? (
                   <DropdownMenuItem
                     onClick={() => {
                       setCreateOpen(false);
+                      setImportOpen(false);
                       setCreateError("");
                       setCreateSuccess("");
+                      setImportError("");
                     }}
                   >
                     Cancel
@@ -148,14 +207,28 @@ export default function DecksListPage() {
                     <DropdownMenuItem
                       onClick={() => {
                         setCreateOpen(true);
+                        setImportOpen(false);
                         setCreateError("");
                         setCreateSuccess("");
+                        setImportError("");
                         setCreateName("");
                         setCreateFieldNames(["", ""]);
                         setCreateRate(20);
                       }}
                     >
                       Create deck
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setImportOpen(true);
+                        setCreateOpen(false);
+                        setImportError("");
+                        setImportSourceId("");
+                        setCreateError("");
+                        setCreateSuccess("");
+                      }}
+                    >
+                      Import shared deck
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/decks/upload")}>Upload deck</DropdownMenuItem>
                   </>
@@ -165,6 +238,28 @@ export default function DecksListPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {createSuccess && <p className="text-sm text-green-600">{createSuccess}</p>}
+            {importOpen && (
+              <form onSubmit={handleImportDeck} className="rounded-lg border p-4 space-y-4">
+                {importError && <p className="text-sm text-destructive">{importError}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="import-source-id">Source deck ID</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Paste the public deck ID from the author. The deck must be published and public.
+                  </p>
+                  <Input
+                    id="import-source-id"
+                    value={importSourceId}
+                    onChange={(e) => setImportSourceId(e.target.value)}
+                    required
+                    placeholder="abc12345"
+                    className="font-mono"
+                  />
+                </div>
+                <Button type="submit" disabled={importing}>
+                  {importing ? "Importing…" : "Import"}
+                </Button>
+              </form>
+            )}
             {createOpen && (
               <form onSubmit={handleCreateDeck} className="rounded-lg border p-4 space-y-4">
                 {createError && <p className="text-sm text-destructive">{createError}</p>}
@@ -231,22 +326,45 @@ export default function DecksListPage() {
                         <p className="text-sm text-muted-foreground">
                           {d.stats.facts_count} facts · {d.stats.cards_count} cards
                           {d.stats.due_cards > 0 && ` · ${d.stats.due_cards} due`}
+                          {isImportedDeck(d) && d.source_deck_id && (
+                            <> · imported from {d.source_deck_id}</>
+                          )}
+                          {isPublishedSourceDeck(d) && (
+                            <> · published v{d.published_version}</>
+                          )}
                         </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {updateAvailableByDeckId[d.id] && (
+                            <span className="text-xs rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-0.5 font-medium">
+                              Update available
+                            </span>
+                          )}
+                          {isImportedDeck(d) && (
+                            <span className="text-xs rounded-full bg-muted px-2 py-0.5">Imported</span>
+                          )}
+                          {!isImportedDeck(d) && d.visibility === "public" && (
+                            <span className="text-xs rounded-full bg-green-600/15 text-green-800 dark:text-green-300 px-2 py-0.5">
+                              Public
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <DropdownMenu align="end">
                         <DropdownMenuItem onClick={() => navigate(`/decks/${d.id}/edit`)}>
                           Edit Deck
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => {
-                            setDeleteId(d.id);
-                            setDeleteError("");
-                            setDeleteSuccess("");
-                          }}
-                        >
-                          Delete
-                        </DropdownMenuItem>
+                        {!isPublishedSourceDeck(d) && (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              setDeleteId(d.id);
+                              setDeleteError("");
+                              setDeleteSuccess("");
+                            }}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenu>
                     </div>
                   </li>

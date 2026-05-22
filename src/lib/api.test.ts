@@ -12,6 +12,15 @@ import {
   fetchAllUserMedia,
   fetchDeckFactsPage,
   fetchDeckFactsUnpaginated,
+  publishDeck,
+  importDeck,
+  getDeckUpdates,
+  syncDeck,
+  resolveMediaFetchUrl,
+  normalizeStoredMediaRef,
+  isImportedDeck,
+  isPublishedSourceDeck,
+  deckHasUpdatesAvailable,
   LIST_PAGINATION_DEFAULT_LIMIT,
   type GetNextCardRes,
 } from "./api";
@@ -526,5 +535,124 @@ describe("fetchAllUserMedia", () => {
     const items = await fetchAllUserMedia("tok");
     expect(items.map((m) => m.id)).toEqual(["m1", "m2"]);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("media URL helpers", () => {
+  it("resolveMediaFetchUrl rewrites absolute API media URLs to configured base", () => {
+    expect(
+      resolveMediaFetchUrl(
+        "https://api.retentio.app:8443/api/media/1ink7csbmb?v=1",
+        "http://localhost:8080"
+      )
+    ).toBe("http://localhost:8080/api/media/1ink7csbmb?v=1");
+  });
+
+  it("resolveMediaFetchUrl handles bare id with version query", () => {
+    expect(resolveMediaFetchUrl("abc123?v=2", "http://localhost:8080")).toBe(
+      "http://localhost:8080/api/media/abc123?v=2"
+    );
+  });
+
+  it("normalizeStoredMediaRef strips host from stored URLs", () => {
+    expect(
+      normalizeStoredMediaRef("https://api.retentio.app:8443/api/media/xyz?v=1")
+    ).toBe("xyz?v=1");
+  });
+});
+
+describe("deck sharing helpers", () => {
+  it("isImportedDeck is true when source_deck_id is set", () => {
+    expect(isImportedDeck({ source_deck_id: "src1" })).toBe(true);
+    expect(isImportedDeck({})).toBe(false);
+    expect(isImportedDeck({ source_deck_id: "  " })).toBe(false);
+  });
+
+  it("isPublishedSourceDeck is true when published_version > 0", () => {
+    expect(isPublishedSourceDeck({ published_version: 1 })).toBe(true);
+    expect(isPublishedSourceDeck({ published_version: 0 })).toBe(false);
+    expect(isPublishedSourceDeck({})).toBe(false);
+  });
+
+  it("deckHasUpdatesAvailable compares source and latest versions", () => {
+    expect(
+      deckHasUpdatesAvailable({ source_version: 1, latest_version: 2 } as never)
+    ).toBe(true);
+    expect(
+      deckHasUpdatesAvailable({ source_version: 2, latest_version: 2 } as never)
+    ).toBe(false);
+  });
+});
+
+describe("deck sharing API", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("publishDeck POSTs to /api/decks/{id}/publish", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { published_version: 1, visibility: "public" },
+        meta: { msg: "published" },
+      })
+    );
+    const res = await publishDeck("deck1", { visibility: "public" }, "tok");
+    expect(res.data.published_version).toBe(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, { headers: Headers; method: string }];
+    expect(url).toContain("/api/decks/deck1/publish");
+    expect(init.method).toBe("POST");
+    expect(init.headers.get("Authorization")).toBe("Bearer tok");
+  });
+
+  it("importDeck POSTs to /api/decks/import", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          id: "imp1",
+          source_deck_id: "src1",
+          source_version: 1,
+          imported_at: "2026-01-01T00:00:00Z",
+        },
+        meta: { msg: "imported" },
+      })
+    );
+    const res = await importDeck({ source_deck_id: "src1" }, "tok");
+    expect(res.data.id).toBe("imp1");
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/import");
+  });
+
+  it("getDeckUpdates GETs /api/decks/{id}/updates", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          source_version: 1,
+          latest_version: 2,
+          added_facts: [],
+          removed_facts: [],
+          edited_facts: [],
+          media_changes: [],
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    const res = await getDeckUpdates("imp1", "tok");
+    expect(res.data.latest_version).toBe(2);
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/imp1/updates");
+  });
+
+  it("syncDeck POSTs to /api/decks/{id}/sync", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { source_version: 2 },
+        meta: { msg: "synced" },
+      })
+    );
+    const res = await syncDeck("imp1", { target_version: 2 }, "tok");
+    expect(res.data.source_version).toBe(2);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/decks/imp1/sync");
+    expect(init.method).toBe("POST");
   });
 });

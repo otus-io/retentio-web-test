@@ -153,6 +153,59 @@ export function getApiBaseUrl(): string {
   return baseUrl;
 }
 
+/**
+ * Build a media download URL against the configured API (not the host embedded in card/fact responses).
+ * Handles bare ids, `id?v=N`, and absolute `https://…/api/media/{id}?v=N` from GET /card.
+ */
+export function resolveMediaFetchUrl(idOrUrl: string, apiBase: string = baseUrl): string {
+  const trimmed = idOrUrl.trim();
+  const root = apiBase.replace(/\/$/, "");
+  if (!trimmed) return `${root}/api/media/`;
+
+  let mediaId = trimmed;
+  let version: string | null = null;
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      const u = new URL(trimmed);
+      const match = u.pathname.match(/\/api\/media\/([^/]+)$/);
+      if (match) {
+        mediaId = match[1];
+        version = u.searchParams.get("v");
+      } else {
+        return trimmed;
+      }
+    } catch {
+      return trimmed;
+    }
+  } else if (trimmed.includes("?")) {
+    const q = trimmed.indexOf("?");
+    mediaId = trimmed.slice(0, q);
+    version = new URLSearchParams(trimmed.slice(q + 1)).get("v");
+  }
+
+  const path = `${root}/api/media/${mediaId}`;
+  return version ? `${path}?v=${encodeURIComponent(version)}` : path;
+}
+
+/** Strip full media URLs to stored id form (`mediaId` or `mediaId?v=N`). */
+export function normalizeStoredMediaRef(value: string | undefined): string | undefined {
+  if (value == null || !String(value).trim()) return value;
+  const trimmed = String(value).trim();
+  if (trimmed.startsWith("shared:")) return trimmed;
+  const resolved = resolveMediaFetchUrl(trimmed, "http://local");
+  try {
+    const u = new URL(resolved);
+    const match = u.pathname.match(/\/api\/media\/([^/]+)$/);
+    if (!match) return trimmed;
+    const id = match[1];
+    const v = u.searchParams.get("v");
+    return v ? `${id}?v=${v}` : id;
+  } catch {
+    return trimmed;
+  }
+}
+
 /** Send a debug log line to the backend; backend appends to logs/debug.log at repo root (see .cursor/rules/debug-logging.mdc). */
 export function debugLog(payload: Record<string, unknown>): void {
   fetch(`${baseUrl}/api/dev/debug-log`, {
@@ -426,6 +479,149 @@ export interface DeckItem {
   stats: DeckStats;
   created_at: string;
   updated_at: string;
+  /** Source deck: private | public (import gate). */
+  visibility?: string;
+  /** Source deck: latest published snapshot version; 0 = never published. */
+  published_version?: number;
+  /** Import deck: author's source deck id. */
+  source_deck_id?: string;
+  /** Import deck: pinned snapshot version. */
+  source_version?: number;
+  /** Import deck: when the import was created. */
+  imported_at?: string;
+  /** Import deck: source author's latest published_version (from GET /decks or GET /decks/{id}). */
+  latest_source_version?: number;
+  /** Import deck: true when source_version < latest_source_version. */
+  source_update_available?: boolean;
+}
+
+/** True when this deck is an imported study copy (read-only facts). */
+export function isImportedDeck(deck: Pick<DeckItem, "source_deck_id">): boolean {
+  return Boolean(deck.source_deck_id?.trim());
+}
+
+/** True when a source deck has ever been published (deletion lock applies). */
+export function isPublishedSourceDeck(deck: Pick<DeckItem, "published_version">): boolean {
+  return (deck.published_version ?? 0) > 0;
+}
+
+export interface PublishDeckReq {
+  visibility?: string;
+}
+
+export interface PublishDeckRes {
+  data: { published_version: number; visibility: string };
+  meta: { msg: string };
+}
+
+export interface ImportDeckReq {
+  source_deck_id: string;
+}
+
+export interface ImportDeckRes {
+  data: {
+    id: string;
+    source_deck_id: string;
+    source_version: number;
+    imported_at: string;
+  };
+  meta: { msg: string };
+}
+
+export interface DeckUpdateFactRef {
+  fact_id: string;
+}
+
+export interface DeckUpdateEditedFact {
+  fact_id: string;
+  before?: FactItem;
+  after?: FactItem;
+}
+
+export interface DeckUpdateMediaChange {
+  media_id: string;
+  before_hash?: string;
+  after_hash?: string;
+  before_bytes?: number;
+  after_bytes?: number;
+}
+
+export interface DeckUpdatesData {
+  source_version: number;
+  latest_version: number;
+  added_facts: DeckUpdateFactRef[];
+  removed_facts: DeckUpdateFactRef[];
+  edited_facts: DeckUpdateEditedFact[];
+  media_changes: DeckUpdateMediaChange[];
+  change_summary?: string;
+}
+
+export interface GetDeckUpdatesRes {
+  data: DeckUpdatesData;
+  meta: { msg: string };
+}
+
+export interface SyncDeckReq {
+  target_version?: number;
+}
+
+export interface SyncDeckRes {
+  data: { source_version: number };
+  meta: { msg: string };
+}
+
+export function deckHasUpdatesAvailable(updates: DeckUpdatesData): boolean {
+  const pinned = updates.source_version ?? 0;
+  const latest = updates.latest_version ?? 0;
+  return pinned < latest;
+}
+
+/** Whether an imported deck has a newer published snapshot (from deck row or /updates). */
+export function importedDeckUpdateAvailable(deck: Pick<DeckItem, "source_deck_id" | "source_version" | "latest_source_version" | "source_update_available">): boolean {
+  if (!isImportedDeck(deck)) return false;
+  if (typeof deck.source_update_available === "boolean") {
+    return deck.source_update_available;
+  }
+  const pinned = deck.source_version ?? 0;
+  const latest = deck.latest_source_version;
+  if (typeof latest === "number") return pinned < latest;
+  return false;
+}
+
+export async function publishDeck(
+  deckId: string,
+  body: PublishDeckReq,
+  token: string
+): Promise<PublishDeckRes> {
+  return request<PublishDeckRes>(`/api/decks/${deckId}/publish`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function importDeck(body: ImportDeckReq, token: string): Promise<ImportDeckRes> {
+  return request<ImportDeckRes>("/api/decks/import", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getDeckUpdates(importDeckId: string, token: string): Promise<GetDeckUpdatesRes> {
+  return request<GetDeckUpdatesRes>(`/api/decks/${importDeckId}/updates`, { token });
+}
+
+export async function syncDeck(
+  importDeckId: string,
+  body: SyncDeckReq,
+  token: string
+): Promise<SyncDeckRes> {
+  return request<SyncDeckRes>(`/api/decks/${importDeckId}/sync`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export interface GetDecksRes {
@@ -444,6 +640,8 @@ export interface UpdateDeckReq {
   name?: string;
   fields?: string[];
   rate?: number;
+  /** Source deck only, before first publish. */
+  visibility?: string;
 }
 
 export interface GetDeckRes {

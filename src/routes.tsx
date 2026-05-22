@@ -9,7 +9,6 @@ import MediaPage from "@/pages/MediaPage";
 import ProfilePage from "@/pages/ProfilePage";
 import RegisterPage from "@/pages/RegisterPage";
 import ManualPage from "@/pages/ManualPage";
-import BulkUploadPage from "@/pages/BulkUploadPage";
 import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
 
@@ -60,14 +59,6 @@ export const routes = [
     element: (
       <ProtectedRoute>
         <DeckEditPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/decks/:id/bulk-upload",
-    element: (
-      <ProtectedRoute>
-        <BulkUploadPage />
       </ProtectedRoute>
     ),
   },

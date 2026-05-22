@@ -1,5 +1,6 @@
 import type JSZip from "jszip";
 import type { AddFactItemReq } from "@/lib/api";
+import { parseExportMetaDeck, type ParsedExportMetaDeck } from "@/lib/parseExportMetaDeck";
 
 /** Normalized path inside the bundle ZIP (forward slashes, trimmed). */
 export function normalizeBundleZipPath(name: string): string {
@@ -74,6 +75,8 @@ export function mimeHintFromManifestKind(kind: string, filename: string): string
 
 export interface ParsedExportBundle {
   exportMeta: unknown;
+  /** Deck creation spec from export_meta.deck (required in bundles). */
+  deck: ParsedExportMetaDeck;
   manifest: MediaManifest;
   facts: AddFactItemReq[];
   /** "" when manifests are at ZIP root; otherwise one folder name, e.g. `export`. */
@@ -150,7 +153,6 @@ function parseFactsJsonl(text: string): AddFactItemReq[] {
       const entries = (row as { entries: unknown }).entries;
       if (!Array.isArray(entries)) throw new Error(`Line ${i + 1}: "entries" must be an array`);
       const out: AddFactItemReq = { entries: entries as AddFactItemReq["entries"] };
-      // Legacy bundles may include per-fact "fields"; the API uses deck fields only (PATCH /api/decks/{id}).
       const tags = (row as { tags?: unknown }).tags;
       if (tags !== undefined) {
         if (!Array.isArray(tags) || !tags.every((t) => typeof t === "string")) {
@@ -272,7 +274,9 @@ export async function parseExportBundleFromZip(zip: JSZip): Promise<ParsedExport
     }
   }
 
-  return { exportMeta, manifest, facts, pathPrefix };
+  const deck = parseExportMetaDeck(exportMeta);
+
+  return { exportMeta, deck, manifest, facts, pathPrefix };
 }
 
 export interface MediaUploadJob {

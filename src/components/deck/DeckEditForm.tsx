@@ -13,6 +13,8 @@ interface DeckEditFormProps {
   saving: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
+  /** Imported decks: fields are locked to the snapshot schema. */
+  fieldsLocked?: boolean;
 }
 
 export function DeckEditForm({
@@ -25,6 +27,7 @@ export function DeckEditForm({
   saving,
   onSubmit,
   onCancel,
+  fieldsLocked = false,
 }: DeckEditFormProps) {
   return (
     <Card>
@@ -39,35 +42,41 @@ export function DeckEditForm({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Fields</p>
-            <p className="text-xs text-muted-foreground">One box per column (at least 1).</p>
-            {fieldNames.map((value, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Label htmlFor={`edit-field-${i}`} className="sr-only">Field {i + 1}</Label>
-                <Input
-                  id={`edit-field-${i}`}
-                  value={value}
-                  onChange={(e) => {
-                    const next = [...fieldNames];
-                    next[i] = e.target.value;
-                    setFieldNames(next);
-                  }}
-                  placeholder={`Field ${i + 1}`}
-                />
-                {fieldNames.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-destructive shrink-0"
-                    onClick={() => setFieldNames(fieldNames.filter((_, j) => j !== i))}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button type="button" variant="outline" onClick={() => setFieldNames([...fieldNames, ""])}>
-              Add field
-            </Button>
+            {fieldsLocked ? (
+              <p className="text-sm text-muted-foreground">{fieldNames.filter(Boolean).join(", ")}</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">One box per column (at least 1).</p>
+                {fieldNames.map((value, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Label htmlFor={`edit-field-${i}`} className="sr-only">Field {i + 1}</Label>
+                    <Input
+                      id={`edit-field-${i}`}
+                      value={value}
+                      onChange={(e) => {
+                        const next = [...fieldNames];
+                        next[i] = e.target.value;
+                        setFieldNames(next);
+                      }}
+                      placeholder={`Field ${i + 1}`}
+                    />
+                    {fieldNames.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-destructive shrink-0"
+                        onClick={() => setFieldNames(fieldNames.filter((_, j) => j !== i))}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => setFieldNames([...fieldNames, ""])}>
+                  Add field
+                </Button>
+              </>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="rate">Rate (1–1000)</Label>

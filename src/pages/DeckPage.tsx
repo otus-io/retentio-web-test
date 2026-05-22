@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,9 @@ import {
   uploadMultipart,
   buildTemplateForRequest,
   validateAddFactBody,
+  isImportedDeck,
+  importedDeckUpdateAvailable,
+  isPublishedSourceDeck,
   type AddFactOperation,
   type AddFactReq,
   type AddFactRes,
@@ -23,6 +26,7 @@ import {
   type UpdateDeckRes,
   type UpdateCardReq,
   type UpdateCardRes,
+  normalizeStoredMediaRef,
   type UpdateFactReq,
   type UploadMediaRes,
   fileLooksLikeJson,
@@ -33,6 +37,10 @@ import {
   DeckInfoCard,
   DeckCardFontDialog,
   DeckAllCardsModal,
+  DeckPublishDialog,
+  DeckSyncUpdatesModal,
+  DeckProvenanceBanner,
+  DeckPublishedBanner,
 } from "@/components/deck";
 import {
   DECK_CARD_TYPOGRAPHY_DEFAULTS,
@@ -48,6 +56,7 @@ import {
   type AddFactEntry,
   makeInitialFactRow,
 } from "@/components/facts";
+import { useImportedDeckUpdates } from "@/hooks/useImportedDeckUpdates";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,9 +95,17 @@ export default function DeckPage() {
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
   const [cardFontsOpen, setCardFontsOpen] = useState(false);
   const [allCardsOpen, setAllCardsOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
   const [cardTypography, setCardTypography] = useState<DeckCardSidesTypography>(() =>
     id ? loadDeckCardSidesTypography(id) : DECK_CARD_TYPOGRAPHY_DEFAULTS
   );
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = window.setTimeout(() => setSuccessMessage(""), 12_000);
+    return () => window.clearTimeout(t);
+  }, [successMessage]);
 
   useEffect(() => {
     if (!addFactsOpen) return;
@@ -111,6 +128,8 @@ export default function DeckPage() {
     setCardSuccess("");
     setBulkEditFactsOpen(false);
     setAllCardsOpen(false);
+    setPublishOpen(false);
+    setSyncOpen(false);
     setFactsHasMore(false);
     setFactsTotal(null);
   }, [id]);
@@ -156,6 +175,17 @@ export default function DeckPage() {
   useEffect(() => {
     fetchDeck();
   }, [fetchDeck]);
+
+  const decksForUpdates = useMemo(() => (deck ? [deck] : []), [deck]);
+  const { updateAvailableByDeckId, refresh: refreshDeckUpdates } = useImportedDeckUpdates(
+    decksForUpdates,
+    token,
+    { pollMs: 60 * 1000 }
+  );
+  const updateAvailable = Boolean(
+    deck &&
+      (updateAvailableByDeckId[deck.id] || importedDeckUpdateAvailable(deck))
+  );
 
   const fetchFacts = useCallback(async () => {
     if (!token || !id) return;
@@ -282,7 +312,9 @@ export default function DeckPage() {
     setSuccessMessage("");
     setSaving(true);
     try {
-      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, rate };
+      const body: UpdateDeckReq = isImportedDeck(deck)
+        ? { name: name.trim() || undefined, rate }
+        : { name: name.trim() || undefined, fields, rate };
       await request<UpdateDeckRes>(`/api/decks/${id}`, {
         method: "PATCH",
         token,
@@ -392,7 +424,14 @@ export default function DeckPage() {
     if (entries.length === 0 || !entries.every(hasContent)) {
       throw new Error("Each entry must have at least one of text, audio, image, video, or JSON.");
     }
-    const body: UpdateFactReq = { entries };
+    const normalized = entries.map((e) => ({
+      ...e,
+      audio: normalizeStoredMediaRef(e.audio),
+      image: normalizeStoredMediaRef(e.image),
+      video: normalizeStoredMediaRef(e.video),
+      json: normalizeStoredMediaRef(e.json),
+    }));
+    const body: UpdateFactReq = { entries: normalized };
     await request<unknown>(`/api/decks/${id}/facts/${factId}`, {
       method: "PATCH",
       token,
@@ -532,13 +571,32 @@ export default function DeckPage() {
     );
   }
 
+  const imported = isImportedDeck(deck);
+
   return (
     <div className="min-h-screen w-full p-4 md:p-6">
       <div className="w-full max-w-6xl mx-auto space-y-6">
         <DeckHeader onLogout={handleLogout} />
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
+        {successMessage && (
+          <div
+            role="status"
+            className="rounded-lg border border-green-600/50 bg-green-600/10 px-4 py-3 text-sm text-green-900 dark:text-green-100"
+          >
+            {successMessage}
+          </div>
+        )}
+
+        {!imported && deck && isPublishedSourceDeck(deck) && <DeckPublishedBanner deck={deck} />}
+
+        {imported && (
+          <DeckProvenanceBanner
+            deck={deck}
+            updateAvailable={updateAvailable}
+            onReviewUpdate={() => setSyncOpen(true)}
+          />
+        )}
 
         {editing ? (
           <DeckEditForm
@@ -549,6 +607,7 @@ export default function DeckPage() {
             rate={rate}
             setRate={setRate}
             saving={saving}
+            fieldsLocked={imported}
             onSubmit={handleUpdate}
             onCancel={() => {
               setEditing(false);
@@ -568,7 +627,7 @@ export default function DeckPage() {
               cardSuccess={cardSuccess}
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
-              onSaveFact={handleSaveFactFromCard}
+              onSaveFact={imported ? undefined : handleSaveFactFromCard}
               onRequestFact={fetchFactById}
               authToken={token}
               rescheduleSuggested={nextCardMeta?.reschedule_suggested}
@@ -579,12 +638,14 @@ export default function DeckPage() {
             />
             <DeckInfoCard
               deck={deck}
+              factsEditable={!imported}
               onEdit={() => {
                 setEditing(true);
                 setSuccessMessage("");
               }}
+              onPublish={imported ? undefined : () => setPublishOpen(true)}
               onOpenCardFonts={() => setCardFontsOpen(true)}
-              onOpenAddFacts={() => setAddFactsOpen(true)}
+              onOpenAddFacts={imported ? undefined : () => setAddFactsOpen(true)}
               onOpenAllCards={() => setAllCardsOpen(true)}
               onBulkEditFacts={() => setBulkEditFactsOpen(true)}
               deleteConfirm={deleteConfirm}
@@ -592,6 +653,47 @@ export default function DeckPage() {
               onDeleteCancel={() => setDeleteConfirm(false)}
               onDelete={handleDelete}
             />
+            {token && !imported && (
+              <DeckPublishDialog
+                open={publishOpen}
+                onOpenChange={setPublishOpen}
+                deck={deck}
+                token={token}
+                onPublished={async (result) => {
+                  const firstPublish = !isPublishedSourceDeck(deck);
+                  setDeck((d) =>
+                    d
+                      ? {
+                          ...d,
+                          published_version: result.published_version,
+                          visibility: result.visibility,
+                        }
+                      : d
+                  );
+                  setSuccessMessage(
+                    firstPublish
+                      ? `Deck published as v${result.published_version}. Others can import using your deck ID below.`
+                      : `Published v${result.published_version}. Importers can review and accept this update.`
+                  );
+                  await fetchDeck();
+                }}
+              />
+            )}
+            {token && imported && (
+              <DeckSyncUpdatesModal
+                open={syncOpen}
+                onClose={() => setSyncOpen(false)}
+                deck={deck}
+                token={token}
+                onSynced={async () => {
+                  setSuccessMessage("Deck updated to latest version.");
+                  await fetchDeck();
+                  void refreshDeckUpdates();
+                  await fetchFacts();
+                  await handleGetNextCard(false);
+                }}
+              />
+            )}
             <DeckCardFontDialog
               open={cardFontsOpen}
               onOpenChange={setCardFontsOpen}
@@ -607,7 +709,7 @@ export default function DeckPage() {
                 token={token}
               />
             )}
-            {bulkEditFactsOpen && deck && token && (
+            {bulkEditFactsOpen && deck && token && !imported && (
               <BulkEditFactsModal
                 open={bulkEditFactsOpen}
                 onClose={() => {
@@ -628,7 +730,7 @@ export default function DeckPage() {
                 setDeleteFactId={setDeleteFactId}
               />
             )}
-            {addFactsOpen && deck && (
+            {addFactsOpen && deck && !imported && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center p-4"
                 role="dialog"

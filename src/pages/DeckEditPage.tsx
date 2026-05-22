@@ -4,6 +4,7 @@ import { DeckEditForm } from "@/components/deck";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
+  isImportedDeck,
   type GetDeckRes,
   type UpdateDeckReq,
   type UpdateDeckRes,
@@ -19,6 +20,7 @@ export default function DeckEditPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [imported, setImported] = useState(false);
 
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
@@ -26,6 +28,7 @@ export default function DeckEditPage() {
     setError("");
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
+      setImported(isImportedDeck(res.data));
       setName(res.data.name);
       setFieldNames(res.data.fields.length > 0 ? [...res.data.fields] : ["", ""]);
       setRate(res.data.rate);
@@ -55,7 +58,9 @@ export default function DeckEditPage() {
     setError("");
     setSaving(true);
     try {
-      const body: UpdateDeckReq = { name: name.trim() || undefined, fields, rate };
+      const body: UpdateDeckReq = imported
+        ? { name: name.trim() || undefined, rate }
+        : { name: name.trim() || undefined, fields, rate };
       await request<UpdateDeckRes>(`/api/decks/${id}`, {
         method: "PATCH",
         token,
@@ -99,6 +104,7 @@ export default function DeckEditPage() {
           rate={rate}
           setRate={setRate}
           saving={saving}
+          fieldsLocked={imported}
           onSubmit={handleUpdate}
           onCancel={() => navigate("/profile")}
         />

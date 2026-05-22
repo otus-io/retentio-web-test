@@ -140,6 +140,35 @@ describe("DeckInfoCard", () => {
     expect(onDeleteConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("hides Delete deck when deck is published", async () => {
+    const user = userEvent.setup();
+    renderCard({ deck: { ...mockDeck, published_version: 2, visibility: "public" } });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.queryByRole("menuitem", { name: /delete deck/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Publish for sharing when onPublish is provided", async () => {
+    const user = userEvent.setup();
+    const onPublish = vi.fn();
+    renderCard({ onPublish });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /publish for sharing/i }));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides fact edit menu items when factsEditable is false", async () => {
+    const user = userEvent.setup();
+    renderCard({ factsEditable: false, onOpenAddFacts: vi.fn() });
+    await user.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.queryByRole("menuitem", { name: /^add facts$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /^edit facts$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Imported badge for import decks", () => {
+    renderCard({ deck: { ...mockDeck, source_deck_id: "src99", source_version: 1 } });
+    expect(screen.getByText("Imported")).toBeInTheDocument();
+  });
+
   it("shows delete confirmation dialog when deleteConfirm is true", () => {
     renderCard({ deleteConfirm: true });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -176,5 +205,31 @@ describe("DeckInfoCard", () => {
     renderCard({ deck: { ...mockDeck, stats: { ...mockDeck.stats, last_reviewed_at: now - 30 } } });
     expect(screen.getByText(/last review/i)).toBeInTheDocument();
     expect(screen.getByText("just now")).toBeInTheDocument();
+  });
+
+  it("shows deck info metadata including visibility and owner", () => {
+    renderCard({ deck: { ...mockDeck, visibility: "private", published_version: 2 } });
+    const deckInfo = screen.getByText("Deck info").parentElement;
+    expect(deckInfo).toHaveTextContent("Visibility:");
+    expect(deckInfo).toHaveTextContent("Private");
+    expect(deckInfo).toHaveTextContent("Published:");
+    expect(deckInfo).toHaveTextContent("v2");
+    expect(deckInfo).toHaveTextContent("Owner:");
+    expect(deckInfo).toHaveTextContent("alice");
+  });
+
+  it("shows import provenance in deck info", () => {
+    renderCard({
+      deck: {
+        ...mockDeck,
+        source_deck_id: "srcdeck99",
+        source_version: 3,
+        imported_at: "2025-06-01T12:00:00Z",
+      },
+    });
+    expect(screen.getByText(/imported copy/i)).toBeInTheDocument();
+    expect(screen.getByText(/source deck:/i)).toBeInTheDocument();
+    expect(screen.getByText("srcdeck99")).toBeInTheDocument();
+    expect(screen.getByText(/pinned to source v3/i)).toBeInTheDocument();
   });
 });

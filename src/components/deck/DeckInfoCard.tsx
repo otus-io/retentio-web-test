@@ -1,7 +1,42 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import {
+  isImportedDeck,
+  isPublishedSourceDeck,
+  type DeckItem,
+} from "@/lib/api";
+
+function formatDeckTimestamp(value: string | undefined): string {
+  if (!value?.trim()) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatVisibilityLabel(visibility: string | undefined, imported: boolean): string {
+  if (imported) return "Imported copy";
+  const v = (visibility?.trim() || "private").toLowerCase();
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
+function formatPublishedLabel(deck: DeckItem, imported: boolean): string {
+  if (imported) {
+    const v = deck.source_version;
+    return v != null && v > 0 ? `Pinned to source v${v}` : "—";
+  }
+  const v = deck.published_version ?? 0;
+  return v > 0 ? `v${v}` : "Not published";
+}
 
 function formatLastReview(unixSec: number): string {
   const d = new Date(unixSec * 1000);
@@ -32,10 +67,14 @@ interface DeckInfoCardProps {
   onOpenAddFacts?: () => void;
   /** Opens full card list (filter by unseen / overdue / seen / hidden). */
   onOpenAllCards?: () => void;
+  /** Opens publish dialog (source decks only). */
+  onPublish?: () => void;
   deleteConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
   onDelete: () => void;
+  /** When false, hide fact-editing menu items (imported decks). */
+  factsEditable?: boolean;
 }
 
 export function DeckInfoCard({
@@ -45,29 +84,54 @@ export function DeckInfoCard({
   onOpenCardFonts,
   onOpenAddFacts,
   onOpenAllCards,
+  onPublish,
   deleteConfirm,
   onDeleteConfirm,
   onDeleteCancel,
   onDelete,
+  factsEditable = true,
 }: DeckInfoCardProps) {
+  const imported = isImportedDeck(deck);
+  const published = isPublishedSourceDeck(deck);
+  const [copied, setCopied] = useState(false);
+
+  async function copyDeckId() {
+    try {
+      await navigator.clipboard.writeText(deck.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <Card className="relative">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu align="end">
           <DropdownMenuItem onClick={onEdit}>Edit Deck</DropdownMenuItem>
+          {onPublish && !imported && (
+            <DropdownMenuItem onClick={onPublish}>
+              {published ? "Publish update" : "Publish for sharing"}
+            </DropdownMenuItem>
+          )}
           {onOpenCardFonts && (
             <DropdownMenuItem onClick={onOpenCardFonts}>Change Font</DropdownMenuItem>
           )}
-          {onOpenAddFacts && (
+          {factsEditable && onOpenAddFacts && (
             <DropdownMenuItem onClick={onOpenAddFacts}>Add Facts</DropdownMenuItem>
           )}
           {onOpenAllCards && (
             <DropdownMenuItem onClick={onOpenAllCards}>Get All Cards</DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={onBulkEditFacts}>Edit Facts</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDeleteConfirm}>
-            Delete deck
-          </DropdownMenuItem>
+          {factsEditable && (
+            <DropdownMenuItem onClick={onBulkEditFacts}>Edit Facts</DropdownMenuItem>
+          )}
+          {!published && (
+            <DropdownMenuItem variant="destructive" onClick={onDeleteConfirm}>
+              Delete deck
+            </DropdownMenuItem>
+          )}
         </DropdownMenu>
       </div>
       <Dialog
@@ -83,7 +147,36 @@ export function DeckInfoCard({
       </Dialog>
       <CardHeader className="pb-2 text-center">
         <CardTitle>{deck.name}</CardTitle>
-        <p className="text-xs text-muted-foreground font-mono">ID: {deck.id}</p>
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+          {imported && (
+            <span className="text-xs rounded-full bg-muted px-2 py-0.5">Imported</span>
+          )}
+          {!imported && deck.visibility === "public" && (
+            <span className="text-xs rounded-full bg-green-600/15 text-green-800 dark:text-green-300 px-2 py-0.5">
+              Public
+            </span>
+          )}
+          {!imported && published && (
+            <span className="text-xs rounded-full bg-green-600/15 text-green-800 dark:text-green-300 px-2 py-0.5 font-medium">
+              Published · v{deck.published_version}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground font-mono mt-1">ID: {deck.id}</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs mt-1"
+          onClick={() => void copyDeckId()}
+        >
+          {copied ? "Copied!" : "Copy deck ID"}
+        </Button>
+        {published && !imported && (
+          <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+            Published decks cannot be deleted. Share this ID so others can import.
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -100,6 +193,44 @@ export function DeckInfoCard({
             <dd className="mt-0.5">Per fact</dd>
           </div>
         </dl>
+        <div className="border-t pt-4 space-y-2">
+          <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Deck info</p>
+          <ul className="text-sm space-y-1.5 list-none">
+            <li>
+              <span className="text-muted-foreground">Visibility:</span>{" "}
+              {formatVisibilityLabel(deck.visibility, imported)}
+            </li>
+            <li>
+              <span className="text-muted-foreground">
+                {imported ? "Source version:" : "Published:"}
+              </span>{" "}
+              {formatPublishedLabel(deck, imported)}
+            </li>
+            <li>
+              <span className="text-muted-foreground">Owner:</span> {deck.owner || "—"}
+            </li>
+            <li>
+              <span className="text-muted-foreground">Created:</span>{" "}
+              {formatDeckTimestamp(deck.created_at)}
+            </li>
+            <li>
+              <span className="text-muted-foreground">Updated:</span>{" "}
+              {formatDeckTimestamp(deck.updated_at)}
+            </li>
+            {imported && deck.source_deck_id && (
+              <li>
+                <span className="text-muted-foreground">Source deck:</span>{" "}
+                <span className="font-mono text-xs">{deck.source_deck_id}</span>
+              </li>
+            )}
+            {imported && deck.imported_at && (
+              <li>
+                <span className="text-muted-foreground">Imported:</span>{" "}
+                {formatDeckTimestamp(deck.imported_at)}
+              </li>
+            )}
+          </ul>
+        </div>
         <div className="border-t pt-4 space-y-2">
           <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Stats</p>
           <ul className="text-sm space-y-1.5 list-none">
