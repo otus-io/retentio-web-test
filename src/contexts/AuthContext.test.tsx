@@ -42,29 +42,46 @@ describe("AuthContext", () => {
     expect(screen.getByTestId("token")).toHaveTextContent("null");
   });
 
-  it("reads token from localStorage on mount", () => {
+  it("reads token from localStorage on mount when profile validates", async () => {
     localStorage.setItem("wordupx_token", "stored-token");
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { username: "u", email: "u@example.com" } })
+    );
     render(<AuthProvider><TestConsumer /></AuthProvider>);
-    expect(screen.getByTestId("token")).toHaveTextContent("stored-token");
+    expect(await screen.findByTestId("token")).toHaveTextContent("stored-token");
+  });
+
+  it("clears revoked token from localStorage when profile returns 401", async () => {
+    localStorage.setItem("wordupx_token", "revoked-token");
+    mockFetch.mockResolvedValueOnce(makeResponse({ msg: "Token has been revoked" }, false));
+    render(<AuthProvider><TestConsumer /></AuthProvider>);
+    expect(await screen.findByTestId("token")).toHaveTextContent("null");
+    expect(localStorage.getItem("wordupx_token")).toBeNull();
   });
 
   it("sets token after login and writes to localStorage", async () => {
     const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(
-      makeResponse({ data: { token: "jwt-token" }, meta: { expires: "2099" } })
-    );
+    mockFetch
+      .mockResolvedValueOnce(
+        makeResponse({ data: { token: "jwt-token" }, meta: { expires: "2099" } })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({ data: { username: "user", email: "user@example.com" } })
+      );
     render(<AuthProvider><TestConsumer /></AuthProvider>);
     await user.click(screen.getByRole("button", { name: /login/i }));
-    expect(screen.getByTestId("token")).toHaveTextContent("jwt-token");
+    expect(await screen.findByTestId("token")).toHaveTextContent("jwt-token");
     expect(localStorage.getItem("wordupx_token")).toBe("jwt-token");
   });
 
   it("clears token after logout and removes from localStorage", async () => {
     const user = userEvent.setup();
     localStorage.setItem("wordupx_token", "jwt-token");
-    // logout also calls /auth/logout
-    mockFetch.mockResolvedValueOnce(makeResponse({ data: { msg: "ok" } }));
+    mockFetch
+      .mockResolvedValueOnce(makeResponse({ data: { username: "u", email: "u@example.com" } }))
+      .mockResolvedValueOnce(makeResponse({ data: { msg: "ok" } }));
     render(<AuthProvider><TestConsumer /></AuthProvider>);
+    await screen.findByTestId("token");
     expect(screen.getByTestId("token")).toHaveTextContent("jwt-token");
     await user.click(screen.getByRole("button", { name: /logout/i }));
     expect(screen.getByTestId("token")).toHaveTextContent("null");
@@ -74,8 +91,11 @@ describe("AuthContext", () => {
   it("clears token locally even if logout API call fails", async () => {
     const user = userEvent.setup();
     localStorage.setItem("wordupx_token", "jwt-token");
-    mockFetch.mockRejectedValueOnce(new Error("network error"));
+    mockFetch
+      .mockResolvedValueOnce(makeResponse({ data: { username: "u", email: "u@example.com" } }))
+      .mockRejectedValueOnce(new Error("network error"));
     render(<AuthProvider><TestConsumer /></AuthProvider>);
+    await screen.findByTestId("token");
     await user.click(screen.getByRole("button", { name: /logout/i }));
     expect(screen.getByTestId("token")).toHaveTextContent("null");
     expect(localStorage.getItem("wordupx_token")).toBeNull();

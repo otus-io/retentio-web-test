@@ -13,8 +13,15 @@ import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { token, authReady } = useAuth();
   const location = useLocation();
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
+        Checking session…
+      </div>
+    );
+  }
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   return <>{children}</>;
 }

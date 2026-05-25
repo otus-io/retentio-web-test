@@ -63,9 +63,13 @@ describe("LoginPage", () => {
 
   it("redirects to /profile after successful login", async () => {
     const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(
-      makeResponse({ data: { token: "tok" }, meta: { expires: "2099" } })
-    );
+    mockFetch
+      .mockResolvedValueOnce(
+        makeResponse({ data: { token: "tok" }, meta: { expires: "2099" } })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({ data: { username: "alice", email: "alice@example.com" } })
+      );
     renderLogin();
     await user.type(screen.getByLabelText(/username/i), "alice");
     await user.type(screen.getByLabelText(/password/i), "secret");
@@ -85,15 +89,22 @@ describe("LoginPage", () => {
 
   it("redirects immediately if already logged in", async () => {
     localStorage.setItem("wordupx_token", "existing-token");
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { username: "u", email: "u@example.com" } })
+    );
     renderLogin();
     expect(await screen.findByText("Profile page")).toBeInTheDocument();
   });
 
   it("redirects to the original 'from' location after login", async () => {
     const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(
-      makeResponse({ data: { token: "tok" }, meta: { expires: "2099" } })
-    );
+    mockFetch
+      .mockResolvedValueOnce(
+        makeResponse({ data: { token: "tok" }, meta: { expires: "2099" } })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({ data: { username: "alice", email: "alice@example.com" } })
+      );
     render(
       <MemoryRouter initialEntries={[{ pathname: "/login", state: { from: { pathname: "/decks/abc" } } }]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>

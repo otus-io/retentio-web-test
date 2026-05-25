@@ -8,12 +8,12 @@ import type { DeckItem, Entry, FactItem } from "@/lib/api";
 import { cardEntryToRenderItems, type CardEntryItem, type GetNextCardRes } from "@/lib/api";
 import type { DeckCardSidesTypography } from "@/lib/deckCardTypography";
 import { DECK_CARD_TYPOGRAPHY_DEFAULTS } from "@/lib/deckCardTypography";
-import { getApiBaseUrl, resolveMediaFetchUrl } from "@/lib/api";
+import { getApiBaseUrl, notifyAuthFailure, resolveMediaFetchUrl } from "@/lib/api";
+import { fetchMediaCached, MediaFetchError } from "@/lib/mediaFetchCache";
 import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 import { looksLikeWikiRubyMarkup, parseWikiRubyMarkup } from "@/lib/wikiRubyMarkup";
 import { formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
-import { decompressApkgMediaMemberIfZstd } from "@/lib/apkgMediaBytes";
 
 function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
   minIntervalSec: number;
@@ -244,8 +244,8 @@ function MediaBlock({
 
   useEffect(() => {
     const fetchUrl = resolveMediaFetchUrl(id, baseUrl);
-    const ac = new AbortController();
     let objectUrl: string | null = null;
+    let stale = false;
     setBlobUrl(null);
     setAudioBlob(null);
     setError(false);
@@ -253,43 +253,8 @@ function MediaBlock({
 
     void (async () => {
       try {
-        const init: RequestInit = {
-          signal: ac.signal,
-          headers: { Authorization: `Bearer ${token}` },
-        };
-        const res = await fetch(fetchUrl, init);
-        const ct = res.headers.get("content-type") ?? "";
-        if (!res.ok) {
-          let serverMsg = "";
-          try {
-            const j = (await res.clone().json()) as { msg?: string };
-            if (typeof j.msg === "string") serverMsg = j.msg;
-          } catch {
-            /* ignore */
-          }
-          throw new Error(serverMsg || `Failed to load: ${res.status}`);
-        }
-        let blob = await res.blob();
-        const headerMime = ct.split(";")[0]?.trim() ?? "";
-        const fallbackMime =
-          kind === "audio"
-            ? "audio/mpeg"
-            : kind === "video"
-              ? "video/mp4"
-              : kind === "image"
-                ? "image/png"
-                : "application/json";
-        const mime =
-          (headerMime && headerMime !== "application/octet-stream" ? headerMime : "") ||
-          (blob.type && blob.type !== "application/octet-stream" ? blob.type : "") ||
-          fallbackMime;
-        if (ac.signal.aborted) return;
-        let buf = await blob.arrayBuffer();
-        if (ac.signal.aborted) return;
-        buf = decompressApkgMediaMemberIfZstd(buf);
-        if (ac.signal.aborted) return;
-        blob = new Blob([buf], { type: mime });
-        if (ac.signal.aborted) return;
+        const { blob } = await fetchMediaCached(fetchUrl, token, kind);
+        if (stale) return;
         if (kind === "audio") {
           setAudioBlob(blob);
         } else {
@@ -298,22 +263,22 @@ function MediaBlock({
           setBlobUrl(url);
         }
       } catch (err: unknown) {
-        if (ac.signal.aborted) return;
-        const name = err instanceof Error ? err.name : "";
-        if (name === "AbortError") return;
-        setLoadErrMsg(err instanceof Error ? err.message : String(err));
+        if (stale) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (err instanceof MediaFetchError && err.status === 401) {
+          notifyAuthFailure(401, fetchUrl, msg);
+        }
+        setLoadErrMsg(msg);
         setError(true);
       }
     })();
+
     return () => {
-      ac.abort();
+      stale = true;
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
         objectUrl = null;
       }
-      // Do not call setBlobUrl/setAudioBlob here: effect re-runs clear state at the top;
-      // setState in cleanup causes extra renders and pairs with Strict Mode so DevTools
-      // often shows the first /api/media request as (canceled) while the second succeeds.
     };
   }, [id, token, baseUrl, kind]);
 
@@ -637,6 +602,14 @@ export function CardSection({
         ) : null}
         {nextCard && deck && (nextCardFact || (Array.isArray(nextCard.card.front) && Array.isArray(nextCard.card.back))) && (
           <div className="relative rounded-lg border p-4 space-y-3">
+            {loadingNextCard && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/80"
+                aria-busy="true"
+              >
+                <p className="text-sm text-muted-foreground">Loading next card…</p>
+              </div>
+            )}
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
                 {nextCard && onSaveFact && (nextCardFact || onRequestFact) && (

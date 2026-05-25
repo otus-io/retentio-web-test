@@ -208,15 +208,36 @@ export function normalizeStoredMediaRef(value: string | undefined): string | und
 
 /** Send a debug log line to the backend; backend appends to logs/debug.log at repo root (see .cursor/rules/debug-logging.mdc). */
 export function debugLog(payload: Record<string, unknown>): void {
-  fetch(`${baseUrl}/api/dev/debug-log`, {
+  const res = fetch(`${baseUrl}/api/dev/debug-log`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  }).catch(() => {});
+  });
+  if (res && typeof res.catch === "function") res.catch(() => {});
 }
 
 export interface ApiError {
   msg?: string;
+}
+
+let authFailureHandler: ((msg: string) => void) | null = null;
+
+/** Called by AuthProvider to clear session when an authenticated API call returns 401. */
+export function setAuthFailureHandler(handler: ((msg: string) => void) | null): void {
+  authFailureHandler = handler;
+}
+
+export function notifyAuthFailure(status: number, path: string, msg: string): void {
+  if (status !== 401) return;
+  if (
+    path.startsWith("/auth/login") ||
+    path.startsWith("/auth/register") ||
+    path.startsWith("/auth/forgot-password") ||
+    path.startsWith("/auth/reset-password")
+  ) {
+    return;
+  }
+  authFailureHandler?.(msg);
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -233,7 +254,11 @@ export async function request<T>(
   if (init.body) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) {
+    const msg = await parseError(res);
+    notifyAuthFailure(res.status, path, msg);
+    throw new Error(msg);
+  }
   const text = await res.text();
   if (!text.trim()) return {} as T;
   return JSON.parse(text) as T;

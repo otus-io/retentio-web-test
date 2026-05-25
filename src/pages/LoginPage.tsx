@@ -11,10 +11,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, token } = useAuth();
+  const { login, token, authReady } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/profile";
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
+        Checking session…
+      </div>
+    );
+  }
 
   if (token) {
     return <Navigate to={from} replace />;

@@ -209,10 +209,6 @@ export default function DeckPage() {
     const targetDeckId = id;
     setCardError("");
     setLoadingNextCard(true);
-    if (!keepCurrentCard) {
-      setNextCard(null);
-      setNextCardFact(null);
-    }
     try {
       const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
       if (routeDeckIdRef.current !== targetDeckId) return;
@@ -658,7 +654,6 @@ export default function DeckPage() {
                 open={publishOpen}
                 onOpenChange={setPublishOpen}
                 deck={deck}
-                token={token}
                 onPublished={async (result) => {
                   const firstPublish = !isPublishedSourceDeck(deck);
                   setDeck((d) =>

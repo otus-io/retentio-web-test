@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   isPublishedSourceDeck,
   publishDeck,
@@ -10,7 +11,6 @@ interface DeckPublishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deck: DeckItem;
-  token: string;
   onPublished: (result: { published_version: number; visibility: string }) => void | Promise<void>;
 }
 
@@ -18,15 +18,18 @@ export function DeckPublishDialog({
   open,
   onOpenChange,
   deck,
-  token,
   onPublished,
 }: DeckPublishDialogProps) {
+  const { token, authReady } = useAuth();
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const firstPublish = !isPublishedSourceDeck(deck);
 
   async function handlePublish() {
-    if (!token) return;
+    if (!authReady || !token) {
+      setError("Session expired. Please sign in again.");
+      return;
+    }
     setError("");
     setPublishing(true);
     try {
