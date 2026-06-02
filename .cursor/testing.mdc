@@ -10,7 +10,7 @@ alwaysApply: false
 
 - Tests expose bugs — do not weaken assertions to greenwash failures.
 - Fix production code when behavior is wrong; change tests only for wrong expectations or intentional contract changes.
-- See also: `.cursor/rules/failing-tests-debugging.mdc`
+- See also: `.cursor/failing-tests-debugging.mdc`
 
 ## Organization
 

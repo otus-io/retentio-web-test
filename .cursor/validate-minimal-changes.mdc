@@ -22,8 +22,8 @@ alwaysApply: true
 3. **Simplicity** — No features, abstractions, configurability, or error handling beyond what the request needs. No helpers for single-use code.
 4. **Surgical edits** — Every changed line should trace to the user's request. Do not delete unrelated pre-existing dead code (mention it if useful). Remove only orphans your change created (unused imports, vars, functions).
 5. **Do not change tests to pass** — Fix production code when behavior is wrong. Edit tests only when the test is wrong or the user asked for test changes.
-6. **Web tests** — Vitest + Testing Library patterns: `.cursor/rules/testing.mdc` and `.cursor/rules/react-web.mdc`.
-7. **Validate after** — Run relevant checks: `npm test -- --run` (scoped paths when possible), `npm run build`. If a check fails, fix within the same scope.
+6. **Web tests** — Vitest + Testing Library patterns: `.cursor/testing.mdc` and `.cursor/react-web.mdc`.
+7. **Validate after** — Run relevant checks: `npm run test:run` (scoped paths when possible), `npm run build`. If a check fails, fix within the same scope; do not expand to “clean up” nearby code.
 
 **Question-only or review-only:** answer without editing unless the user asked for code changes.
 
@@ -43,6 +43,8 @@ State a brief plan with verifiable success criteria, e.g.:
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
 ```
+
+Bug fix: reproduce (test or steps), then fix. Refactor: tests pass before and after.
 
 ## Quick checklist
 

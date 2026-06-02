@@ -208,7 +208,7 @@ export function normalizeStoredMediaRef(value: string | undefined): string | und
   }
 }
 
-/** Send a debug log line to the backend; backend appends to logs/debug.log at repo root (see .cursor/rules/debug-logging.mdc). */
+/** Send a debug log line to the backend; backend appends to logs/debug.log at repo root (see .cursor/debug-logging.mdc). */
 export function debugLog(payload: Record<string, unknown>): void {
   const res = fetch(`${baseUrl}/api/dev/debug-log`, {
     method: "POST",

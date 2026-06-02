@@ -1,0 +1,38 @@
+---
+description: Retentio Web Test app — commits, PRs, docs, and TypeScript/React code style
+alwaysApply: true
+---
+
+# Retentio Web Test Conventions
+
+## Project Overview
+
+Vite + React + TypeScript app for Retentio deck review, catalog, and auth. HTTP API via `src/lib/api.ts`. JWT in `localStorage` (`wordupx_token`). Local dev: `./utils/run-dev.sh` (see `docs/development.md`).
+
+## Commit & PR Conventions
+
+- Commit/PR title: `<type>(<scope>): <subject>` in imperative mood, under 50 chars
+- Types: feat, fix, docs, style, refactor, perf, test, chore
+- Scopes: auth, deck, card, fact, catalog, media, ui, api, ci
+- Keep PRs focused; squash and merge for feature branches
+
+## Code Style
+
+- **TypeScript/React**: Vitest + Testing Library; Tailwind; React Router v6
+- Prefer clear naming; comments only for non-obvious logic
+- Stack patterns: `.cursor/react-web.mdc`, `.cursor/testing.mdc`
+
+## Documentation
+
+- User-facing docs: English + Chinese where the repo already pairs them (e.g. `docs/quickstart.md` + `docs/quickstart_zh.md`)
+- Design docs: English only — see `design-docs.mdc`
+- API contract: `../retentio-backend/docs/api.md`; update `docs/api_progress_tracker.md` when adding/changing API usage
+
+## Key Principles
+
+- Test failures: follow `validate-minimal-changes.mdc` (fix production code first)
+- CI must pass before merge: `npm run test:run`, `npm run build` (see `ci-workflows.mdc`)
+
+## Git & hooks
+
+Feature branches only; never push to `main`. Hooks via `./utils/setup-hooks.sh` — see `git-workflow.mdc`.
