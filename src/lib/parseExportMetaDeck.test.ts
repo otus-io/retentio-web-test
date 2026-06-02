@@ -7,12 +7,14 @@ describe("parseExportMetaDeck", () => {
       model: "x",
       deck: {
         name: "大家的日语",
+        description: "Minna no Nihongo vocabulary deck",
         fields: ["日文", "音调核", "词性", "中文"],
         rate: 30,
       },
     });
     expect(out).toEqual({
       name: "大家的日语",
+      description: "Minna no Nihongo vocabulary deck",
       fields: ["日文", "音调核", "词性", "中文"],
       rate: 30,
     });

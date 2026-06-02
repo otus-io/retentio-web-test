@@ -1,9 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { DeckInfoCard } from "./DeckInfoCard";
 import type { DeckItem } from "@/lib/api";
+
+vi.mock("@/lib/tags", () => ({
+  getDeckTags: vi.fn(),
+}));
+
+import { getDeckTags, type TagItem } from "@/lib/tags";
+
+const mockGetDeckTags = vi.mocked(getDeckTags);
 
 const mockDeck: DeckItem = {
   id: "deck123",
@@ -45,6 +53,11 @@ function renderCard(overrides: Partial<Parameters<typeof DeckInfoCard>[0]> = {})
 }
 
 describe("DeckInfoCard", () => {
+  beforeEach(() => {
+    mockGetDeckTags.mockReset();
+    mockGetDeckTags.mockResolvedValue({ data: { tags: [] }, meta: { msg: "ok" } });
+  });
+
   it("renders the deck name", () => {
     renderCard();
     expect(screen.getByText("My Vocab")).toBeInTheDocument();
@@ -216,6 +229,42 @@ describe("DeckInfoCard", () => {
     expect(deckInfo).toHaveTextContent("v2");
     expect(deckInfo).toHaveTextContent("Owner:");
     expect(deckInfo).toHaveTextContent("alice");
+  });
+
+  it("renders deck tags from GET /api/decks/{id}/tags", async () => {
+    mockGetDeckTags.mockResolvedValue({
+      data: {
+        tags: [
+          { id: "t1", name: "JLPT", description: "" },
+          { id: "t2", name: "verb", description: "POS" },
+        ],
+      },
+      meta: { msg: "ok" },
+    });
+    renderCard({ token: "tok" });
+    await waitFor(() => expect(screen.getByText("JLPT")).toBeInTheDocument());
+    expect(screen.getByText("verb")).toBeInTheDocument();
+    expect(mockGetDeckTags).toHaveBeenCalledWith("deck123", "tok");
+  });
+
+  it("handles null tags in API response without crashing", async () => {
+    mockGetDeckTags.mockResolvedValue({
+      data: { tags: null as unknown as TagItem[] },
+      meta: { msg: "ok" },
+    });
+    renderCard({ token: "tok" });
+    await waitFor(() => {
+      const tagsDt = screen.getByText("Tags");
+      expect(tagsDt.parentElement?.querySelector("dd")).toHaveTextContent("—");
+    });
+  });
+
+  it("shows em dash when deck has no tags", async () => {
+    renderCard({ token: "tok" });
+    await waitFor(() => {
+      const tagsDt = screen.getByText("Tags");
+      expect(tagsDt.parentElement?.querySelector("dd")).toHaveTextContent("—");
+    });
   });
 
   it("shows import provenance in deck info", () => {

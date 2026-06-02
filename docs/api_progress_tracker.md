@@ -89,6 +89,26 @@
 | --- | --- | --- | --- |
 | 所有列表接口 | 支持 `page` / `pageSize` 分页参数 | ❌ | ❌ |
 
+### 标签
+
+| 接口 | 说明 | 前端 | 后端 |
+| --- | --- | --- | --- |
+| `POST /api/tags` | 创建标签 | ✅ (`src/lib/tags.ts`) | ✅ |
+| `GET /api/tags` | 列出用户标签 | ✅ | ✅ |
+| `GET /api/tags/{tagId}` | 获取单个标签 | ✅ | ✅ |
+| `PATCH /api/tags/{tagId}` | 更新名称/描述 | ✅ | ✅ |
+| `DELETE /api/tags/{tagId}` | 删除标签及关联 | ✅ | ✅ |
+| `GET /api/tags/{tagId}/facts` | 列出带该标签的词条 | ✅ | ✅ |
+| `GET /api/decks/{id}/tags` | 卡组标签列表 | ✅ | ✅ |
+| `PUT /api/decks/{id}/tags/{tagId}` | 关联标签到卡组 | ✅ | ✅ |
+| `DELETE /api/decks/{id}/tags/{tagId}` | 从卡组移除标签 | ✅ | ✅ |
+| `GET /api/decks/{id}/facts/{factId}/tags` | 词条标签列表 | ✅ | ✅ |
+| `PUT /api/decks/{id}/facts/{factId}/tags/{tagId}` | 关联标签到词条 | ✅ | ✅ |
+| `DELETE /api/decks/{id}/facts/{factId}/tags/{tagId}` | 从词条移除标签 | ✅ | ✅ |
+| `GET /api/decks/{id}/card?tag_id=` | 按标签筛选下一张卡 | ✅ (`getNextCard`) | ✅ |
+| `GET /api/decks/{id}/cards?tag_id=` | 按标签筛选卡片统计 | ✅ (`getDeckCards`) | ✅ |
+| `POST /api/decks` `tags` / `tag_ids` | 创建卡组时打标签 | ✅ (类型) | ✅ |
+
 ---
 
 ### 其他待办

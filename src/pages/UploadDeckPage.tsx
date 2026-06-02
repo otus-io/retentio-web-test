@@ -69,6 +69,7 @@ export default function UploadDeckPage() {
         name: deckFromMeta.name,
         fields: deckFromMeta.fields,
         rate: deckFromMeta.rate,
+        ...(deckFromMeta.description ? { description: deckFromMeta.description } : {}),
       };
       const createRes = await request<CreateDeckRes>("/api/decks", {
         method: "POST",

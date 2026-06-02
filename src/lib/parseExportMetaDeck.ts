@@ -2,10 +2,13 @@
  * Reads `deck` from Anki export `export_meta.json` (or any JSON with the same shape)
  * for prefilling Retentio deck creation.
  */
+const MAX_DESCRIPTION_LEN = 500;
+
 export interface ParsedExportMetaDeck {
   name: string;
   fields: string[];
   rate: number;
+  description?: string;
 }
 
 export function parseExportMetaDeck(data: unknown): ParsedExportMetaDeck {
@@ -44,5 +47,14 @@ export function parseExportMetaDeck(data: unknown): ParsedExportMetaDeck {
     rate = n;
   }
 
-  return { name, fields, rate };
+  let description: string | undefined;
+  if (d.description !== undefined && d.description !== null) {
+    const s = typeof d.description === "string" ? d.description.trim() : String(d.description).trim();
+    if (s.length > MAX_DESCRIPTION_LEN) {
+      throw new Error(`deck.description must be at most ${MAX_DESCRIPTION_LEN} characters`);
+    }
+    if (s.length > 0) description = s;
+  }
+
+  return { name, fields, rate, ...(description ? { description } : {}) };
 }

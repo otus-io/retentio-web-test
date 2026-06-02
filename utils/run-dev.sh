@@ -20,16 +20,16 @@ API_RELEASE="https://api.retentio.app:8443"
 usage() {
   echo "Usage: $0 [local|release]"
   echo ""
-  echo "  (none)   VITE_API_URL=$API_RELEASE  (default)"
+  echo "  (none)   VITE_API_URL=$API_LOCAL  (default)"
   echo "  local    VITE_API_URL=$API_LOCAL"
   echo "  release  VITE_API_URL=$API_RELEASE"
 }
 
-case "${1:-release}" in
-  local|dev)
+case "${1:-local}" in
+  local|dev|"")
     export VITE_API_URL="$API_LOCAL"
     ;;
-  release|prod|production|"")
+  release|prod|production)
     export VITE_API_URL="$API_RELEASE"
     ;;
   -h|--help|help)

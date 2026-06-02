@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem, Entry, FactItem } from "@/lib/api";
 import { entryToDisplayString } from "@/lib/api";
+import { FactTagsPicker } from "./FactTagsPicker";
 
 const DEFAULT_PAGE_SIZE = 5;
 
@@ -37,6 +38,8 @@ interface FactsListProps {
   onOpenAddFacts?: () => void;
   /** When set, overrides `deck.stats.facts_count` for “shown of N” (from GET /facts `meta.total`). */
   factsTotal?: number | null;
+  /** Required for fact tag editing (immediate save via tag APIs). */
+  token?: string | null;
 }
 
 export function FactsList({
@@ -58,9 +61,25 @@ export function FactsList({
   setDeleteFactId,
   onOpenAddFacts,
   factsTotal: factsTotalProp,
+  token,
 }: FactsListProps) {
   const [page, setPage] = useState(1);
+  const [editingFactTagIds, setEditingFactTagIds] = useState<string[]>([]);
   const pageSize = DEFAULT_PAGE_SIZE;
+  const deckId = deck.id;
+
+  const syncEditingTagsFromFact = useCallback((fact: FactItem) => {
+    setEditingFactTagIds((fact.tags ?? []).map((t) => t.id));
+  }, []);
+
+  useEffect(() => {
+    if (!editingFactId) {
+      setEditingFactTagIds([]);
+      return;
+    }
+    const fact = factsList.find((f) => f.id === editingFactId);
+    if (fact) syncEditingTagsFromFact(fact);
+  }, [editingFactId, factsList, syncEditingTagsFromFact]);
 
   const total = factsList.length;
   const totalInDeck =
@@ -128,6 +147,15 @@ export function FactsList({
                         />
                       </div>
                     ))}
+                    {token && (
+                      <FactTagsPicker
+                        token={token}
+                        deckId={deckId}
+                        factId={f.id}
+                        selectedIds={editingFactTagIds}
+                        onSelectedIdsChange={setEditingFactTagIds}
+                      />
+                    )}
                     <div className="flex gap-2">
                       <Button type="submit">Save</Button>
                       <Button
@@ -136,6 +164,7 @@ export function FactsList({
                         onClick={() => {
                           setEditingFactId(null);
                           setEditingFactEntries([]);
+                          setEditingFactTagIds([]);
                           setFactError("");
                         }}
                       >
@@ -145,15 +174,30 @@ export function FactsList({
                   </form>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm min-w-0 flex-1">
-                      {f.entries.map(entryToDisplayString).join(" · ")}
-                    </span>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <span className="text-sm block">
+                        {f.entries.map(entryToDisplayString).join(" · ")}
+                      </span>
+                      {(f.tags?.length ?? 0) > 0 && (
+                        <ul className="flex flex-wrap gap-1 list-none">
+                          {f.tags!.map((t) => (
+                            <li
+                              key={t.id}
+                              className="inline-flex rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {t.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuItem
                         onClick={() => {
                           setEditingFactId(f.id);
                           setEditingFactEntries(f.entries.map((e) => ({ ...e })));
                           setEditingFactSplit(1);
+                          syncEditingTagsFromFact(f);
                           setFactError("");
                         }}
                       >

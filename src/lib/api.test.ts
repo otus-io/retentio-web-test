@@ -13,6 +13,8 @@ import {
   fetchDeckFactsPage,
   fetchDeckFactsUnpaginated,
   publishDeck,
+  getCatalogDeck,
+  listCatalogDecks,
   importDeck,
   getDeckUpdates,
   syncDeck,
@@ -601,6 +603,67 @@ describe("deck sharing API", () => {
     const [url, init] = mockFetch.mock.calls[0] as [string, { headers: Headers; method: string }];
     expect(url).toContain("/api/decks/deck1/publish");
     expect(init.method).toBe("POST");
+    expect(init.headers.get("Authorization")).toBe("Bearer tok");
+  });
+
+  it("getCatalogDeck GETs /api/decks/catalog/{id}", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          id: "src1",
+          name: "JLPT N5",
+          description: "Core vocabulary",
+          owner: "alice",
+          fields: ["English", "Japanese"],
+          published_version: 1,
+          fact_count: 10,
+          published_at: "2026-05-22T12:00:00Z",
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    const res = await getCatalogDeck("src1");
+    expect(res.data.description).toBe("Core vocabulary");
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/catalog/src1");
+  });
+
+  it("listCatalogDecks GETs /api/decks/catalog without auth when no token", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { decks: [] },
+        meta: { msg: "ok", has_more: "false" },
+      })
+    );
+    await listCatalogDecks({ limit: 12 });
+    const [, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(init.headers.get("Authorization")).toBeNull();
+  });
+
+  it("listCatalogDecks GETs /api/decks/catalog with auth when token provided", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          decks: [
+            {
+              id: "src1",
+              name: "JLPT N5",
+              owner: "alice",
+              fields: ["English", "Japanese"],
+              published_version: 1,
+              fact_count: 10,
+              published_at: "2026-05-22T12:00:00Z",
+            },
+          ],
+        },
+        meta: { msg: "ok", has_more: "false" },
+      })
+    );
+    const res = await listCatalogDecks({ limit: 12 }, "tok");
+    expect(res.data.decks).toHaveLength(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, { headers: Headers }];
+    expect(url).toContain("/api/decks/catalog");
+    expect(url).toContain("limit=12");
     expect(init.headers.get("Authorization")).toBe("Bearer tok");
   });
 

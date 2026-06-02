@@ -11,6 +11,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import ManualPage from "@/pages/ManualPage";
 import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
+import CatalogDeckPage from "@/pages/CatalogDeckPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, authReady } = useAuth();
@@ -78,6 +79,7 @@ export const routes = [
     ),
   },
   { path: "/", element: <HomePage /> },
+  { path: "/catalog/:id", element: <CatalogDeckPage /> },
   { path: "/research", element: <ResearchPage /> },
   { path: "/manual", element: <ManualPage /> },
   { path: "*", element: <Navigate to="/" replace /> },

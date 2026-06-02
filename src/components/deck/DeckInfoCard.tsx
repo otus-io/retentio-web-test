@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -8,6 +8,7 @@ import {
   isPublishedSourceDeck,
   type DeckItem,
 } from "@/lib/api";
+import { getDeckTags, type TagItem } from "@/lib/tags";
 
 function formatDeckTimestamp(value: string | undefined): string {
   if (!value?.trim()) return "—";
@@ -59,6 +60,10 @@ function formatLastReview(unixSec: number): string {
 
 interface DeckInfoCardProps {
   deck: DeckItem;
+  /** When set, loads and shows deck tags from GET /api/decks/{id}/tags. */
+  token?: string | null;
+  /** Bump to refetch tags after edit (e.g. deck page). */
+  tagsRefreshKey?: number;
   onEdit: () => void;
   onBulkEditFacts: () => void;
   /** Opens font settings for study cards (main + ruby, front + back). */
@@ -79,6 +84,8 @@ interface DeckInfoCardProps {
 
 export function DeckInfoCard({
   deck,
+  token,
+  tagsRefreshKey = 0,
   onEdit,
   onBulkEditFacts,
   onOpenCardFonts,
@@ -94,6 +101,30 @@ export function DeckInfoCard({
   const imported = isImportedDeck(deck);
   const published = isPublishedSourceDeck(deck);
   const [copied, setCopied] = useState(false);
+  const [deckTags, setDeckTags] = useState<TagItem[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token?.trim()) {
+      setDeckTags([]);
+      return;
+    }
+    let cancelled = false;
+    setTagsLoading(true);
+    void getDeckTags(deck.id, token)
+      .then((res) => {
+        if (!cancelled) setDeckTags(Array.isArray(res.data.tags) ? res.data.tags : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDeckTags([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTagsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deck.id, token, tagsRefreshKey]);
 
   async function copyDeckId() {
     try {
@@ -191,6 +222,30 @@ export function DeckInfoCard({
           <div>
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Sibling</dt>
             <dd className="mt-0.5">Per fact</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Tags</dt>
+            <dd className="mt-0.5">
+              {tagsLoading ? (
+                <span className="text-muted-foreground">Loading…</span>
+              ) : (deckTags?.length ?? 0) === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <ul className="flex flex-wrap gap-1.5 list-none">
+                  {[...(deckTags ?? [])]
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+                    .map((t) => (
+                      <li
+                        key={t.id}
+                        className="inline-flex rounded-full border bg-muted/50 px-2.5 py-0.5 text-sm"
+                        title={t.description || undefined}
+                      >
+                        {t.name}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </dd>
           </div>
         </dl>
         <div className="border-t pt-4 space-y-2">

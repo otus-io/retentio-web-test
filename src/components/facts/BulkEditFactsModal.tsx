@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  Fragment,
   type ChangeEvent,
 } from "react";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import {
   type UpdateFactReq,
   type UploadMediaRes,
 } from "@/lib/api";
+import { FactTagsPicker } from "./FactTagsPicker";
 
 const PAGE_SIZE = 50;
 const NO_DECK_FIELDS: string[] = [];
@@ -563,9 +565,10 @@ export function BulkEditFactsModal({
           ) : (
             <>
               <p className="mb-2 text-xs text-muted-foreground">
-                Each row is one fact — edit text and media, then Save. Add column appends one empty cell on every row
-                (facts can be wider than the deck field list). Save column names only updates deck field names; extra
-                columns use the headers above until you add matching fields in Edit deck.
+                Each row is one fact — edit text and media, then Save. Tags on each row save immediately when you add
+                or remove them. Add column appends one empty cell on every row (facts can be wider than the deck field
+                list). Save column names only updates deck field names; extra columns use the headers above until you add
+                matching fields in Edit deck.
               </p>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Button
@@ -646,7 +649,8 @@ export function BulkEditFactsModal({
                   </thead>
                   <tbody>
                     {pageRows.map((fact, i) => (
-                      <tr key={fact.id} className="border-b last:border-0 align-top">
+                      <Fragment key={fact.id}>
+                        <tr className="border-b align-top">
                         <td className="px-3 py-2 text-muted-foreground tabular-nums">{start + i + 1}</td>
                         {Array.from({ length: colCount }, (_, idx) => {
                           const ent = factEntryAt(fact, idx);
@@ -762,7 +766,31 @@ export function BulkEditFactsModal({
                             </Button>
                           </div>
                         </td>
-                      </tr>
+                        </tr>
+                        <tr className="border-b last:border-0 bg-muted/5">
+                          <td
+                            colSpan={colCount + 2}
+                            className="px-3 py-2"
+                          >
+                            <FactTagsPicker
+                              token={token}
+                              deckId={deckId}
+                              factId={fact.id}
+                              idPrefix={fact.id}
+                              tagItems={fact.tags}
+                              selectedIds={(fact.tags ?? []).map((t) => t.id)}
+                              onSelectedIdsChange={() => {}}
+                              onTagsUpdated={(tags) => {
+                                setLocalFacts((prev) =>
+                                  prev.map((f) => (f.id === fact.id ? { ...f, tags } : f))
+                                );
+                              }}
+                              compact
+                              disabled={busy}
+                            />
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

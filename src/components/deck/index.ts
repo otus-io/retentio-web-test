@@ -1,5 +1,6 @@
 export { DeckHeader } from "./DeckHeader";
 export { DeckEditForm } from "./DeckEditForm";
+export { DeckTagsPicker } from "./DeckTagsPicker";
 export { DeckInfoCard } from "./DeckInfoCard";
 export { DeckPublishDialog } from "./DeckPublishDialog";
 export { DeckSyncUpdatesModal } from "./DeckSyncUpdatesModal";

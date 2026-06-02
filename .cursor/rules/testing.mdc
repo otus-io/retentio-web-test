@@ -1,70 +1,47 @@
 ---
-description: Blackbox testing principles and Flutter test conventions
-globs: frontend/test/**/*.dart
+description: Vitest and Testing Library conventions for the web test app
+globs: src/**/*.test.{ts,tsx}
 alwaysApply: false
 ---
 
-# Testing Conventions
+# Testing Conventions (Vitest)
 
-## Blackbox Testing Principle
+## Blackbox principle
 
-- Tests are written to **expose bugs**, not to pass
-- NEVER modify test data to work around production code bugs
-- NEVER modify production code to make tests pass
-- If a test fails, it means the **production code has a bug** — document it for developers to fix
-- Only modify tests to fix compile errors from API/type changes (e.g., after a model refactor)
+- Tests expose bugs — do not weaken assertions to greenwash failures.
+- Fix production code when behavior is wrong; change tests only for wrong expectations or intentional contract changes.
+- See also: `.cursor/rules/failing-tests-debugging.mdc`
 
-## Test File Organization
+## Organization
 
-```
-frontend/test/
-├── models/        # Unit tests for data models (fromJson, toJson, edge cases)
-├── providers/     # Unit tests for Riverpod state classes
-├── screen/        # Widget tests for screens and components
-│   ├── deck/
-│   ├── home/
-│   ├── login/
-│   └── profile/
-└── widget_test.dart  # Default Flutter test (known failure — needs ProviderScope)
-```
+- Colocate tests: `Component.test.tsx` next to `Component.tsx`, or `src/lib/*.test.ts`
+- Use `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`
 
-## Widget Test Pattern
+## Pattern
 
-```dart
-testWidgets('description', (WidgetTester tester) async {
-  await tester.pumpWidget(
-    ProviderScope(          // Always wrap in ProviderScope for Riverpod
-      child: MaterialApp(
-        home: MyWidget(),
-      ),
-    ),
-  );
-  await tester.pumpAndSettle();
-  expect(find.text('Expected'), findsOneWidget);
+```tsx
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi } from "vitest";
+
+describe("MyComponent", () => {
+  it("does the thing", async () => {
+    const user = userEvent.setup();
+    render(<MyComponent />);
+    await user.click(screen.getByRole("button", { name: /submit/i }));
+    expect(screen.getByText("Done")).toBeInTheDocument();
+  });
 });
 ```
 
-## Model Test Pattern
+## API tests
 
-```dart
-test('fromJson handles null values gracefully', () {
-  final json = {'name': 'Test'};  // Deliberately missing fields
-  // This should NOT throw — if it does, the model has a bug
-  final model = Model.fromJson(json);
-  expect(model.name, 'Test');
-});
-```
+- Mock `fetch` at module level; assert URL, method, headers, body.
+- See `src/lib/api.test.ts` for patterns.
 
-## Test Reports
-
-- Failed tests are documented in `docs/` (e.g. dated `*-test-summary.md` files)
-- Format: `YYYY-MM-DD-test-summary.md` with root cause analysis and fix suggestions
-- Reports include both English and Chinese content
-
-## Running Tests
+## Running tests
 
 ```bash
-cd frontend && flutter test                    # All tests
-cd frontend && flutter test test/models/       # Model tests only
-cd frontend && flutter test --reporter expanded # Verbose output
+npm test -- --run                    # all
+npm test -- --run src/lib/api.test.ts  # one file
 ```

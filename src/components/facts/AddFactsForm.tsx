@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { DeckItem } from "@/lib/api";
 import type { AddFactOperation } from "@/lib/api";
 import { buildSiblingTemplate, buildTemplateWithSplit, fileLooksLikeJson } from "@/lib/api";
+import { FactTagsPicker } from "./FactTagsPicker";
 
 /** One entry in the Add Facts row: label, text value, and optional media files. Type is derived from file when uploading. */
 export type AddFactEntry = {
@@ -40,6 +41,9 @@ interface AddFactsFormProps {
   onSubmit: (e: React.FormEvent) => void;
   /** When set, form is in modal: no Card wrapper, and a Cancel button is shown that calls this. */
   onCancel?: () => void;
+  token?: string | null;
+  factTagIds?: string[];
+  onFactTagIdsChange?: (ids: string[]) => void;
 }
 
 export function AddFactsForm({
@@ -56,6 +60,9 @@ export function AddFactsForm({
   addFactsError,
   onSubmit,
   onCancel,
+  token,
+  factTagIds = [],
+  onFactTagIdsChange,
 }: AddFactsFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingMediaRowIndex, setPendingMediaRowIndex] = useState<number | null>(null);
@@ -390,6 +397,14 @@ export function AddFactsForm({
           tabIndex={-1}
         />
       </div>
+      {token && onFactTagIdsChange && (
+        <FactTagsPicker
+          token={token}
+          selectedIds={factTagIds}
+          onSelectedIdsChange={onFactTagIdsChange}
+          disabled={addingFacts}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="op" className="sr-only">Operation</Label>
         <select

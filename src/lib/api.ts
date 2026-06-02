@@ -1,3 +1,5 @@
+import type { TagItem } from "./tags";
+
 const baseUrl = (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "http://localhost:8080";
 
 /** True when upload failures should log details (browser console + optional agent ingest). */
@@ -498,6 +500,7 @@ export interface DeckStats {
 export interface DeckItem {
   id: string;
   name: string;
+  description?: string;
   owner: string;
   fields: string[];
   rate: number;
@@ -625,6 +628,66 @@ export async function publishDeck(
   });
 }
 
+export interface CatalogDeckItem {
+  id: string;
+  name: string;
+  description?: string;
+  owner: string;
+  fields: string[];
+  published_version: number;
+  fact_count: number;
+  deck_tag_names?: string[];
+  published_at: string;
+}
+
+export interface ListCatalogDecksParams {
+  query?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListCatalogDecksRes {
+  data: { decks: CatalogDeckItem[] };
+  meta: {
+    msg: string;
+    count?: string | number;
+    total?: string | number;
+    limit?: string | number;
+    offset?: string | number;
+    has_more?: string | boolean;
+  };
+}
+
+export interface GetCatalogDeckRes {
+  data: CatalogDeckItem;
+  meta: { msg: string };
+}
+
+export async function getCatalogDeck(
+  id: string,
+  token?: string | null
+): Promise<GetCatalogDeckRes> {
+  return request<GetCatalogDeckRes>(`/api/decks/catalog/${encodeURIComponent(id)}`, { token });
+}
+
+export async function listCatalogDecks(
+  params: ListCatalogDecksParams = {},
+  token?: string | null
+): Promise<ListCatalogDecksRes> {
+  const sp = new URLSearchParams();
+  if (params.query?.trim()) sp.set("query", params.query.trim());
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  if (params.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  return request<ListCatalogDecksRes>(`/api/decks/catalog${qs ? `?${qs}` : ""}`, { token });
+}
+
+export function catalogHasMore(meta: ListCatalogDecksRes["meta"]): boolean {
+  const v = meta.has_more;
+  if (typeof v === "boolean") return v;
+  return v === "true";
+}
+
 export async function importDeck(body: ImportDeckReq, token: string): Promise<ImportDeckRes> {
   return request<ImportDeckRes>("/api/decks/import", {
     method: "POST",
@@ -656,13 +719,19 @@ export interface GetDecksRes {
 
 export interface CreateDeckReq {
   name: string;
+  description?: string;
   /** Omit or use [] for an empty deck; field names can be set later (e.g. deck edit or import). */
   fields?: string[];
   rate?: number;
+  /** Tag names to create/link (mutually exclusive with tag_ids). */
+  tags?: string[];
+  /** Existing tag IDs (mutually exclusive with tags). */
+  tag_ids?: string[];
 }
 
 export interface UpdateDeckReq {
   name?: string;
+  description?: string;
   fields?: string[];
   rate?: number;
   /** Source deck only, before first publish. */
@@ -709,6 +778,8 @@ export interface AddFactItemReq {
   entries: Entry[];
   /** Optional fact tag names (server resolves/creates and associates to the fact). */
   tags?: string[];
+  /** Existing tag IDs (mutually exclusive with tags). */
+  tag_ids?: string[];
 }
 
 /**
@@ -789,6 +860,8 @@ export type AddFactOperation = "append" | "prepend" | "shuffle" | "spread";
 export interface FactItem {
   id: string;
   entries: Entry[];
+  /** Present when the API returns fact tags (GET fact / list facts). */
+  tags?: TagItem[];
 }
 
 export interface GetFactsRes {
@@ -1006,3 +1079,34 @@ export interface AddCardForFactRes {
   data: { card_id: string };
   meta: { msg: string };
 }
+
+export type { TagItem } from "./tags";
+export {
+  createTag,
+  listTags,
+  getTag,
+  updateTag,
+  deleteTag,
+  getTagFacts,
+  getDeckTags,
+  addTagToDeck,
+  removeTagFromDeck,
+  getFactTags,
+  addTagToFact,
+  removeTagFromFact,
+  deckCardQueryWithTag,
+  getNextCard,
+  getDeckCards,
+} from "./tags";
+export type {
+  CreateTagReq,
+  UpdateTagReq,
+  CreateTagRes,
+  ListTagsRes,
+  GetTagRes,
+  UpdateTagRes,
+  DeleteTagRes,
+  TagFactRef,
+  GetTagFactsRes,
+  TagsListRes,
+} from "./tags";

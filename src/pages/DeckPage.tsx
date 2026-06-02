@@ -31,6 +31,7 @@ import {
   type UploadMediaRes,
   fileLooksLikeJson,
 } from "@/lib/api";
+import { getDeckTags } from "@/lib/tags";
 import {
   DeckHeader,
   DeckEditForm,
@@ -73,6 +74,8 @@ export default function DeckPage() {
   const [fieldNames, setFieldNames] = useState<string[]>([]);
   const [sibling, setSibling] = useState(false);
   const [rate, setRate] = useState(20);
+  const [deckTagIds, setDeckTagIds] = useState<string[]>([]);
+  const [deckTagsRefreshKey, setDeckTagsRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [factRow, setFactRow] = useState<AddFactEntry[]>([]);
@@ -80,6 +83,7 @@ export default function DeckPage() {
   const [addFactSplit, setAddFactSplit] = useState(1);
   const [addingFacts, setAddingFacts] = useState(false);
   const [addFactsError, setAddFactsError] = useState("");
+  const [addFactTagIds, setAddFactTagIds] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [factsList, setFactsList] = useState<FactItem[]>([]);
   const [factsHasMore, setFactsHasMore] = useState(false);
@@ -163,6 +167,13 @@ export default function DeckPage() {
       setRate(data.rate);
       setFactRow(makeInitialFactRow(data));
       setAddFactSplit(1);
+      try {
+        const tagsRes = await getDeckTags(targetDeckId, token);
+        if (routeDeckIdRef.current !== targetDeckId) return;
+        setDeckTagIds(tagsRes.data.tags.map((t) => t.id));
+      } catch {
+        if (routeDeckIdRef.current === targetDeckId) setDeckTagIds([]);
+      }
     } catch (e) {
       if (routeDeckIdRef.current !== targetDeckId) return;
       setError(e instanceof Error ? e.message : "Failed to load deck");
@@ -318,6 +329,7 @@ export default function DeckPage() {
       });
       setEditing(false);
       setSuccessMessage("Deck updated.");
+      setDeckTagsRefreshKey((k) => k + 1);
       await fetchDeck();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
@@ -390,7 +402,12 @@ export default function DeckPage() {
         return;
       }
       const body: AddFactReq = {
-        facts: [{ entries }],
+        facts: [
+          {
+            entries,
+            ...(addFactTagIds.length > 0 ? { tag_ids: addFactTagIds } : {}),
+          },
+        ],
         ...buildTemplateForRequest(row.length, addFactSplit, sibling),
       };
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
@@ -399,6 +416,7 @@ export default function DeckPage() {
         body: JSON.stringify(body),
       });
       setFactRow(makeInitialFactRow(deck));
+      setAddFactTagIds([]);
       setAddFactSplit(1);
       const hasMedia = row.some((e) => e.media.length > 0);
       setSuccessMessage(hasMedia ? "Facts and media added." : "Facts added.");
@@ -605,10 +623,25 @@ export default function DeckPage() {
             saving={saving}
             fieldsLocked={imported}
             onSubmit={handleUpdate}
+            token={token}
+            deckId={id}
+            tagIds={deckTagIds}
+            onTagIdsChange={setDeckTagIds}
             onCancel={() => {
               setEditing(false);
               setError("");
               setSuccessMessage("");
+              if (token && id) {
+                void getDeckTags(id, token)
+                  .then((res) => setDeckTagIds(res.data.tags.map((t) => t.id)))
+                  .catch(() => setDeckTagIds([]));
+                setDeckTagsRefreshKey((k) => k + 1);
+              }
+              if (deck) {
+                setName(deck.name);
+                setFieldNames([...deck.fields]);
+                setRate(deck.rate);
+              }
             }}
           />
         ) : (
@@ -634,10 +667,17 @@ export default function DeckPage() {
             />
             <DeckInfoCard
               deck={deck}
+              token={token}
+              tagsRefreshKey={deckTagsRefreshKey}
               factsEditable={!imported}
               onEdit={() => {
                 setEditing(true);
                 setSuccessMessage("");
+                if (token && id) {
+                  void getDeckTags(id, token)
+                    .then((res) => setDeckTagIds(res.data.tags.map((t) => t.id)))
+                    .catch(() => setDeckTagIds([]));
+                }
               }}
               onPublish={imported ? undefined : () => setPublishOpen(true)}
               onOpenCardFonts={() => setCardFontsOpen(true)}
@@ -755,6 +795,9 @@ export default function DeckPage() {
                     addFactsError={addFactsError}
                     onSubmit={handleAddFacts}
                     onCancel={() => setAddFactsOpen(false)}
+                    token={token}
+                    factTagIds={addFactTagIds}
+                    onFactTagIdsChange={setAddFactTagIds}
                   />
                 </div>
               </div>

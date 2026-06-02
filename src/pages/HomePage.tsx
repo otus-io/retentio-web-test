@@ -5,6 +5,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { homeStrings } from "@/locales/home";
+import { DeckCatalogPanel } from "@/components/catalog/DeckCatalogPanel";
 
 export default function HomePage() {
   const { token } = useAuth();
@@ -52,6 +53,8 @@ export default function HomePage() {
               {t.heroSubtitle}
             </p>
           </section>
+
+          <DeckCatalogPanel token={token} />
 
           <div className="grid gap-8 md:grid-cols-2 md:gap-10 lg:gap-12">
             <section className="space-y-5">

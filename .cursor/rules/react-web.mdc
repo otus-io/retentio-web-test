@@ -1,0 +1,45 @@
+---
+description: React/TypeScript web conventions for the Vite + React Router test app
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React Web (retentio-web-test)
+
+## Stack
+
+- **Build**: Vite 7, TypeScript, Tailwind CSS 3
+- **UI**: React 18, React Router 6, lightweight components in `src/components/ui/`
+- **API**: `src/lib/api.ts` — `request()` to backend; base URL from `VITE_API_URL` (default `http://localhost:8080`)
+- **Auth**: `AuthContext` + JWT in `localStorage` (`wordupx_token`)
+- **i18n**: `LocaleContext` + `src/locales/` (en/zh string modules)
+- **Tests**: Vitest + Testing Library (`*.test.tsx` colocated or under `src/`)
+
+## File organization
+
+```
+src/
+├── components/     # Feature + UI components (catalog/, deck/, facts/, ui/)
+├── contexts/       # Auth, locale
+├── hooks/
+├── lib/            # api.ts, tags, import/export helpers
+├── locales/        # Static copy modules
+├── pages/          # Route-level screens
+└── routes.tsx      # React Router config + ProtectedRoute
+```
+
+## Patterns
+
+- API calls go through `src/lib/api.ts` — do not scatter raw `fetch` in components.
+- Public routes: `/`, `/catalog/:id`, `/login`, `/manual`, `/research`. Protected: `/decks`, `/profile`, etc.
+- Match existing component style: functional components, hooks, Tailwind utility classes.
+- Prefer extending existing types in `api.ts` over ad-hoc response shapes.
+
+## Checks before commit
+
+```bash
+npm test -- --run          # or scoped: npm test -- --run src/lib/api.test.ts
+npm run build
+```
+
+Dev backend URL: see `docs/development.md` (`VITE_API_URL`, `./utils/run-dev.sh`).

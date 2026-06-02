@@ -18,7 +18,7 @@ import {
   type GetDecksRes,
 } from "@/lib/api";
 import { useImportedDeckUpdates } from "@/hooks/useImportedDeckUpdates";
-import { DeckUpdatesAlertBanner } from "@/components/deck";
+import { DeckTagsPicker, DeckUpdatesAlertBanner } from "@/components/deck";
 
 export default function DecksListPage() {
   const { token, logout } = useAuth();
@@ -30,8 +30,10 @@ export default function DecksListPage() {
   const [deleteSuccess, setDeleteSuccess] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
   const [createFieldNames, setCreateFieldNames] = useState<string[]>(["", ""]);
   const [createRate, setCreateRate] = useState(20);
+  const [createTagIds, setCreateTagIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
@@ -91,13 +93,21 @@ export default function DecksListPage() {
     setCreateError("");
     setCreating(true);
     try {
-      const body: CreateDeckReq = { name: createName.trim(), fields, rate: createRate };
+      const body: CreateDeckReq = {
+        name: createName.trim(),
+        ...(createDescription.trim() ? { description: createDescription.trim() } : {}),
+        fields,
+        rate: createRate,
+        ...(createTagIds.length > 0 ? { tag_ids: createTagIds } : {}),
+      };
       const res = await request<CreateDeckRes>("/api/decks", { method: "POST", token, body: JSON.stringify(body) });
       const deckId = res.data.deck_id;
       setCreateOpen(false);
       setCreateName("");
+      setCreateDescription("");
       setCreateFieldNames(["", ""]);
       setCreateRate(20);
+      setCreateTagIds([]);
       setDeleteSuccess("");
       await fetchDecks();
       setCreateSuccess("Deck created.");
@@ -198,6 +208,8 @@ export default function DecksListPage() {
                       setCreateError("");
                       setCreateSuccess("");
                       setImportError("");
+                      setCreateDescription("");
+                      setCreateTagIds([]);
                     }}
                   >
                     Cancel
@@ -212,8 +224,10 @@ export default function DecksListPage() {
                         setCreateSuccess("");
                         setImportError("");
                         setCreateName("");
+                        setCreateDescription("");
                         setCreateFieldNames(["", ""]);
                         setCreateRate(20);
+                        setCreateTagIds([]);
                       }}
                     >
                       Create deck
@@ -268,6 +282,19 @@ export default function DecksListPage() {
                   <Input id="create-name" value={createName} onChange={(e) => setCreateName(e.target.value)} required placeholder="My deck" />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="create-description">Description</Label>
+                  <textarea
+                    id="create-description"
+                    value={createDescription}
+                    onChange={(e) => setCreateDescription(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    placeholder="Optional deck description"
+                  />
+                  <p className="text-xs text-muted-foreground">Up to 500 characters.</p>
+                </div>
+                <div className="space-y-2">
                   <p className="text-sm font-medium">Fields</p>
                   <p className="text-xs text-muted-foreground">One box per field (at least 1).</p>
                   {createFieldNames.map((value, i) => (
@@ -303,6 +330,14 @@ export default function DecksListPage() {
                   <Label htmlFor="create-rate">Rate (1–1000)</Label>
                   <Input id="create-rate" type="number" min={1} max={1000} value={createRate} onChange={(e) => setCreateRate(parseInt(e.target.value, 10) || 20)} />
                 </div>
+                {token && (
+                  <DeckTagsPicker
+                    token={token}
+                    selectedIds={createTagIds}
+                    onSelectedIdsChange={setCreateTagIds}
+                    disabled={creating}
+                  />
+                )}
                 <Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create"}</Button>
               </form>
             )}

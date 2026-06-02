@@ -23,7 +23,7 @@ function renderLogin(initialPath = "/login") {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/profile" element={<p>Profile page</p>} />
+          <Route path="/decks" element={<p>Decks page</p>} />
           <Route path="/register" element={<p>Register page</p>} />
         </Routes>
       </AuthProvider>
@@ -61,7 +61,7 @@ describe("LoginPage", () => {
     expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
   });
 
-  it("redirects to /profile after successful login", async () => {
+  it("redirects to /decks after successful login", async () => {
     const user = userEvent.setup();
     mockFetch
       .mockResolvedValueOnce(
@@ -74,7 +74,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/username/i), "alice");
     await user.type(screen.getByLabelText(/password/i), "secret");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
-    expect(await screen.findByText("Profile page")).toBeInTheDocument();
+    expect(await screen.findByText("Decks page")).toBeInTheDocument();
   });
 
   it("shows an error message when login fails", async () => {
@@ -93,7 +93,7 @@ describe("LoginPage", () => {
       makeResponse({ data: { username: "u", email: "u@example.com" } })
     );
     renderLogin();
-    expect(await screen.findByText("Profile page")).toBeInTheDocument();
+    expect(await screen.findByText("Decks page")).toBeInTheDocument();
   });
 
   it("redirects to the original 'from' location after login", async () => {

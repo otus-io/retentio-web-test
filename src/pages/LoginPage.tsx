@@ -14,7 +14,7 @@ export default function LoginPage() {
   const { login, token, authReady } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/profile";
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/decks";
 
   if (!authReady) {
     return (

@@ -9,18 +9,21 @@ import {
   type UpdateDeckReq,
   type UpdateDeckRes,
 } from "@/lib/api";
+import { getDeckTags } from "@/lib/tags";
 
 export default function DeckEditPage() {
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [fieldNames, setFieldNames] = useState<string[]>([]);
   const [rate, setRate] = useState(20);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [imported, setImported] = useState(false);
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
@@ -30,8 +33,15 @@ export default function DeckEditPage() {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
       setImported(isImportedDeck(res.data));
       setName(res.data.name);
+      setDescription(res.data.description ?? "");
       setFieldNames(res.data.fields.length > 0 ? [...res.data.fields] : ["", ""]);
       setRate(res.data.rate);
+      try {
+        const tagsRes = await getDeckTags(id, token);
+        setTagIds(tagsRes.data.tags.map((t) => t.id));
+      } catch {
+        setTagIds([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load deck");
     } finally {
@@ -60,7 +70,7 @@ export default function DeckEditPage() {
     try {
       const body: UpdateDeckReq = imported
         ? { name: name.trim() || undefined, rate }
-        : { name: name.trim() || undefined, fields, rate };
+        : { name: name.trim() || undefined, description, fields, rate };
       await request<UpdateDeckRes>(`/api/decks/${id}`, {
         method: "PATCH",
         token,
@@ -99,12 +109,18 @@ export default function DeckEditPage() {
         <DeckEditForm
           name={name}
           setName={setName}
+          description={description}
+          setDescription={setDescription}
           fieldNames={fieldNames}
           setFieldNames={setFieldNames}
           rate={rate}
           setRate={setRate}
           saving={saving}
           fieldsLocked={imported}
+          token={token}
+          deckId={id}
+          tagIds={tagIds}
+          onTagIdsChange={setTagIds}
           onSubmit={handleUpdate}
           onCancel={() => navigate("/profile")}
         />
