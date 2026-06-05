@@ -4,6 +4,12 @@ export { DeckTagsPicker } from "./DeckTagsPicker";
 export { DeckInfoCard } from "./DeckInfoCard";
 export { DeckPublishDialog } from "./DeckPublishDialog";
 export { DeckSyncUpdatesModal } from "./DeckSyncUpdatesModal";
+export { SubmitFactFeedbackModal } from "./SubmitFactFeedbackModal";
+export { DeckFeedbackInboxModal } from "./DeckFeedbackInboxModal";
+export {
+  DeckFeedbackAlertBanner,
+  DeckOpenFeedbackBanner,
+} from "./DeckFeedbackAlertBanner";
 export { DeckProvenanceBanner } from "./DeckProvenanceBanner";
 export { DeckPublishedBanner } from "./DeckPublishedBanner";
 export { DeckUpdatesAlertBanner } from "./DeckUpdatesAlertBanner";

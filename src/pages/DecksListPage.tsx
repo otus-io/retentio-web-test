@@ -18,7 +18,8 @@ import {
   type GetDecksRes,
 } from "@/lib/api";
 import { useImportedDeckUpdates } from "@/hooks/useImportedDeckUpdates";
-import { DeckTagsPicker, DeckUpdatesAlertBanner } from "@/components/deck";
+import { useDeckFeedbackNotifications } from "@/hooks/useDeckFeedbackNotifications";
+import { DeckTagsPicker, DeckUpdatesAlertBanner, DeckFeedbackAlertBanner } from "@/components/deck";
 
 export default function DecksListPage() {
   const { token, logout } = useAuth();
@@ -42,6 +43,7 @@ export default function DecksListPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [updatesBannerDismissed, setUpdatesBannerDismissed] = useState(false);
+  const [feedbackBannerDismissed, setFeedbackBannerDismissed] = useState(false);
 
   const {
     updateAvailableByDeckId,
@@ -49,6 +51,14 @@ export default function DecksListPage() {
     updateCount,
     refresh: refreshDeckUpdates,
   } = useImportedDeckUpdates(decks, token);
+
+  const {
+    openCountByDeckId,
+    anyOpenFeedback,
+    totalOpenCount,
+    feedbackDeckCount,
+    firstDeckId: firstDeckWithFeedback,
+  } = useDeckFeedbackNotifications(decks, token);
 
   const firstDeckWithUpdate = decks.find((d) => updateAvailableByDeckId[d.id]);
 
@@ -72,6 +82,10 @@ export default function DecksListPage() {
   useEffect(() => {
     if (anyUpdateAvailable) setUpdatesBannerDismissed(false);
   }, [anyUpdateAvailable, updateCount]);
+
+  useEffect(() => {
+    if (anyOpenFeedback) setFeedbackBannerDismissed(false);
+  }, [anyOpenFeedback, totalOpenCount]);
 
   async function handleLogout() {
     await logout();
@@ -191,6 +205,15 @@ export default function DecksListPage() {
             updateCount={updateCount}
             firstDeckId={firstDeckWithUpdate?.id}
             onDismiss={() => setUpdatesBannerDismissed(true)}
+          />
+        )}
+
+        {!feedbackBannerDismissed && (
+          <DeckFeedbackAlertBanner
+            totalOpenCount={totalOpenCount}
+            feedbackDeckCount={feedbackDeckCount}
+            firstDeckId={firstDeckWithFeedback}
+            onDismiss={() => setFeedbackBannerDismissed(true)}
           />
         )}
 
@@ -372,6 +395,13 @@ export default function DecksListPage() {
                           {updateAvailableByDeckId[d.id] && (
                             <span className="text-xs rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-0.5 font-medium">
                               Update available
+                            </span>
+                          )}
+                          {(openCountByDeckId[d.id] ?? 0) > 0 && (
+                            <span className="text-xs rounded-full bg-blue-500/20 text-blue-900 dark:text-blue-100 px-2 py-0.5 font-medium">
+                              {(openCountByDeckId[d.id] ?? 0) === 1
+                                ? "1 open feedback"
+                                : `${openCountByDeckId[d.id]} open feedback`}
                             </span>
                           )}
                           {isImportedDeck(d) && (

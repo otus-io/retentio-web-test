@@ -74,6 +74,8 @@ interface DeckInfoCardProps {
   onOpenAllCards?: () => void;
   /** Opens publish dialog (source decks only). */
   onPublish?: () => void;
+  /** Opens feedback inbox (published source decks only). */
+  onOpenFeedbackInbox?: () => void;
   deleteConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
@@ -92,6 +94,7 @@ export function DeckInfoCard({
   onOpenAddFacts,
   onOpenAllCards,
   onPublish,
+  onOpenFeedbackInbox,
   deleteConfirm,
   onDeleteConfirm,
   onDeleteCancel,
@@ -145,6 +148,9 @@ export function DeckInfoCard({
             <DropdownMenuItem onClick={onPublish}>
               {published ? "Publish update" : "Publish for sharing"}
             </DropdownMenuItem>
+          )}
+          {onOpenFeedbackInbox && published && !imported && (
+            <DropdownMenuItem onClick={onOpenFeedbackInbox}>Feedback inbox</DropdownMenuItem>
           )}
           {onOpenCardFonts && (
             <DropdownMenuItem onClick={onOpenCardFonts}>Change Font</DropdownMenuItem>

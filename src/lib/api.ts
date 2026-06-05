@@ -712,6 +712,154 @@ export async function syncDeck(
   });
 }
 
+export type FeedbackCategory = "translation" | "audio" | "typo" | "other";
+export type FeedbackStatus = "open" | "accepted" | "resolved" | "dismissed";
+
+export interface ReportedFact {
+  id: string;
+  entries: Entry[];
+}
+
+export interface FeedbackEditPaths {
+  deck_id: string;
+  fact_id: string;
+  get_fact_path: string;
+  patch_fact_path: string;
+}
+
+export interface DeckFeedbackItem {
+  id: string;
+  source_deck_id: string;
+  import_deck_id: string;
+  fact_id: string;
+  reporter: string;
+  source_version: number;
+  category: FeedbackCategory;
+  message?: string;
+  entry_index?: number;
+  reported_fact: ReportedFact;
+  proposed_entries?: Entry[];
+  status: FeedbackStatus;
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string;
+  accepted_at?: string;
+  edit: FeedbackEditPaths;
+}
+
+export interface SubmitFeedbackReq {
+  fact_id: string;
+  category?: FeedbackCategory;
+  message?: string;
+  entry_index?: number;
+  proposed_entries?: Entry[];
+}
+
+export interface SubmitFeedbackRes {
+  data: {
+    feedback_id: string;
+    source_deck_id: string;
+    fact_id: string;
+    status: FeedbackStatus;
+  };
+  meta: { msg: string };
+}
+
+export interface ListDeckFeedbackParams {
+  status?: FeedbackStatus | "";
+  fact_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListDeckFeedbackRes {
+  data: { feedback: DeckFeedbackItem[] };
+  meta: {
+    msg: string;
+    count?: string | number;
+    total?: string | number;
+    limit?: string | number;
+    offset?: string | number;
+    has_more?: string | boolean;
+  };
+}
+
+export interface PatchFeedbackReq {
+  status: "open" | "resolved" | "dismissed";
+}
+
+export interface PatchFeedbackRes {
+  data: DeckFeedbackItem;
+  meta: { msg: string };
+}
+
+export interface AcceptFeedbackRes {
+  data: DeckFeedbackItem & { working_copy_updated?: boolean };
+  meta: { msg: string };
+}
+
+export function feedbackHasMore(meta: ListDeckFeedbackRes["meta"]): boolean {
+  const v = meta.has_more;
+  if (typeof v === "boolean") return v;
+  return v === "true";
+}
+
+export async function submitDeckFeedback(
+  importDeckId: string,
+  body: SubmitFeedbackReq,
+  token: string
+): Promise<SubmitFeedbackRes> {
+  return request<SubmitFeedbackRes>(`/api/decks/${importDeckId}/feedback`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listDeckFeedback(
+  sourceDeckId: string,
+  params: ListDeckFeedbackParams,
+  token: string
+): Promise<ListDeckFeedbackRes> {
+  const sp = new URLSearchParams();
+  if (params.status?.trim()) sp.set("status", params.status.trim());
+  if (params.fact_id?.trim()) sp.set("fact_id", params.fact_id.trim());
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  if (params.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  return request<ListDeckFeedbackRes>(
+    `/api/decks/${sourceDeckId}/feedback${qs ? `?${qs}` : ""}`,
+    { token }
+  );
+}
+
+export async function patchDeckFeedback(
+  sourceDeckId: string,
+  feedbackId: string,
+  body: PatchFeedbackReq,
+  token: string
+): Promise<PatchFeedbackRes> {
+  return request<PatchFeedbackRes>(`/api/decks/${sourceDeckId}/feedback/${feedbackId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function acceptDeckFeedback(
+  sourceDeckId: string,
+  feedbackId: string,
+  token: string
+): Promise<AcceptFeedbackRes> {
+  return request<AcceptFeedbackRes>(
+    `/api/decks/${sourceDeckId}/feedback/${feedbackId}/accept`,
+    {
+      method: "POST",
+      token,
+    }
+  );
+}
+
 export interface GetDecksRes {
   data: { decks: DeckItem[] };
   meta: { msg: string; total: string };

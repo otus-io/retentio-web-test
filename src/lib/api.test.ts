@@ -18,6 +18,11 @@ import {
   importDeck,
   getDeckUpdates,
   syncDeck,
+  submitDeckFeedback,
+  listDeckFeedback,
+  patchDeckFeedback,
+  acceptDeckFeedback,
+  feedbackHasMore,
   resolveMediaFetchUrl,
   normalizeStoredMediaRef,
   isImportedDeck,
@@ -716,6 +721,78 @@ describe("deck sharing API", () => {
     expect(res.data.source_version).toBe(2);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/decks/imp1/sync");
+    expect(init.method).toBe("POST");
+  });
+
+  it("submitDeckFeedback POSTs to import deck feedback endpoint", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          feedback_id: "fb123",
+          source_deck_id: "src1",
+          fact_id: "fact1",
+          status: "open",
+        },
+        meta: { msg: "feedback submitted" },
+      })
+    );
+    const res = await submitDeckFeedback(
+      "imp1",
+      { fact_id: "fact1", category: "typo", message: "Fix spelling" },
+      "tok"
+    );
+    expect(res.data.feedback_id).toBe("fb123");
+    const [url, init] = mockFetch.mock.calls[0] as [string, { method: string; headers: Headers }];
+    expect(url).toContain("/api/decks/imp1/feedback");
+    expect(init.method).toBe("POST");
+    expect(init.headers.get("Authorization")).toBe("Bearer tok");
+  });
+
+  it("listDeckFeedback GETs source deck inbox with filters", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { feedback: [{ id: "fb1", status: "open" }] },
+        meta: { msg: "ok", has_more: "false", total: "1" },
+      })
+    );
+    const res = await listDeckFeedback("src1", { status: "open", limit: 20 }, "tok");
+    expect(res.data.feedback).toHaveLength(1);
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/src1/feedback");
+    expect(url).toContain("status=open");
+    expect(url).toContain("limit=20");
+  });
+
+  it("feedbackHasMore parses meta.has_more", () => {
+    expect(feedbackHasMore({ msg: "ok", has_more: true })).toBe(true);
+    expect(feedbackHasMore({ msg: "ok", has_more: "true" })).toBe(true);
+    expect(feedbackHasMore({ msg: "ok", has_more: false })).toBe(false);
+  });
+
+  it("patchDeckFeedback PATCHes feedback status", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { id: "fb1", status: "resolved" },
+        meta: { msg: "feedback updated" },
+      })
+    );
+    await patchDeckFeedback("src1", "fb1", { status: "resolved" }, "tok");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/decks/src1/feedback/fb1");
+    expect(init.method).toBe("PATCH");
+  });
+
+  it("acceptDeckFeedback POSTs accept endpoint", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { id: "fb1", status: "accepted", working_copy_updated: true },
+        meta: { msg: "feedback accepted" },
+      })
+    );
+    const res = await acceptDeckFeedback("src1", "fb1", "tok");
+    expect(res.data.status).toBe("accepted");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/decks/src1/feedback/fb1/accept");
     expect(init.method).toBe("POST");
   });
 });

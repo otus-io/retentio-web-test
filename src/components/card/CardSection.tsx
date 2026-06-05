@@ -434,6 +434,8 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, entries: Entry[]) => Promise<void>;
+  /** Import decks: open feedback form for the current card's fact. */
+  onReportFact?: (factId: string) => void | Promise<void>;
   /** When next card has precomputed front/back, fact is not loaded. Pass this to fetch fact by id when opening Duplicate or Edit. */
   onRequestFact?: (factId: string) => Promise<FactItem | null>;
   authToken?: string | null;
@@ -457,6 +459,7 @@ export function CardSection({
   onUpdateCard,
   onHideCard,
   onSaveFact,
+  onReportFact,
   onRequestFact,
   authToken,
   rescheduleSuggested,
@@ -558,6 +561,18 @@ export function CardSection({
     rubyPx: cardTypography.back.rubyFontSize,
   };
 
+  const openReportFeedback = async () => {
+    if (!nextCard || !onReportFact) return;
+    if (nextCardFact) {
+      await onReportFact(nextCardFact.id);
+      return;
+    }
+    if (onRequestFact) {
+      const fact = await onRequestFact(nextCard.card.fact_id);
+      if (fact) await onReportFact(fact.id);
+    }
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onSaveFact || !editFactId || !deck) return;
@@ -612,6 +627,14 @@ export function CardSection({
             )}
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
+                {nextCard && onReportFact && (nextCardFact || onRequestFact) && (
+                  <DropdownMenuItem
+                    onClick={() => void openReportFeedback()}
+                    disabled={loadingNextCard}
+                  >
+                    Report to author
+                  </DropdownMenuItem>
+                )}
                 {nextCard && onSaveFact && (nextCardFact || onRequestFact) && (
                   <DropdownMenuItem
                     onClick={openEditPopup}

@@ -40,6 +40,9 @@ import {
   DeckAllCardsModal,
   DeckPublishDialog,
   DeckSyncUpdatesModal,
+  SubmitFactFeedbackModal,
+  DeckFeedbackInboxModal,
+  DeckOpenFeedbackBanner,
   DeckProvenanceBanner,
   DeckPublishedBanner,
 } from "@/components/deck";
@@ -58,6 +61,7 @@ import {
   makeInitialFactRow,
 } from "@/components/facts";
 import { useImportedDeckUpdates } from "@/hooks/useImportedDeckUpdates";
+import { useDeckFeedbackNotifications } from "@/hooks/useDeckFeedbackNotifications";
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
@@ -101,6 +105,9 @@ export default function DeckPage() {
   const [allCardsOpen, setAllCardsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [feedbackSubmitOpen, setFeedbackSubmitOpen] = useState(false);
+  const [feedbackSubmitFact, setFeedbackSubmitFact] = useState<FactItem | null>(null);
+  const [feedbackInboxOpen, setFeedbackInboxOpen] = useState(false);
   const [cardTypography, setCardTypography] = useState<DeckCardSidesTypography>(() =>
     id ? loadDeckCardSidesTypography(id) : DECK_CARD_TYPOGRAPHY_DEFAULTS
   );
@@ -134,6 +141,9 @@ export default function DeckPage() {
     setAllCardsOpen(false);
     setPublishOpen(false);
     setSyncOpen(false);
+    setFeedbackSubmitOpen(false);
+    setFeedbackSubmitFact(null);
+    setFeedbackInboxOpen(false);
     setFactsHasMore(false);
     setFactsTotal(null);
   }, [id]);
@@ -197,6 +207,13 @@ export default function DeckPage() {
     deck &&
       (updateAvailableByDeckId[deck.id] || importedDeckUpdateAvailable(deck))
   );
+
+  const { openCountByDeckId, refresh: refreshFeedbackCounts } = useDeckFeedbackNotifications(
+    decksForUpdates,
+    token,
+    { pollMs: 60 * 1000 }
+  );
+  const openFeedbackCount = deck ? (openCountByDeckId[deck.id] ?? 0) : 0;
 
   const fetchFacts = useCallback(async () => {
     if (!token || !id) return;
@@ -277,6 +294,20 @@ export default function DeckPage() {
       }
     },
     [token, id]
+  );
+
+  const handleReportFact = useCallback(
+    async (factId: string) => {
+      const fact =
+        nextCardFact?.id === factId ? nextCardFact : await fetchFactById(factId);
+      if (!fact) {
+        setError("Could not load fact for feedback.");
+        return;
+      }
+      setFeedbackSubmitFact(fact);
+      setFeedbackSubmitOpen(true);
+    },
+    [nextCardFact, fetchFactById]
   );
 
   useEffect(() => {
@@ -604,6 +635,13 @@ export default function DeckPage() {
 
         {!imported && deck && isPublishedSourceDeck(deck) && <DeckPublishedBanner deck={deck} />}
 
+        {!imported && deck && isPublishedSourceDeck(deck) && openFeedbackCount > 0 && (
+          <DeckOpenFeedbackBanner
+            openCount={openFeedbackCount}
+            onOpenInbox={() => setFeedbackInboxOpen(true)}
+          />
+        )}
+
         {imported && (
           <DeckProvenanceBanner
             deck={deck}
@@ -657,6 +695,7 @@ export default function DeckPage() {
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
               onSaveFact={imported ? undefined : handleSaveFactFromCard}
+              onReportFact={imported ? handleReportFact : undefined}
               onRequestFact={fetchFactById}
               authToken={token}
               rescheduleSuggested={nextCardMeta?.reschedule_suggested}
@@ -680,6 +719,11 @@ export default function DeckPage() {
                 }
               }}
               onPublish={imported ? undefined : () => setPublishOpen(true)}
+              onOpenFeedbackInbox={
+                !imported && isPublishedSourceDeck(deck)
+                  ? () => setFeedbackInboxOpen(true)
+                  : undefined
+              }
               onOpenCardFonts={() => setCardFontsOpen(true)}
               onOpenAddFacts={imported ? undefined : () => setAddFactsOpen(true)}
               onOpenAllCards={() => setAllCardsOpen(true)}
@@ -726,6 +770,42 @@ export default function DeckPage() {
                   void refreshDeckUpdates();
                   await fetchFacts();
                   await handleGetNextCard(false);
+                }}
+              />
+            )}
+            {token && imported && feedbackSubmitFact && (
+              <SubmitFactFeedbackModal
+                open={feedbackSubmitOpen}
+                onClose={() => {
+                  setFeedbackSubmitOpen(false);
+                  setFeedbackSubmitFact(null);
+                }}
+                deck={deck}
+                fact={feedbackSubmitFact}
+                token={token}
+                onSubmitted={async () => {
+                  setSuccessMessage("Feedback sent to the deck author.");
+                }}
+              />
+            )}
+            {token && !imported && isPublishedSourceDeck(deck) && (
+              <DeckFeedbackInboxModal
+                open={feedbackInboxOpen}
+                onClose={() => {
+                  setFeedbackInboxOpen(false);
+                  void refreshFeedbackCounts();
+                }}
+                deck={deck}
+                token={token}
+                onAccepted={async (detail) => {
+                  await fetchFacts();
+                  await fetchDeck();
+                  await refreshFeedbackCounts();
+                  if (detail?.published_version != null) {
+                    setSuccessMessage(
+                      `Feedback accepted and published as v${detail.published_version}. Importers can review and sync.`
+                    );
+                  }
                 }}
               />
             )}
