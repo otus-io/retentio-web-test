@@ -1,0 +1,26 @@
+[Unit]
+Description=Retentio Web Test (Vite static server)
+After=network.target
+
+[Service]
+Type=simple
+User=otus
+Group=otus
+WorkingDirectory=/home/otus/otusio/retentio-web-test
+
+Environment=NODE_ENV=production
+Environment=PORT=3001
+
+ExecStart=/bin/bash /home/otus/otusio/retentio-web-test/utils/run-web-test-prod.sh
+
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=retentio-web-test
+
+[Install]
+WantedBy=multi-user.target
