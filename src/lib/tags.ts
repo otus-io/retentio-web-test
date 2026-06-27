@@ -74,9 +74,25 @@ export function createTag(body: CreateTagReq, token: string): Promise<CreateTagR
   });
 }
 
-/** GET /api/tags */
-export async function listTags(token: string): Promise<ListTagsRes> {
-  const res = await request<ListTagsRes>("/api/tags", { token });
+export type TagUsedOn = "deck" | "fact";
+
+export interface ListTagsOptions {
+  usedOn?: TagUsedOn;
+  /** Required when usedOn is "fact"; optional scope when usedOn is "deck". */
+  deckId?: string;
+}
+
+/** GET /api/tags — optional used_on/deck_id narrow lists for deck or fact pickers. */
+export async function listTags(token: string, options?: ListTagsOptions): Promise<ListTagsRes> {
+  if (options?.usedOn === "fact" && !options.deckId) {
+    throw new Error("deckId is required when usedOn is fact");
+  }
+  const params = new URLSearchParams();
+  if (options?.usedOn) params.set("used_on", options.usedOn);
+  if (options?.deckId) params.set("deck_id", options.deckId);
+  const query = params.toString();
+  const path = `/api/tags${query ? `?${query}` : ""}`;
+  const res = await request<ListTagsRes>(path, { token });
   return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 

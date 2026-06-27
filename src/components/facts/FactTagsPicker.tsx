@@ -46,10 +46,16 @@ export function FactTagsPicker({
   const searchId = idPrefix ? `${idPrefix}-fact-tags-search` : "fact-tags-search";
 
   const refreshTags = useCallback(async () => {
+    if (!deckId) {
+      setTags([]);
+      setLoadError("Deck is required to load fact tags");
+      setLoading(false);
+      return;
+    }
     setLoadError("");
     setLoading(true);
     try {
-      const res = await listTags(token);
+      const res = await listTags(token, { usedOn: "fact", deckId });
       const sorted = [...res.data.tags].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       );
@@ -60,7 +66,7 @@ export function FactTagsPicker({
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, deckId]);
 
   useEffect(() => {
     void refreshTags();
@@ -181,7 +187,7 @@ export function FactTagsPicker({
       const msg = err instanceof Error ? err.message : "Failed to create tag";
       if (/already exists/i.test(msg)) {
         try {
-          const res = await listTags(token);
+          const res = await listTags(token, { usedOn: "fact", deckId: deckId! });
           const sorted = [...res.data.tags].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
           );

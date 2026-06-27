@@ -1022,17 +1022,37 @@
 
 **接口：** `GET /api/decks/{id}/cards`
 
+可选查询参数 `tag_id` 会同时筛选 `stats` 与 `cards`，仅包含本卡组中带该标签的词条卡片。
+
 **响应示例：**
+
+`data.stats` 与 `GET /api/decks/{id}` 相同（`cards_count`、`facts_count`、`unseen_cards`、`reviewed_cards`、`due_cards`、`hidden_cards`、`new_cards_today`、`last_reviewed_at`，以及可选的 `orphaned_hidden_cards`）。响应还包含完整 `cards` 数组。
 
 ```json
 {
   "data": {
-    "total_cards": 20,
-    "hidden_count": 3,
-    "hidden_facts": [
-      { "id": "h1d2e3n4", "entries": ["Hidden word", "隠れた語"], "fields": ["English", "Japanese"] }
-    ],
-    "orphaned_hidden_cards": 0
+    "stats": {
+      "cards_count": 20,
+      "facts_count": 15,
+      "unseen_cards": 5,
+      "reviewed_cards": 15,
+      "due_cards": 7,
+      "hidden_cards": 3,
+      "new_cards_today": 2,
+      "last_reviewed_at": 1710000000,
+      "orphaned_hidden_cards": 1
+    },
+    "cards": [
+      {
+        "id": "cd1ef2gh",
+        "fact_id": "h1d2e3n4",
+        "template": [[0], [1]],
+        "last_review": 1710000000,
+        "due_date": 1710500000,
+        "hidden": true,
+        "created_at": 1709000000
+      }
+    ]
   },
   "meta": { "msg": "Card stats retrieved successfully" }
 }

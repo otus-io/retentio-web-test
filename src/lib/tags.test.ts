@@ -49,6 +49,40 @@ describe("tags API", () => {
     await listTags("tok");
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toContain("/api/tags");
+    expect(url).not.toContain("used_on");
+  });
+
+  it("listTags with used_on=deck adds deck picker query", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { tags: [] }, meta: { msg: "ok" } })
+    );
+    await listTags("tok", { usedOn: "deck" });
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("used_on=deck");
+  });
+
+  it("listTags with used_on=deck and deckId adds deck_id query", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { tags: [] }, meta: { msg: "ok" } })
+    );
+    await listTags("tok", { usedOn: "deck", deckId: "deck1" });
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("used_on=deck");
+    expect(url).toContain("deck_id=deck1");
+  });
+
+  it("listTags with used_on=fact requires deckId", async () => {
+    await expect(listTags("tok", { usedOn: "fact" })).rejects.toThrow(/deckId is required/i);
+  });
+
+  it("listTags with used_on=fact and deckId adds query params", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { tags: [] }, meta: { msg: "ok" } })
+    );
+    await listTags("tok", { usedOn: "fact", deckId: "deck1" });
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("used_on=fact");
+    expect(url).toContain("deck_id=deck1");
   });
 
   it("updateTag PATCHes /api/tags/{id}", async () => {

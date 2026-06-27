@@ -26,6 +26,7 @@ import {
   resolveMediaFetchUrl,
   normalizeStoredMediaRef,
   isImportedDeck,
+  deckDisplayOwner,
   isPublishedSourceDeck,
   deckHasUpdatesAvailable,
   LIST_PAGINATION_DEFAULT_LIMIT,
@@ -573,6 +574,12 @@ describe("deck sharing helpers", () => {
     expect(isImportedDeck({ source_deck_id: "src1" })).toBe(true);
     expect(isImportedDeck({})).toBe(false);
     expect(isImportedDeck({ source_deck_id: "  " })).toBe(false);
+  });
+
+  it("deckDisplayOwner trims owner or returns em dash", () => {
+    expect(deckDisplayOwner({ owner: " alice " })).toBe("alice");
+    expect(deckDisplayOwner({ owner: "" })).toBe("—");
+    expect(deckDisplayOwner({})).toBe("—");
   });
 
   it("isPublishedSourceDeck is true when published_version > 0", () => {

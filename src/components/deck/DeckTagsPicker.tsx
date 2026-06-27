@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { TagNameSearchCombo } from "@/components/tags/TagNameSearchCombo";
 import { addTagToDeck, createTag, listTags, removeTagFromDeck, type TagItem } from "@/lib/tags";
 
-const MAX_DECK_TAGS = 20;
+const MAX_DECK_TAGS = 100;
 
 /** Match backend tag name normalization (trim, collapse spaces, lowercase). */
 export function normalizeTagName(raw: string): string {
@@ -39,7 +39,7 @@ export function DeckTagsPicker({
     setLoadError("");
     setLoading(true);
     try {
-      const res = await listTags(token);
+      const res = await listTags(token, { usedOn: "deck", deckId });
       const sorted = [...res.data.tags].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       );
@@ -50,7 +50,7 @@ export function DeckTagsPicker({
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, deckId]);
 
   useEffect(() => {
     void refreshTags();
@@ -177,7 +177,7 @@ export function DeckTagsPicker({
       const msg = err instanceof Error ? err.message : "Failed to create tag";
       if (/already exists/i.test(msg)) {
         try {
-          const res = await listTags(token);
+          const res = await listTags(token, { usedOn: "deck", deckId });
           const sorted = [...res.data.tags].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
           );

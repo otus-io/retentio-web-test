@@ -1017,17 +1017,37 @@ Permanently remove a single card from a deck. The fact and any other cards for t
 
 **Endpoint:** `GET /api/decks/{id}/cards`
 
+Optional query `tag_id` filters both `stats` and `cards` to facts tagged in this deck.
+
 **Response:**
+
+`data.stats` matches `GET /api/decks/{id}` (`cards_count`, `facts_count`, `unseen_cards`, `reviewed_cards`, `due_cards`, `hidden_cards`, `new_cards_today`, `last_reviewed_at`, optional `orphaned_hidden_cards`). Response also includes `cards` (full card array).
 
 ```json
 {
   "data": {
-    "total_cards": 20,
-    "hidden_count": 3,
-    "hidden_facts": [
-      { "id": "h1d2e3n4", "entries": ["Hidden word", "隠れた語"], "fields": ["English", "Japanese"] }
-    ],
-    "orphaned_hidden_cards": 0
+    "stats": {
+      "cards_count": 20,
+      "facts_count": 15,
+      "unseen_cards": 5,
+      "reviewed_cards": 15,
+      "due_cards": 7,
+      "hidden_cards": 3,
+      "new_cards_today": 2,
+      "last_reviewed_at": 1710000000,
+      "orphaned_hidden_cards": 1
+    },
+    "cards": [
+      {
+        "id": "cd1ef2gh",
+        "fact_id": "h1d2e3n4",
+        "template": [[0], [1]],
+        "last_review": 1710000000,
+        "due_date": 1710500000,
+        "hidden": true,
+        "created_at": 1709000000
+      }
+    ]
   },
   "meta": { "msg": "Card stats retrieved successfully" }
 }
@@ -1163,7 +1183,7 @@ For full design (upload, delete, display, sync), see **[Media Upload design doc]
 | `/api/decks/{id}/facts/{factId}` | DELETE | `{ "data": { "fact_id" }, "meta": { "msg" } }` |
 | `/api/decks/{id}/card` | GET | `{ "data": { "card": { id, fact_id, template, …, front[], back[] }, "urgency" }, "meta": { "msg", … } }` |
 | `/api/decks/{id}/card` | PATCH | Interval: `{ "data": { "last_review", "due_date", "new_interval" }, "meta": { "msg" } }`; visibility: `{ "data": { "hidden_status" }, "meta": { "msg" } }` |
-| `/api/decks/{id}/cards` | GET | `{ "data": { "total_cards", "hidden_count", "hidden_facts", "orphaned_hidden_cards" }, "meta": { "msg" } }` |
+| `/api/decks/{id}/cards` | GET | `{ "data": { "stats": { … }, "cards": [ … ] }, "meta": { "msg" } }` — optional `tag_id` query |
 | `/api/decks/{id}/cards/{cardId}` | DELETE | `{ "data": { "card_id" }, "meta": { "msg" } }` |
 | `/api/decks/{id}/reschedule` | POST | `{ "data": { "cards_shifted", "days", "max_days_away" }, "meta": { "msg" } }` |
 | `/api/media` | POST | `{ "data": { id, owner, filename, mime, size, checksum, created_at }, "meta": { "msg" } }` |

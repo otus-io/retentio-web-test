@@ -400,6 +400,7 @@ export function AddFactsForm({
       {token && onFactTagIdsChange && (
         <FactTagsPicker
           token={token}
+          deckId={deck.id}
           selectedIds={factTagIds}
           onSelectedIdsChange={onFactTagIdsChange}
           disabled={addingFacts}

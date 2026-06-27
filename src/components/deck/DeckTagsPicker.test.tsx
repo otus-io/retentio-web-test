@@ -15,6 +15,16 @@ import { listTags, createTag } from "@/lib/tags";
 const mockListTags = vi.mocked(listTags);
 const mockCreateTag = vi.mocked(createTag);
 
+const deckOnlyTags = {
+  data: {
+    tags: [
+      { id: "d1", name: "IELTS", description: "" },
+      { id: "d2", name: "vocabulary", description: "" },
+    ],
+  },
+  meta: { msg: "ok" },
+};
+
 describe("normalizeTagName", () => {
   it("trims, collapses spaces, lowercases", () => {
     expect(normalizeTagName("  GRE   Prep ")).toBe("gre prep");
@@ -24,15 +34,46 @@ describe("normalizeTagName", () => {
 describe("DeckTagsPicker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockListTags.mockResolvedValue({
-      data: {
-        tags: [
-          { id: "t1", name: "verb", description: "" },
-          { id: "t2", name: "noun", description: "" },
-        ],
-      },
-      meta: { msg: "ok" },
-    });
+    mockListTags.mockResolvedValue(deckOnlyTags);
+  });
+
+  it("loads deck-scoped tags via used_on=deck", async () => {
+    render(
+      <DeckTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={vi.fn()} />
+    );
+
+    await waitFor(() =>
+      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck", deckId: undefined })
+    );
+  });
+
+  it("passes deckId when editing an existing deck", async () => {
+    render(
+      <DeckTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck", deckId: "deck1" })
+    );
+  });
+
+  it("shows only tags returned by the deck picker API", async () => {
+    const user = userEvent.setup();
+    render(
+      <DeckTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={vi.fn()} />
+    );
+
+    await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
+    await user.click(screen.getByRole("combobox"));
+
+    expect(screen.getByRole("option", { name: "IELTS" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "vocabulary" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "verb" })).not.toBeInTheDocument();
   });
 
   it("loads tags and adds selection from search results", async () => {
@@ -45,8 +86,8 @@ describe("DeckTagsPicker", () => {
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "verb" }));
-    expect(onChange).toHaveBeenCalledWith(["t1"]);
+    await user.click(screen.getByRole("option", { name: "IELTS" }));
+    expect(onChange).toHaveBeenCalledWith(["d1"]);
   });
 
   it("filters tags as the user types", async () => {
@@ -57,10 +98,10 @@ describe("DeckTagsPicker", () => {
 
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
     await user.click(screen.getByRole("combobox"));
-    await user.type(screen.getByRole("combobox"), "noun");
+    await user.type(screen.getByRole("combobox"), "vocab");
 
-    expect(screen.getByRole("option", { name: "noun" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "verb" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "vocabulary" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "IELTS" })).not.toBeInTheDocument();
   });
 
   it("Add creates a new tag and selects it", async () => {
@@ -86,7 +127,7 @@ describe("DeckTagsPicker", () => {
   it("edit mode persists add via addTagToDeck", async () => {
     const { addTagToDeck } = await import("@/lib/tags");
     vi.mocked(addTagToDeck).mockResolvedValue({
-      data: { tags: [{ id: "t1", name: "verb", description: "" }] },
+      data: { tags: [{ id: "d1", name: "IELTS", description: "" }] },
       meta: { msg: "ok" },
     });
     const user = userEvent.setup();
@@ -101,9 +142,9 @@ describe("DeckTagsPicker", () => {
     );
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "verb" }));
-    await waitFor(() => expect(addTagToDeck).toHaveBeenCalledWith("deck1", "t1", "tok"));
-    expect(onChange).toHaveBeenCalledWith(["t1"]);
+    await user.click(screen.getByRole("option", { name: "IELTS" }));
+    await waitFor(() => expect(addTagToDeck).toHaveBeenCalledWith("deck1", "d1", "tok"));
+    expect(onChange).toHaveBeenCalledWith(["d1"]);
   });
 
   it("Add selects existing tag by normalized name without creating", async () => {
@@ -115,10 +156,10 @@ describe("DeckTagsPicker", () => {
 
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
 
-    await user.type(screen.getByRole("combobox"), "  VERB ");
+    await user.type(screen.getByRole("combobox"), "  IELTS ");
     await user.click(screen.getByRole("button", { name: /^add$/i }));
 
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["t1"]));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["d1"]));
     expect(mockCreateTag).not.toHaveBeenCalled();
   });
 });

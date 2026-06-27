@@ -15,32 +15,73 @@ import { listTags, createTag } from "@/lib/tags";
 const mockListTags = vi.mocked(listTags);
 const mockCreateTag = vi.mocked(createTag);
 
+const factOnlyTags = {
+  data: {
+    tags: [
+      { id: "f1", name: "verb", description: "" },
+      { id: "f2", name: "noun", description: "" },
+    ],
+  },
+  meta: { msg: "ok" },
+};
+
 describe("FactTagsPicker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockListTags.mockResolvedValue({
-      data: {
-        tags: [
-          { id: "t1", name: "verb", description: "" },
-          { id: "t2", name: "noun", description: "" },
-        ],
-      },
-      meta: { msg: "ok" },
-    });
+    mockListTags.mockResolvedValue(factOnlyTags);
+  });
+
+  it("loads fact-scoped tags via used_on=fact and deckId", async () => {
+    render(
+      <FactTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "fact", deckId: "deck1" })
+    );
+  });
+
+  it("shows only tags returned by the fact picker API", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
+    await user.click(screen.getByRole("combobox"));
+
+    expect(screen.getByRole("option", { name: "verb" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "noun" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "IELTS" })).not.toBeInTheDocument();
   });
 
   it("loads tags and adds selection from search results", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
-      <FactTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={onChange} />
+      <FactTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={onChange}
+      />
     );
 
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
 
     await user.click(screen.getByRole("combobox"));
     await user.click(screen.getByRole("option", { name: "verb" }));
-    expect(onChange).toHaveBeenCalledWith(["t1"]);
+    expect(onChange).toHaveBeenCalledWith(["f1"]);
   });
 
   it("Add creates a new tag and selects it", async () => {
@@ -51,7 +92,12 @@ describe("FactTagsPicker", () => {
     });
     const onChange = vi.fn();
     render(
-      <FactTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={onChange} />
+      <FactTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={onChange}
+      />
     );
 
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
@@ -66,7 +112,7 @@ describe("FactTagsPicker", () => {
   it("edit mode persists add via addTagToFact", async () => {
     const { addTagToFact } = await import("@/lib/tags");
     vi.mocked(addTagToFact).mockResolvedValue({
-      data: { tags: [{ id: "t1", name: "verb", description: "" }] },
+      data: { tags: [{ id: "f1", name: "verb", description: "" }] },
       meta: { msg: "ok" },
     });
     const user = userEvent.setup();
@@ -83,15 +129,20 @@ describe("FactTagsPicker", () => {
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
     await user.click(screen.getByRole("combobox"));
     await user.click(screen.getByRole("option", { name: "verb" }));
-    await waitFor(() => expect(addTagToFact).toHaveBeenCalledWith("deck1", "fact1", "t1", "tok"));
-    expect(onChange).toHaveBeenCalledWith(["t1"]);
+    await waitFor(() => expect(addTagToFact).toHaveBeenCalledWith("deck1", "fact1", "f1", "tok"));
+    expect(onChange).toHaveBeenCalledWith(["f1"]);
   });
 
   it("Add selects existing tag by normalized name without creating", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
-      <FactTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={onChange} />
+      <FactTagsPicker
+        token="tok"
+        deckId="deck1"
+        selectedIds={[]}
+        onSelectedIdsChange={onChange}
+      />
     );
 
     await waitFor(() => expect(screen.getByRole("combobox")).not.toBeDisabled());
@@ -99,7 +150,7 @@ describe("FactTagsPicker", () => {
     await user.type(screen.getByRole("combobox"), "  VERB ");
     await user.click(screen.getByRole("button", { name: /^add$/i }));
 
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["t1"]));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["f1"]));
     expect(mockCreateTag).not.toHaveBeenCalled();
   });
 
@@ -112,9 +163,10 @@ describe("FactTagsPicker", () => {
     render(
       <FactTagsPicker
         token="tok"
-        selectedIds={["t1"]}
+        deckId="deck1"
+        selectedIds={["f1"]}
         onSelectedIdsChange={vi.fn()}
-        tagItems={[{ id: "t1", name: "verb", description: "" }]}
+        tagItems={[{ id: "f1", name: "verb", description: "" }]}
         compact
       />
     );

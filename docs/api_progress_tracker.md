@@ -54,7 +54,7 @@
 | `GET /api/decks/{id}/card` | 获取最紧急卡片 | ✅ | ✅ |
 | `POST /api/decks/{id}/card` | 为已有词条添加一张卡片（body: fact_id, template [[正面],[背面]]，可选 operation: append/prepend/shuffle/spread） | ✅ | ✅ |
 | `PATCH /api/decks/{id}/card` | 更新卡片间隔或可见性（按 card_id 查找，支持 last_review 离线同步） | ✅ | ✅ |
-| `GET /api/decks/{id}/cards` | 获取卡片统计（总数、隐藏数量、隐藏事实） | ✅ | ✅ |
+| `GET /api/decks/{id}/cards` | 返回 `stats`（与 GET deck 相同）+ 完整 `cards` 列表；可选 `tag_id` 按词条标签筛选 | ✅ | ✅ |
 | `DELETE /api/decks/{id}/cards/{cardId}` | 删除单张卡片（词条与其他卡片不变） | ✅ | ✅ |
 | `POST /api/decks/{id}/reschedule` | 假期模式：按天数平移卡片复习计划 | ✅ | ✅ |
 
@@ -94,7 +94,7 @@
 | 接口 | 说明 | 前端 | 后端 |
 | --- | --- | --- | --- |
 | `POST /api/tags` | 创建标签 | ✅ (`src/lib/tags.ts`) | ✅ |
-| `GET /api/tags` | 列出用户标签 | ✅ | ✅ |
+| `GET /api/tags` | 列出用户标签；可选 `used_on=deck` 或 `used_on=fact&deck_id={id}` 缩小选择器范围 | ✅ (`listTags`) | ✅ |
 | `GET /api/tags/{tagId}` | 获取单个标签 | ✅ | ✅ |
 | `PATCH /api/tags/{tagId}` | 更新名称/描述 | ✅ | ✅ |
 | `DELETE /api/tags/{tagId}` | 删除标签及关联 | ✅ | ✅ |
@@ -108,6 +108,18 @@
 | `GET /api/decks/{id}/card?tag_id=` | 按标签筛选下一张卡 | ✅ (`getNextCard`) | ✅ |
 | `GET /api/decks/{id}/cards?tag_id=` | 按标签筛选卡片统计 | ✅ (`getDeckCards`) | ✅ |
 | `POST /api/decks` `tags` / `tag_ids` | 创建卡组时打标签 | ✅ (类型) | ✅ |
+
+### 卡组共享 / 发布
+
+| 接口 | 说明 | 前端 | 后端 |
+| --- | --- | --- | --- |
+| `POST /api/decks/{id}/publish` | 发布或更新快照（首次须 `visibility: public`；标签名随快照） | ✅ (`DeckPublishDialog`) | ✅ |
+| `GET /api/decks/catalog` | 浏览已发布卡组（含 `deck_tag_names`） | ✅ | ✅ |
+| `GET /api/decks/catalog/{id}` | 单条目录详情 | ✅ | ✅ |
+| `POST /api/decks/import` | 按源卡组 ID 导入 | ✅ | ✅ |
+| `GET /api/decks/{id}/updates` | 导入卡组查看源更新 diff | ✅ | ✅ |
+| `POST /api/decks/{id}/sync` | 接受源卡组新版本 | ✅ | ✅ |
+| `PATCH /api/decks/{id}` `visibility` | 首次发布前可改可见性；已发布后冻结 | ✅ | ✅ |
 
 ---
 

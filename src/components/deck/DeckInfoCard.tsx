@@ -4,6 +4,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
+  deckDisplayOwner,
   isImportedDeck,
   isPublishedSourceDeck,
   type DeckItem,
@@ -268,7 +269,8 @@ export function DeckInfoCard({
               {formatPublishedLabel(deck, imported)}
             </li>
             <li>
-              <span className="text-muted-foreground">Owner:</span> {deck.owner || "—"}
+              <span className="text-muted-foreground">{imported ? "Author:" : "Owner:"}</span>{" "}
+              {deckDisplayOwner(deck)}
             </li>
             <li>
               <span className="text-muted-foreground">Created:</span>{" "}

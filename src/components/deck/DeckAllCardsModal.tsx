@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { request, type DeckCardListItem, type GetCardsRes } from "@/lib/api";
+import { listTags } from "@/lib/tags";
 import { formatUnixSecondsUtc } from "@/lib/unixTime";
 
 export type DeckAllCardsFilter = "all" | "Hidden" | "Unseen" | "Due" | "Seen";
@@ -15,34 +16,55 @@ export function buildGetAllCardsPath(deckId: string, tagId: string): string {
   return `${deckPath}?tag_id=${encodeURIComponent(trimmedTagId)}`;
 }
 
-function idSet(list: DeckCardListItem[] | undefined): Set<string> {
-  return new Set((list ?? []).map((c) => c.id));
+function bucketDeckCards(cards: DeckCardListItem[], nowUnix = Math.floor(Date.now() / 1000)) {
+  const hidden: DeckCardListItem[] = [];
+  const unseen: DeckCardListItem[] = [];
+  const due: DeckCardListItem[] = [];
+  const seen: DeckCardListItem[] = [];
+  for (const card of cards) {
+    if (card.hidden) {
+      hidden.push(card);
+      continue;
+    }
+    const isUnseen = card.due_date - card.last_review === 1;
+    if (isUnseen) unseen.push(card);
+    if (card.due_date <= nowUnix) due.push(card);
+    if (card.due_date > nowUnix && !isUnseen) seen.push(card);
+  }
+  return { hidden, unseen, due, seen };
 }
 
-/** Rows for the selected filter — uses only lists/counts from `GET /api/decks/{id}/cards`. */
+function idSet(list: DeckCardListItem[]): Set<string> {
+  return new Set(list.map((c) => c.id));
+}
+
+/** Rows for the selected filter — buckets `data.cards` with the same rules as backend stats. */
 export function pickCardsForFilter(data: GetCardsData, filter: DeckAllCardsFilter): DeckCardListItem[] {
+  const cards = data.cards ?? [];
+  const buckets = bucketDeckCards(cards);
   switch (filter) {
     case "all":
-      return data.cards ?? [];
+      return cards;
     case "Hidden":
-      return data.hidden_cards_list ?? [];
+      return buckets.hidden;
     case "Unseen":
-      return data.unseen_cards_list ?? [];
+      return buckets.unseen;
     case "Due":
-      return data.due_cards_list ?? [];
+      return buckets.due;
     case "Seen":
-      return data.seen_cards_list ?? [];
+      return buckets.seen;
     default:
-      return data.cards ?? [];
+      return cards;
   }
 }
 
-/** Category column from server-provided membership lists (same semantics as filter tabs). */
+/** Category column from card buckets (same semantics as filter tabs). */
 export function categoryLabelForGetCardsRow(card: DeckCardListItem, data: GetCardsData): string {
-  const hidden = idSet(data.hidden_cards_list);
-  const unseen = idSet(data.unseen_cards_list);
-  const due = idSet(data.due_cards_list);
-  const seen = idSet(data.seen_cards_list);
+  const buckets = bucketDeckCards(data.cards ?? []);
+  const hidden = idSet(buckets.hidden);
+  const unseen = idSet(buckets.unseen);
+  const due = idSet(buckets.due);
+  const seen = idSet(buckets.seen);
   if (hidden.has(card.id)) return "Hidden";
   const parts: string[] = [];
   if (unseen.has(card.id)) parts.push("Unseen");
@@ -68,20 +90,10 @@ interface DeckAllCardsModalProps {
   token: string | null;
 }
 
-interface DeckTagItem {
+interface FilterTagItem {
   id: string;
   name: string;
   description?: string;
-}
-
-interface GetDeckTagsRes {
-  data: { tags: DeckTagItem[] };
-  meta?: { msg?: string };
-}
-
-interface GetUserTagsRes {
-  data: { tags: DeckTagItem[] };
-  meta?: { msg?: string };
 }
 
 export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token }: DeckAllCardsModalProps) {
@@ -90,10 +102,9 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
   const [data, setData] = useState<GetCardsData | null>(null);
   const [filter, setFilter] = useState<DeckAllCardsFilter>("all");
   const [tagId, setTagId] = useState("");
-  const [deckTags, setDeckTags] = useState<DeckTagItem[]>([]);
+  const [filterTags, setFilterTags] = useState<FilterTagItem[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [tagsError, setTagsError] = useState("");
-  const [tagSource, setTagSource] = useState<"deck" | "user">("deck");
 
   const load = useCallback(async (tagIdOverride?: string) => {
     if (!token || !deckId) return;
@@ -111,24 +122,18 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
     }
   }, [deckId, tagId, token]);
 
-  const loadDeckTags = useCallback(async () => {
+  const loadFilterTags = useCallback(async () => {
     if (!token || !deckId) return;
     setTagsLoading(true);
     setTagsError("");
     try {
-      const deckRes = await request<GetDeckTagsRes>(`/api/decks/${encodeURIComponent(deckId)}/tags`, { token });
-      const tags = deckRes.data.tags ?? [];
-      if (tags.length > 0) {
-        setDeckTags(tags);
-        setTagSource("deck");
-      } else {
-        const userRes = await request<GetUserTagsRes>("/api/tags", { token });
-        setDeckTags(userRes.data.tags ?? []);
-        setTagSource("user");
-      }
+      const res = await listTags(token, { usedOn: "fact", deckId });
+      const sorted = [...(res.data.tags ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      );
+      setFilterTags(sorted);
     } catch (e) {
-      setDeckTags([]);
-      setTagSource("deck");
+      setFilterTags([]);
       setTagsError(e instanceof Error ? e.message : "Failed to load tags");
     } finally {
       setTagsLoading(false);
@@ -140,8 +145,8 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
     setFilter("all");
     setTagId("");
     void load();
-    void loadDeckTags();
-  }, [open, load, loadDeckTags]);
+    void loadFilterTags();
+  }, [open, load, loadFilterTags]);
 
   const filteredRows = useMemo(() => {
     if (!data) return [];
@@ -152,7 +157,10 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
     }));
   }, [data, filter]);
 
-  const seenOnlyCount = data?.seen_cards_list?.length ?? 0;
+  const seenOnlyCount = useMemo(() => {
+    if (!data) return 0;
+    return bucketDeckCards(data.cards ?? []).seen.length;
+  }, [data]);
 
   if (!open) return null;
 
@@ -189,10 +197,10 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {data && !loading && (
             <p className="text-sm text-muted-foreground">
-              Total {data.total_cards} · Due {data.due_cards} · Unseen {data.unseen_cards} · Seen (not due) {seenOnlyCount}{" "}
-              · Hidden {data.hidden_cards_count}
-              {data.orphaned_hidden_cards != null && data.orphaned_hidden_cards > 0
-                ? ` · Orphaned hidden ${data.orphaned_hidden_cards}`
+              Total {data.stats.cards_count} · Due {data.stats.due_cards} · Unseen {data.stats.unseen_cards} · Seen (not due) {seenOnlyCount}{" "}
+              · Hidden {data.stats.hidden_cards}
+              {data.stats.orphaned_hidden_cards != null && data.stats.orphaned_hidden_cards > 0
+                ? ` · Orphaned hidden ${data.stats.orphaned_hidden_cards}`
                 : ""}
             </p>
           )}
@@ -227,7 +235,7 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
                 disabled={loading || tagsLoading}
               >
                 <option value="">All tags</option>
-                {deckTags.map((tag) => (
+                {filterTags.map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.name} ({tag.id})
                   </option>
@@ -240,12 +248,10 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
-              {tagSource === "deck"
-                ? "Deck tags loaded in the dropdown."
-                : "No deck tags yet; dropdown shows all your tags."}
+              Fact tags in this deck (plus unused tags you can attach to facts).
             </p>
             {tagsError && <p className="text-sm text-destructive">{tagsError}</p>}
-            {!tagsLoading && deckTags.length === 0 && (
+            {!tagsLoading && filterTags.length === 0 && (
               <p className="text-sm text-muted-foreground">No tags found.</p>
             )}
             {tagsLoading && <p className="text-sm text-muted-foreground">Loading tags…</p>}

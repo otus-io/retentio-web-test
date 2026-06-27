@@ -1,4 +1,20 @@
 ---
+# Deploy to production over SSH: pull main, install, build, run via systemd.
+#
+# Production app directory: ~/otusio/retentio-web-test
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   SERVER_HOST       — hostname or IP
+#   SERVER_USERNAME   — SSH user (e.g. otus)
+#   SERVER_SSH_KEY    — private key for that user; matching public key in ~/.ssh/authorized_keys on the server
+#
+# Server prerequisites:
+#   — Git, Node.js 20+ on PATH (nvm or system install)
+#   — npm 10+
+#   — Passwordless sudo for cp of utils/retentio-web-test.service → /etc/systemd/system/,
+#     plus systemctl daemon-reload, enable, restart (see retentio-backend/docs/server-side-config.md)
+#   — Repo cloned at ~/otusio/retentio-web-test with origin able to fetch this repository
+
 name: Deploy Web Test
 
 on:
@@ -15,20 +31,47 @@ on:
       - 'tailwind.config.js'
       - 'postcss.config.js'
       - '.env.example'
+      - 'utils/run-web-test-prod.sh'
+      - 'utils/retentio-web-test.service'
       - '.github/workflows/deploy-web-test.yml'
 
 jobs:
   deploy-web-test:
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
-      - name: Deploy webapp to server
-        uses: appleboy/ssh-action@v1
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 30m
+          script_stop: true
           script: |
-            cd "$HOME/otusio/retentio-web-test" || exit 1
-            git pull origin main || exit 1
-            npm ci --include=dev || exit 1
-            VITE_API_URL=https://api.retentio.app:8443 npm run build || exit 1
+            set -euo pipefail
+            cd ~/otusio/retentio-web-test
+            source ~/.profile 2>/dev/null || true
+            source ~/.bashrc 2>/dev/null || true
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              . "$NVM_DIR/nvm.sh"
+              nvm use 2>/dev/null || nvm use default 2>/dev/null || true
+            fi
+            REQUIRED_NODE_VERSION="20.0.0"
+            NODE_VERSION="$(node -v 2>/dev/null | sed 's/^v//' || echo 0)"
+            if [ "$(printf '%s\n' "$REQUIRED_NODE_VERSION" "$NODE_VERSION" | sort -V | head -n1)" != "$REQUIRED_NODE_VERSION" ]; then
+              echo "node $NODE_VERSION found; require >=$REQUIRED_NODE_VERSION"
+              exit 1
+            fi
+            node -v
+            npm ci --include=dev
+            VITE_API_URL=https://api.retentio.app:8443 npm run build
+            sudo cp ~/otusio/retentio-web-test/utils/retentio-web-test.service /etc/systemd/system/retentio-web-test.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable retentio-web-test
+            sudo systemctl restart retentio-web-test || exit 1

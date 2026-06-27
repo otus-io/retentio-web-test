@@ -491,17 +491,19 @@ export interface DeckStats {
   due_cards: number;
   facts_count: number;
   hidden_cards: number;
-  last_reviewed_at?: number;
+  last_reviewed_at: number;
   new_cards_today: number;
   reviewed_cards: number;
   unseen_cards: number;
+  orphaned_hidden_cards?: number;
 }
 
 export interface DeckItem {
   id: string;
   name: string;
   description?: string;
-  owner: string;
+  /** Source author on imports; omitted when source metadata is unavailable. */
+  owner?: string;
   fields: string[];
   rate: number;
   stats: DeckStats;
@@ -526,6 +528,11 @@ export interface DeckItem {
 /** True when this deck is an imported study copy (read-only facts). */
 export function isImportedDeck(deck: Pick<DeckItem, "source_deck_id">): boolean {
   return Boolean(deck.source_deck_id?.trim());
+}
+
+/** Author username for display. Imported decks use the source author (API `owner`). */
+export function deckDisplayOwner(deck: Pick<DeckItem, "owner">): string {
+  return deck.owner?.trim() || "—";
 }
 
 /** True when a source deck has ever been published (deletion lock applies). */
@@ -1176,19 +1183,11 @@ export interface DeckCardListItem {
   created_at: number;
 }
 
-/** Response from `GET /api/decks/{id}/cards` — full card list plus aggregate counts and filter lists (server-derived). */
+/** Response from `GET /api/decks/{id}/cards` — stats plus full card list. */
 export interface GetCardsRes {
   data: {
-    total_cards: number;
-    hidden_cards_count: number;
-    due_cards: number;
-    due_cards_list: DeckCardListItem[];
-    unseen_cards: number;
-    hidden_cards_list: DeckCardListItem[];
-    unseen_cards_list: DeckCardListItem[];
-    seen_cards_list: DeckCardListItem[];
+    stats: DeckStats;
     cards: DeckCardListItem[];
-    orphaned_hidden_cards?: number;
   };
   meta: { msg?: string };
 }

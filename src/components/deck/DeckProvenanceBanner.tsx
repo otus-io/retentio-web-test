@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import type { DeckItem } from "@/lib/api";
+import { deckDisplayOwner } from "@/lib/api";
 
 interface DeckProvenanceBannerProps {
   deck: DeckItem;
@@ -29,6 +30,12 @@ export function DeckProvenanceBanner({
         <p>
           <span className="text-muted-foreground">Imported from </span>
           <span className="font-mono">{deck.source_deck_id}</span>
+          {deckDisplayOwner(deck) !== "—" && (
+            <>
+              <span className="text-muted-foreground"> by </span>
+              <span className="font-medium">{deckDisplayOwner(deck)}</span>
+            </>
+          )}
           <span className="text-muted-foreground"> · pinned to </span>
           <span className="font-medium">v{deck.source_version ?? "?"}</span>
           <span className="text-muted-foreground"> · facts are read-only</span>

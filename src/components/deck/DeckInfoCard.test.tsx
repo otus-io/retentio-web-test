@@ -220,6 +220,37 @@ describe("DeckInfoCard", () => {
     expect(screen.getByText("just now")).toBeInTheDocument();
   });
 
+  it("shows Author label and source owner for imported decks", () => {
+    renderCard({
+      deck: {
+        ...mockDeck,
+        owner: "alice",
+        source_deck_id: "srcdeck01",
+        source_version: 2,
+        imported_at: "2024-06-01T00:00:00Z",
+      },
+    });
+    const deckInfo = screen.getByText("Deck info").parentElement;
+    expect(deckInfo).toHaveTextContent("Author:");
+    expect(deckInfo).toHaveTextContent("alice");
+    expect(deckInfo).not.toHaveTextContent("Owner:");
+  });
+
+  it("shows em dash for imported deck when source author is unknown", () => {
+    renderCard({
+      deck: {
+        ...mockDeck,
+        owner: undefined,
+        source_deck_id: "srcdeck01",
+        source_version: 2,
+        imported_at: "2024-06-01T00:00:00Z",
+      },
+    });
+    const deckInfo = screen.getByText("Deck info").parentElement;
+    expect(deckInfo).toHaveTextContent("Author:");
+    expect(deckInfo).toHaveTextContent("—");
+  });
+
   it("shows deck info metadata including visibility and owner", () => {
     renderCard({ deck: { ...mockDeck, visibility: "private", published_version: 2 } });
     const deckInfo = screen.getByText("Deck info").parentElement;
