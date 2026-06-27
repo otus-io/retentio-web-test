@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthProvider, useAuth } from "./AuthContext";
 
@@ -10,6 +10,7 @@ vi.stubGlobal("fetch", mockFetch);
 function makeResponse(body: unknown, ok = true) {
   return {
     ok,
+    status: ok ? 200 : 401,
     statusText: ok ? "OK" : "Unauthorized",
     text: () => Promise.resolve(JSON.stringify(body)),
     json: () => Promise.resolve(body),
@@ -55,7 +56,9 @@ describe("AuthContext", () => {
     localStorage.setItem("wordupx_token", "revoked-token");
     mockFetch.mockResolvedValueOnce(makeResponse({ msg: "Token has been revoked" }, false));
     render(<AuthProvider><TestConsumer /></AuthProvider>);
-    expect(await screen.findByTestId("token")).toHaveTextContent("null");
+    await waitFor(() => {
+      expect(screen.getByTestId("token")).toHaveTextContent("null");
+    });
     expect(localStorage.getItem("wordupx_token")).toBeNull();
   });
 

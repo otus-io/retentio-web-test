@@ -38,13 +38,13 @@ npm run dev:local
 npm run dev:release
 ```
 
-2. One-off value for a single run:
+1. One-off value for a single run:
 
 ```bash
 VITE_API_URL=http://localhost:8080 npm run dev
 ```
 
-3. Local persistent override:
+1. Local persistent override:
 
 - Create `.env.development.local` in this folder.
 - Add:
@@ -69,4 +69,3 @@ npm test
 # or
 npm run test:run
 ```
-

@@ -55,4 +55,3 @@ When running `npm run dev` (`vite`), env values are resolved in this order (late
 5. Shell environment variables from command line
 
 Because this repo defines `VITE_API_URL` in `.env.development`, use `.env.development.local` to override it locally.
-

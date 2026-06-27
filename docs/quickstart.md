@@ -100,6 +100,7 @@ This guide walks you through using the Retentio API via Swagger UI.
 | `/api/media/{id}/meta` | GET | Get media metadata (no file body) |
 | `/api/media/{id}` | GET | Download media file |
 | `/api/media/{id}` | DELETE | Delete media |
+
 ---
 
 ## 1. Authentication
@@ -1193,6 +1194,7 @@ For full design (upload, delete, display, sync), see **[Media Upload design doc]
 | `/api/media/{id}/meta` | GET | `{ "data": { id, owner, filename, mime, size, checksum, created_at }, "meta": { "msg" } }` |
 | `/api/media/{id}` | GET | Download media (binary) |
 | `/api/media/{id}` | DELETE | `{ "data": { "msg": "media deleted" } }` |
+
 Full JSON examples for each are in the sections above.
 
 ---
