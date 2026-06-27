@@ -10,8 +10,7 @@ alwaysApply: false
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `webapp-ci.yml` | Push/PR to `main`, `src/**` and related config | `npm ci`, `npm run test:run`, `npm run build` |
-| `deploy-web-test.yml` | Push to `main`, same path filters | SSH deploy to server |
+| `test-build-deploy.yml` | Push/PR to `main`, `src/**` and related config | `npm ci`, `npm run test:run`, `npm run build`; SSH deploy on push to `main` after tests pass |
 | `pr-review.yml` | PR opened/synchronized | Automated PR review (if configured) |
 
 ## CI requirements
@@ -24,4 +23,4 @@ alwaysApply: false
 
 - Do not skip CI checks or add `[skip ci]` without team agreement
 - New features should include Vitest coverage in `src/**/*.test.{ts,tsx}`
-- Deploy workflow only triggers on `main` pushes touching app paths
+- Deploy job runs only on push to `main` after the test job succeeds

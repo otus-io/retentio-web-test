@@ -1,5 +1,5 @@
 ---
-# Deploy to production over SSH: pull main, install, build, run via systemd.
+# Test, build, and deploy to production over SSH: pull main, install, build, run via systemd.
 #
 # Production app directory: ~/otusio/retentio-web-test
 #
@@ -15,7 +15,7 @@
 #     plus systemctl daemon-reload, enable, restart (see retentio-backend/docs/server-side-config.md)
 #   — Repo cloned at ~/otusio/retentio-web-test with origin able to fetch this repository
 
-name: Deploy Web Test
+name: Test and Deploy Web Test
 
 on:
   push:
@@ -33,10 +33,56 @@ on:
       - '.env.example'
       - 'utils/run-web-test-prod.sh'
       - 'utils/retentio-web-test.service'
-      - '.github/workflows/deploy-web-test.yml'
+      - '.github/workflows/test-build-deploy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - '.env.example'
+      - '.github/workflows/test-build-deploy.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_API_URL: https://api.retentio.app:8443
+
   deploy-web-test:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
 

@@ -12,7 +12,7 @@ cd "$REPO_ROOT"
 
 export NODE_ENV=production
 
-# systemd does not load login shells; mirror deploy-web-test.yml Node setup.
+# systemd does not load login shells; mirror test-build-deploy.yml Node setup.
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   # shellcheck source=/dev/null
