@@ -13,15 +13,18 @@ cd "$REPO_ROOT"
 export NODE_ENV=production
 
 # systemd does not load login shells; mirror test-build-deploy.yml Node setup.
+# nvm references unset vars when no .nvmrc; disable nounset while loading it.
+set +u
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   # shellcheck source=/dev/null
   . "$NVM_DIR/nvm.sh"
-  nvm use 2>/dev/null || nvm use default 2>/dev/null || true
+  nvm use 20 2>/dev/null || nvm use default 2>/dev/null || true
 fi
+set -u
 if [ -f "$HOME/.profile" ]; then
   # shellcheck source=/dev/null
-  . "$HOME/.profile"
+  . "$HOME/.profile" 2>/dev/null || true
 fi
 export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"
 
