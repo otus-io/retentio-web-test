@@ -466,6 +466,7 @@ export function BulkEditFactsModal({
       try {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("deck_id", deckId);
         const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
         const newId = String(res.data.id).trim();
         if (!newId) throw new Error("Upload response missing media id");

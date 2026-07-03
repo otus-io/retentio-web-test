@@ -309,6 +309,7 @@ export function AddCardFromFactModal({
           for (const { entry } of mediaCells) {
             const formData = new FormData();
             formData.append("file", entry.file);
+            formData.append("deck_id", deckId);
             const res = (await uploadMultipart(
               "/api/media",
               formData,

@@ -61,6 +61,7 @@ export async function importExportBundleIntoDeck(
     const fobj = new File([blob], job.filename, { type: fromZip || hinted || undefined });
     const form = new FormData();
     form.set("file", fobj);
+    form.set("deck_id", deckId);
     const res = (await uploadMultipart("/api/media", form, token, job.clientId)) as UploadMediaRes;
     if (!res?.data?.id) throw new Error(`Upload failed for media ${job.clientId}`);
     uploaded += 1;

@@ -404,6 +404,7 @@ export default function DeckPage() {
         for (const { file } of entry.media) {
           const formData = new FormData();
           formData.append("file", file);
+          formData.append("deck_id", id);
           const res = (await uploadMultipart("/api/media", formData, token)) as UploadMediaRes;
           const id = res?.data?.id != null ? String(res.data.id).trim() : "";
           if (!id) throw new Error("upload response missing media id");
