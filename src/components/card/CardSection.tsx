@@ -434,8 +434,13 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, entries: Entry[]) => Promise<void>;
-  /** Import decks: open feedback form for the current card's fact. */
+  /** Import decks: open report form for the current card's fact. */
   onReportFact?: (factId: string) => void | Promise<void>;
+  /**
+   * Import decks: after a successful Edit save, show an opt-in to send the
+   * private overlay to the author (fact_edit contribution).
+   */
+  onOfferSendEditToAuthor?: (factId: string) => void | Promise<void>;
   /** When next card has precomputed front/back, fact is not loaded. Pass this to fetch fact by id when opening Duplicate or Edit. */
   onRequestFact?: (factId: string) => Promise<FactItem | null>;
   authToken?: string | null;
@@ -460,6 +465,7 @@ export function CardSection({
   onHideCard,
   onSaveFact,
   onReportFact,
+  onOfferSendEditToAuthor,
   onRequestFact,
   authToken,
   rescheduleSuggested,
@@ -481,6 +487,8 @@ export function CardSection({
   const [editSaving, setEditSaving] = useState(false);
   const [imageRevealed, setImageRevealed] = useState(false);
   const [examplesRevealed, setExamplesRevealed] = useState(false);
+  /** Fact id with a pending “send edit to author?” notice (import decks). */
+  const [pendingContributeFactId, setPendingContributeFactId] = useState<string | null>(null);
 
   const cardResetKey = nextCard ? `${nextCard.card.id}-${nextCard.card.due_date}` : null;
 
@@ -494,6 +502,7 @@ export function CardSection({
       setHasFlippedOnce(false);
       setImageRevealed(false);
       setExamplesRevealed(false);
+      setPendingContributeFactId(null);
     }
   }, [cardResetKey]);
 
@@ -561,16 +570,20 @@ export function CardSection({
     rubyPx: cardTypography.back.rubyFontSize,
   };
 
-  const openReportFeedback = async () => {
-    if (!nextCard || !onReportFact) return;
-    if (nextCardFact) {
-      await onReportFact(nextCardFact.id);
-      return;
-    }
+  const resolveCurrentFactId = async (): Promise<string | null> => {
+    if (!nextCard) return null;
+    if (nextCardFact) return nextCardFact.id;
     if (onRequestFact) {
       const fact = await onRequestFact(nextCard.card.fact_id);
-      if (fact) await onReportFact(fact.id);
+      return fact?.id ?? null;
     }
+    return nextCard.card.fact_id ?? null;
+  };
+
+  const openReportFeedback = async () => {
+    if (!onReportFact) return;
+    const factId = await resolveCurrentFactId();
+    if (factId) await onReportFact(factId);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -585,6 +598,9 @@ export function CardSection({
     try {
       await onSaveFact(editFactId, editFactEntries);
       setEditPopupOpen(false);
+      if (onOfferSendEditToAuthor) {
+        setPendingContributeFactId(editFactId);
+      }
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Update failed");
     } finally {
@@ -627,20 +643,20 @@ export function CardSection({
             )}
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
-                {nextCard && onReportFact && (nextCardFact || onRequestFact) && (
-                  <DropdownMenuItem
-                    onClick={() => void openReportFeedback()}
-                    disabled={loadingNextCard}
-                  >
-                    Report to author
-                  </DropdownMenuItem>
-                )}
                 {nextCard && onSaveFact && (nextCardFact || onRequestFact) && (
                   <DropdownMenuItem
                     onClick={openEditPopup}
                     disabled={loadingNextCard}
                   >
                     Edit
+                  </DropdownMenuItem>
+                )}
+                {nextCard && onReportFact && (nextCardFact || onRequestFact) && (
+                  <DropdownMenuItem
+                    onClick={() => void openReportFeedback()}
+                    disabled={loadingNextCard}
+                  >
+                    Report to author
                   </DropdownMenuItem>
                 )}
                 {nextCard && onAddCardSuccess && (nextCardFact || onRequestFact) && (
@@ -665,6 +681,37 @@ export function CardSection({
                 )}
               </DropdownMenu>
             </div>
+            {pendingContributeFactId && onOfferSendEditToAuthor && (
+              <div
+                role="status"
+                className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-left text-sm space-y-2"
+              >
+                <p>
+                  Saved privately on this import. Send this edit to the author?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      const factId = pendingContributeFactId;
+                      setPendingContributeFactId(null);
+                      void onOfferSendEditToAuthor(factId);
+                    }}
+                  >
+                    Send to author
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPendingContributeFactId(null)}
+                  >
+                    Not now
+                  </Button>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Due: {formatUnixSecondsUtc(nextCard.card.due_date)}
             </p>

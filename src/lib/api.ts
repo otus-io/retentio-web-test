@@ -565,12 +565,23 @@ export interface ImportDeckRes {
 
 export interface DeckUpdateFactRef {
   fact_id: string;
+  /** Published (added) or previous (removed) fact body when the API includes it. */
+  fact?: FactItem;
+  has_local_overlay?: boolean;
+  /** True when the fact is local-only or has a private overlay. */
+  local?: boolean;
+  aligned?: boolean;
+  /** Suggested sync action for removals: accept | keep. */
+  default_action?: "accept" | "keep" | string;
 }
 
 export interface DeckUpdateEditedFact {
   fact_id: string;
   before?: FactItem;
   after?: FactItem;
+  has_local_overlay?: boolean;
+  local?: boolean;
+  aligned?: boolean;
 }
 
 export interface DeckUpdateMediaChange {
@@ -581,6 +592,12 @@ export interface DeckUpdateMediaChange {
   after_bytes?: number;
 }
 
+export interface DeckUpdateCardTemplateChange {
+  fact_id: string;
+  added_templates?: number[][][];
+  removed_templates?: number[][][];
+}
+
 export interface DeckUpdatesData {
   source_version: number;
   latest_version: number;
@@ -588,6 +605,7 @@ export interface DeckUpdatesData {
   removed_facts: DeckUpdateFactRef[];
   edited_facts: DeckUpdateEditedFact[];
   media_changes: DeckUpdateMediaChange[];
+  card_template_changes?: DeckUpdateCardTemplateChange[];
   change_summary?: string;
 }
 
@@ -596,8 +614,16 @@ export interface GetDeckUpdatesRes {
   meta: { msg: string };
 }
 
+export type SyncFactDecisionAction = "accept" | "keep";
+
+export interface SyncFactDecision {
+  fact_id: string;
+  action: SyncFactDecisionAction;
+}
+
 export interface SyncDeckReq {
   target_version?: number;
+  decisions?: SyncFactDecision[];
 }
 
 export interface SyncDeckRes {
@@ -719,68 +745,109 @@ export async function syncDeck(
   });
 }
 
-export type FeedbackCategory = "translation" | "audio" | "typo" | "other";
-export type FeedbackStatus = "open" | "accepted" | "resolved" | "dismissed";
+export type ContributionType =
+  | "fact_edit"
+  | "fact_add"
+  | "deck_tag_update"
+  | "fact_tag_update"
+  | "template_add"
+  | "field_rename"
+  | "report";
+export type ContributionStatus = "open" | "accepted" | "resolved" | "dismissed";
 
 export interface ReportedFact {
   id: string;
   entries: Entry[];
 }
 
-export interface FeedbackEditPaths {
+export interface ContributionEditPaths {
   deck_id: string;
   fact_id: string;
   get_fact_path: string;
   patch_fact_path: string;
 }
 
-export interface DeckFeedbackItem {
+export interface DeckContributionItem {
   id: string;
   source_deck_id: string;
   import_deck_id: string;
-  fact_id: string;
+  fact_id?: string;
   reporter: string;
   source_version: number;
-  category: FeedbackCategory;
+  type: ContributionType | string;
   message?: string;
   entry_index?: number;
-  reported_fact: ReportedFact;
+  reported_fact?: ReportedFact;
   proposed_entries?: Entry[];
-  status: FeedbackStatus;
+  reported_tags?: string[];
+  add_tags?: string[];
+  remove_tags?: string[];
+  template?: number[][];
+  reported_fields?: string[];
+  proposed_fields?: string[];
+  status: ContributionStatus;
   created_at: string;
   updated_at: string;
   resolved_at?: string;
   accepted_at?: string;
-  edit: FeedbackEditPaths;
+  edit?: ContributionEditPaths;
 }
 
-export interface SubmitFeedbackReq {
-  fact_id: string;
-  category?: FeedbackCategory;
-  message?: string;
-  entry_index?: number;
-  proposed_entries?: Entry[];
-}
-
-export interface SubmitFeedbackRes {
+export interface SubmitContributionRes {
   data: {
-    feedback_id: string;
+    contribution_id: string;
     source_deck_id: string;
-    fact_id: string;
-    status: FeedbackStatus;
+    fact_id?: string;
+    type: string;
+    status: ContributionStatus;
   };
   meta: { msg: string };
 }
 
-export interface ListDeckFeedbackParams {
-  status?: FeedbackStatus | "";
+export interface SubmitFactReportReq {
+  message: string;
+}
+
+/** @deprecated Prefer SubmitContributionRes */
+export type SubmitFactReportRes = SubmitContributionRes;
+
+export interface SubmitFactEditContributionReq {
+  message?: string;
+  entry_index?: number;
+}
+
+export interface SubmitFactAddContributionReq {
+  message?: string;
+}
+
+export interface SubmitTagContributionReq {
+  add_tags?: string[];
+  remove_tags?: string[];
+  message?: string;
+}
+
+export interface SubmitTemplateContributionReq {
+  template: number[][];
+  message?: string;
+}
+
+export interface SubmitFieldRenameContributionReq {
+  proposed_fields: string[];
+  message?: string;
+}
+
+export interface ListDeckContributionsParams {
+  status?: ContributionStatus | "";
+  type?: ContributionType | string | "";
   fact_id?: string;
+  reporter?: string;
+  media_type?: string;
   limit?: number;
   offset?: number;
 }
 
-export interface ListDeckFeedbackRes {
-  data: { feedback: DeckFeedbackItem[] };
+export interface ListDeckContributionsRes {
+  data: { contributions: DeckContributionItem[] };
   meta: {
     msg: string;
     count?: string | number;
@@ -791,75 +858,179 @@ export interface ListDeckFeedbackRes {
   };
 }
 
-export interface PatchFeedbackReq {
+export interface PatchContributionReq {
   status: "open" | "resolved" | "dismissed";
 }
 
-export interface PatchFeedbackRes {
-  data: DeckFeedbackItem;
+export interface PatchContributionRes {
+  data: DeckContributionItem;
   meta: { msg: string };
 }
 
-export interface AcceptFeedbackRes {
-  data: DeckFeedbackItem & { working_copy_updated?: boolean };
+export interface AcceptContributionRes {
+  data: DeckContributionItem & { working_copy_updated?: boolean };
   meta: { msg: string };
 }
 
-export function feedbackHasMore(meta: ListDeckFeedbackRes["meta"]): boolean {
+export function contributionsHasMore(meta: ListDeckContributionsRes["meta"]): boolean {
   const v = meta.has_more;
   if (typeof v === "boolean") return v;
   return v === "true";
 }
 
-export async function submitDeckFeedback(
+export async function submitFactReport(
   importDeckId: string,
-  body: SubmitFeedbackReq,
+  factId: string,
+  body: SubmitFactReportReq,
   token: string
-): Promise<SubmitFeedbackRes> {
-  return request<SubmitFeedbackRes>(`/api/decks/${importDeckId}/feedback`, {
-    method: "POST",
-    token,
-    body: JSON.stringify(body),
-  });
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/facts/${factId}/report`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
 }
 
-export async function listDeckFeedback(
-  sourceDeckId: string,
-  params: ListDeckFeedbackParams,
+export async function submitFactEditContribution(
+  importDeckId: string,
+  factId: string,
+  body: SubmitFactEditContributionReq,
   token: string
-): Promise<ListDeckFeedbackRes> {
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/facts/${factId}/edit`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function submitFactAddContribution(
+  importDeckId: string,
+  factId: string,
+  body: SubmitFactAddContributionReq,
+  token: string
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/facts/${factId}/add`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function submitFactTagContribution(
+  importDeckId: string,
+  factId: string,
+  body: SubmitTagContributionReq,
+  token: string
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/facts/${factId}/tags`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function submitDeckTagContribution(
+  importDeckId: string,
+  body: SubmitTagContributionReq,
+  token: string
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/deck-tags`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function submitTemplateContribution(
+  importDeckId: string,
+  factId: string,
+  body: SubmitTemplateContributionReq,
+  token: string
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/facts/${factId}/templates`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function submitFieldRenameContribution(
+  importDeckId: string,
+  body: SubmitFieldRenameContributionReq,
+  token: string
+): Promise<SubmitContributionRes> {
+  return request<SubmitContributionRes>(
+    `/api/decks/${importDeckId}/contributions/fields/rename`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function listDeckContributions(
+  sourceDeckId: string,
+  params: ListDeckContributionsParams,
+  token: string
+): Promise<ListDeckContributionsRes> {
   const sp = new URLSearchParams();
   if (params.status?.trim()) sp.set("status", params.status.trim());
+  if (params.type?.trim()) sp.set("type", params.type.trim());
   if (params.fact_id?.trim()) sp.set("fact_id", params.fact_id.trim());
+  if (params.reporter?.trim()) sp.set("reporter", params.reporter.trim());
+  if (params.media_type?.trim()) sp.set("media_type", params.media_type.trim());
   if (params.limit != null) sp.set("limit", String(params.limit));
   if (params.offset != null) sp.set("offset", String(params.offset));
   const qs = sp.toString();
-  return request<ListDeckFeedbackRes>(
-    `/api/decks/${sourceDeckId}/feedback${qs ? `?${qs}` : ""}`,
+  return request<ListDeckContributionsRes>(
+    `/api/decks/${sourceDeckId}/contributions${qs ? `?${qs}` : ""}`,
     { token }
   );
 }
 
-export async function patchDeckFeedback(
+export async function patchContribution(
   sourceDeckId: string,
-  feedbackId: string,
-  body: PatchFeedbackReq,
+  contributionId: string,
+  body: PatchContributionReq,
   token: string
-): Promise<PatchFeedbackRes> {
-  return request<PatchFeedbackRes>(`/api/decks/${sourceDeckId}/feedback/${feedbackId}`, {
-    method: "PATCH",
-    token,
-    body: JSON.stringify(body),
-  });
+): Promise<PatchContributionRes> {
+  return request<PatchContributionRes>(
+    `/api/decks/${sourceDeckId}/contributions/${contributionId}`,
+    {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
 }
 
-export async function acceptDeckFeedback(
+export async function acceptContribution(
   sourceDeckId: string,
-  feedbackId: string,
+  contributionId: string,
   token: string
-): Promise<AcceptFeedbackRes> {
-  return request<AcceptFeedbackRes>(
-    `/api/decks/${sourceDeckId}/feedback/${feedbackId}/accept`,
+): Promise<AcceptContributionRes> {
+  return request<AcceptContributionRes>(
+    `/api/decks/${sourceDeckId}/contributions/${contributionId}/accept`,
     {
       method: "POST",
       token,

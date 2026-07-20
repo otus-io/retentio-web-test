@@ -121,6 +121,25 @@
 | `POST /api/decks/{id}/sync` | 接受源卡组新版本 | ✅ | ✅ |
 | `PATCH /api/decks/{id}` `visibility` | 首次发布前可改可见性；已发布后冻结 | ✅ | ✅ |
 
+### 导入卡组私有 overlays + 贡献
+
+| 接口 | 说明 | 前端 | 后端 |
+| --- | --- | --- | --- |
+| `POST/PATCH/DELETE …/facts…`（导入卡组） | 私有 overlay / local_facts；不自动贡献 | ✅ (`DeckPage` 解锁编辑) | ✅ |
+| `POST …/contributions/facts/{id}/edit` | 提交 overlay 为 fact_edit | ✅ | ✅ |
+| `POST …/contributions/facts/{id}/add` | 提交 local fact 为 fact_add | ✅ | ✅ |
+| `POST …/contributions/facts/{id}/tags` | 词条标签名 add/remove | ✅ | ✅ |
+| `POST …/contributions/deck-tags` | 卡组标签名 add/remove | ✅ | ✅ |
+| `POST …/contributions/facts/{id}/templates` | 提交一张卡片模板 | ✅ | ✅ |
+| `POST …/contributions/fields/rename` | 建议字段重命名（同长度） | ✅ | ✅ |
+| `POST …/contributions/facts/{id}/report` | 仅消息举报 | ✅ | ✅ |
+| `GET …/contributions` | 作者收件箱（含 type/status/reporter/media_type） | ✅ | ✅ |
+| `POST …/contributions/{id}/accept` | 按类型应用到工作副本（不发布） | ✅ | ✅ |
+| `PATCH …/contributions/{id}` | open / resolved / dismissed | ✅ | ✅ |
+| `GET …/contributions/{id}/media/{attachmentId}` | 附件预览 | ❌ | 🔧 stub 404 |
+| `GET …/updates` overlay 元数据 | `aligned` / `has_local_overlay` / `default_action` / `card_template_changes` | ✅ | ✅ |
+| `POST …/sync` `decisions[]` | 按词条 accept \| keep | ✅ (`DeckSyncUpdatesModal`) | ✅ |
+
 ---
 
 ### 其他待办

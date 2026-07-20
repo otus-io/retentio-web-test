@@ -400,8 +400,8 @@ export default function DecksListPage() {
                           {(openCountByDeckId[d.id] ?? 0) > 0 && (
                             <span className="text-xs rounded-full bg-blue-500/20 text-blue-900 dark:text-blue-100 px-2 py-0.5 font-medium">
                               {(openCountByDeckId[d.id] ?? 0) === 1
-                                ? "1 open feedback"
-                                : `${openCountByDeckId[d.id]} open feedback`}
+                                ? "1 open contribution"
+                                : `${openCountByDeckId[d.id]} open contributions`}
                             </span>
                           )}
                           {isImportedDeck(d) && (

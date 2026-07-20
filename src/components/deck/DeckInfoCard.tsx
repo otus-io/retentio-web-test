@@ -75,13 +75,21 @@ interface DeckInfoCardProps {
   onOpenAllCards?: () => void;
   /** Opens publish dialog (source decks only). */
   onPublish?: () => void;
-  /** Opens feedback inbox (published source decks only). */
+  /** Opens contributions inbox (published source decks only). */
   onOpenFeedbackInbox?: () => void;
+  /** Import decks: suggest field label renames to the author. */
+  onSuggestFieldRenames?: () => void;
+  /** Import decks: suggest deck tag add/remove to the author. */
+  onSuggestDeckTags?: () => void;
+  /** Import decks: open pending private edits outbox. */
+  onOpenPendingContributions?: () => void;
+  /** Pending outbox count for menu label. */
+  pendingContributionCount?: number;
   deleteConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
   onDelete: () => void;
-  /** When false, hide fact-editing menu items (imported decks). */
+  /** When false, hide fact-editing menu items. */
   factsEditable?: boolean;
 }
 
@@ -96,6 +104,10 @@ export function DeckInfoCard({
   onOpenAllCards,
   onPublish,
   onOpenFeedbackInbox,
+  onSuggestFieldRenames,
+  onSuggestDeckTags,
+  onOpenPendingContributions,
+  pendingContributionCount = 0,
   deleteConfirm,
   onDeleteConfirm,
   onDeleteCancel,
@@ -151,7 +163,19 @@ export function DeckInfoCard({
             </DropdownMenuItem>
           )}
           {onOpenFeedbackInbox && published && !imported && (
-            <DropdownMenuItem onClick={onOpenFeedbackInbox}>Feedback inbox</DropdownMenuItem>
+            <DropdownMenuItem onClick={onOpenFeedbackInbox}>Contributions inbox</DropdownMenuItem>
+          )}
+          {imported && onOpenPendingContributions && (
+            <DropdownMenuItem onClick={onOpenPendingContributions}>
+              Contributions
+              {pendingContributionCount > 0 ? ` (${pendingContributionCount} pending)` : ""}
+            </DropdownMenuItem>
+          )}
+          {imported && onSuggestFieldRenames && (
+            <DropdownMenuItem onClick={onSuggestFieldRenames}>Suggest field renames</DropdownMenuItem>
+          )}
+          {imported && onSuggestDeckTags && (
+            <DropdownMenuItem onClick={onSuggestDeckTags}>Suggest deck tags</DropdownMenuItem>
           )}
           {onOpenCardFonts && (
             <DropdownMenuItem onClick={onOpenCardFonts}>Change Font</DropdownMenuItem>

@@ -18,11 +18,17 @@ import {
   importDeck,
   getDeckUpdates,
   syncDeck,
-  submitDeckFeedback,
-  listDeckFeedback,
-  patchDeckFeedback,
-  acceptDeckFeedback,
-  feedbackHasMore,
+  submitFactReport,
+  submitFactEditContribution,
+  submitFactAddContribution,
+  submitFactTagContribution,
+  submitDeckTagContribution,
+  submitTemplateContribution,
+  submitFieldRenameContribution,
+  listDeckContributions,
+  patchContribution,
+  acceptContribution,
+  contributionsHasMore,
   resolveMediaFetchUrl,
   normalizeStoredMediaRef,
   isImportedDeck,
@@ -724,82 +730,217 @@ describe("deck sharing API", () => {
         meta: { msg: "synced" },
       })
     );
-    const res = await syncDeck("imp1", { target_version: 2 }, "tok");
+    const res = await syncDeck(
+      "imp1",
+      {
+        target_version: 2,
+        decisions: [{ fact_id: "f1", action: "keep" }],
+      },
+      "tok"
+    );
     expect(res.data.source_version).toBe(2);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/decks/imp1/sync");
     expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      target_version: 2,
+      decisions: [{ fact_id: "f1", action: "keep" }],
+    });
   });
 
-  it("submitDeckFeedback POSTs to import deck feedback endpoint", async () => {
+  it("submitFactReport POSTs to import deck report contribution endpoint", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({
         data: {
-          feedback_id: "fb123",
+          contribution_id: "cont123",
           source_deck_id: "src1",
           fact_id: "fact1",
+          type: "report",
           status: "open",
         },
-        meta: { msg: "feedback submitted" },
+        meta: { msg: "contribution submitted" },
       })
     );
-    const res = await submitDeckFeedback(
-      "imp1",
-      { fact_id: "fact1", category: "typo", message: "Fix spelling" },
-      "tok"
-    );
-    expect(res.data.feedback_id).toBe("fb123");
+    const res = await submitFactReport("imp1", "fact1", { message: "Fix spelling" }, "tok");
+    expect(res.data.contribution_id).toBe("cont123");
     const [url, init] = mockFetch.mock.calls[0] as [string, { method: string; headers: Headers }];
-    expect(url).toContain("/api/decks/imp1/feedback");
+    expect(url).toContain("/api/decks/imp1/contributions/facts/fact1/report");
     expect(init.method).toBe("POST");
     expect(init.headers.get("Authorization")).toBe("Bearer tok");
   });
 
-  it("listDeckFeedback GETs source deck inbox with filters", async () => {
+  it("submitFactEditContribution POSTs edit endpoint", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({
-        data: { feedback: [{ id: "fb1", status: "open" }] },
+        data: {
+          contribution_id: "c1",
+          source_deck_id: "src1",
+          fact_id: "fact1",
+          type: "fact_edit",
+          status: "open",
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    await submitFactEditContribution("imp1", "fact1", { message: "better gloss" }, "tok");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/decks/imp1/contributions/facts/fact1/edit");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ message: "better gloss" });
+  });
+
+  it("submitFactAddContribution POSTs add endpoint", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          contribution_id: "c2",
+          source_deck_id: "src1",
+          fact_id: "fact2",
+          type: "fact_add",
+          status: "open",
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    await submitFactAddContribution("imp1", "fact2", {}, "tok");
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/imp1/contributions/facts/fact2/add");
+  });
+
+  it("submitFactTagContribution and submitDeckTagContribution POST tag endpoints", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        makeResponse({
+          data: {
+            contribution_id: "c3",
+            source_deck_id: "src1",
+            fact_id: "fact1",
+            type: "fact_tag_update",
+            status: "open",
+          },
+          meta: { msg: "ok" },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({
+          data: {
+            contribution_id: "c4",
+            source_deck_id: "src1",
+            type: "deck_tag_update",
+            status: "open",
+          },
+          meta: { msg: "ok" },
+        })
+      );
+    await submitFactTagContribution(
+      "imp1",
+      "fact1",
+      { add_tags: ["food"], remove_tags: ["old"] },
+      "tok"
+    );
+    await submitDeckTagContribution("imp1", { add_tags: ["jlpt"] }, "tok");
+    const [factUrl] = mockFetch.mock.calls[0] as [string];
+    const [deckUrl] = mockFetch.mock.calls[1] as [string];
+    expect(factUrl).toContain("/api/decks/imp1/contributions/facts/fact1/tags");
+    expect(deckUrl).toContain("/api/decks/imp1/contributions/deck-tags");
+  });
+
+  it("submitTemplateContribution POSTs templates endpoint", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          contribution_id: "c5",
+          source_deck_id: "src1",
+          fact_id: "fact1",
+          type: "template_add",
+          status: "open",
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    await submitTemplateContribution(
+      "imp1",
+      "fact1",
+      { template: [[0], [1]] },
+      "tok"
+    );
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/decks/imp1/contributions/facts/fact1/templates");
+    expect(JSON.parse(String(init.body))).toEqual({ template: [[0], [1]] });
+  });
+
+  it("submitFieldRenameContribution POSTs fields/rename endpoint", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: {
+          contribution_id: "c6",
+          source_deck_id: "src1",
+          type: "field_rename",
+          status: "open",
+        },
+        meta: { msg: "ok" },
+      })
+    );
+    await submitFieldRenameContribution(
+      "imp1",
+      { proposed_fields: ["EN", "JP"] },
+      "tok"
+    );
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("/api/decks/imp1/contributions/fields/rename");
+  });
+
+  it("listDeckContributions GETs source deck inbox with filters", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({
+        data: { contributions: [{ id: "cont1", status: "open", type: "report" }] },
         meta: { msg: "ok", has_more: "false", total: "1" },
       })
     );
-    const res = await listDeckFeedback("src1", { status: "open", limit: 20 }, "tok");
-    expect(res.data.feedback).toHaveLength(1);
+    const res = await listDeckContributions(
+      "src1",
+      { status: "open", reporter: "bob", media_type: "audio", limit: 20 },
+      "tok"
+    );
+    expect(res.data.contributions).toHaveLength(1);
     const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toContain("/api/decks/src1/feedback");
+    expect(url).toContain("/api/decks/src1/contributions");
     expect(url).toContain("status=open");
+    expect(url).toContain("reporter=bob");
+    expect(url).toContain("media_type=audio");
     expect(url).toContain("limit=20");
   });
 
-  it("feedbackHasMore parses meta.has_more", () => {
-    expect(feedbackHasMore({ msg: "ok", has_more: true })).toBe(true);
-    expect(feedbackHasMore({ msg: "ok", has_more: "true" })).toBe(true);
-    expect(feedbackHasMore({ msg: "ok", has_more: false })).toBe(false);
+  it("contributionsHasMore parses meta.has_more", () => {
+    expect(contributionsHasMore({ msg: "ok", has_more: true })).toBe(true);
+    expect(contributionsHasMore({ msg: "ok", has_more: "true" })).toBe(true);
+    expect(contributionsHasMore({ msg: "ok", has_more: false })).toBe(false);
   });
 
-  it("patchDeckFeedback PATCHes feedback status", async () => {
+  it("patchContribution PATCHes contribution status", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({
-        data: { id: "fb1", status: "resolved" },
-        meta: { msg: "feedback updated" },
+        data: { id: "cont1", status: "resolved" },
+        meta: { msg: "contribution updated" },
       })
     );
-    await patchDeckFeedback("src1", "fb1", { status: "resolved" }, "tok");
+    await patchContribution("src1", "cont1", { status: "resolved" }, "tok");
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/decks/src1/feedback/fb1");
+    expect(url).toContain("/api/decks/src1/contributions/cont1");
     expect(init.method).toBe("PATCH");
   });
 
-  it("acceptDeckFeedback POSTs accept endpoint", async () => {
+  it("acceptContribution POSTs accept endpoint", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({
-        data: { id: "fb1", status: "accepted", working_copy_updated: true },
-        meta: { msg: "feedback accepted" },
+        data: { id: "cont1", status: "accepted", working_copy_updated: true },
+        meta: { msg: "contribution accepted" },
       })
     );
-    const res = await acceptDeckFeedback("src1", "fb1", "tok");
+    const res = await acceptContribution("src1", "cont1", "tok");
     expect(res.data.status).toBe("accepted");
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/decks/src1/feedback/fb1/accept");
+    expect(url).toContain("/api/decks/src1/contributions/cont1/accept");
     expect(init.method).toBe("POST");
   });
 });

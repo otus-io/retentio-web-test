@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { CardSection } from "./CardSection";
-import type { DeckItem, GetNextCardRes } from "@/lib/api";
+import type { DeckItem, FactItem, GetNextCardRes } from "@/lib/api";
 
 const mockDeck: DeckItem = {
   id: "deck1",
@@ -153,5 +154,35 @@ describe("CardSection", () => {
       />
     );
     expect(screen.getByText("Loading next card…")).toBeInTheDocument();
+  });
+
+  it("after edit save with onOfferSendEditToAuthor, shows send-to-author notice", async () => {
+    const user = userEvent.setup();
+    const onSaveFact = vi.fn().mockResolvedValue(undefined);
+    const onOfferSendEditToAuthor = vi.fn();
+    const fact: FactItem = {
+      id: "f1",
+      entries: [{ text: "Apple" }, { text: "苹果" }],
+    };
+    render(
+      <CardSection
+        {...defaultProps}
+        nextCard={makeNextCard()}
+        nextCardFact={fact}
+        onSaveFact={onSaveFact}
+        onOfferSendEditToAuthor={onOfferSendEditToAuthor}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /^edit$/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(onSaveFact).toHaveBeenCalled();
+    expect(screen.getByText(/saved privately/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /send to author/i }));
+    expect(onOfferSendEditToAuthor).toHaveBeenCalledWith("f1");
+    expect(screen.queryByText(/saved privately/i)).not.toBeInTheDocument();
   });
 });

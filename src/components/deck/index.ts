@@ -4,7 +4,13 @@ export { DeckTagsPicker } from "./DeckTagsPicker";
 export { DeckInfoCard } from "./DeckInfoCard";
 export { DeckPublishDialog } from "./DeckPublishDialog";
 export { DeckSyncUpdatesModal } from "./DeckSyncUpdatesModal";
-export { SubmitFactFeedbackModal } from "./SubmitFactFeedbackModal";
+export { SubmitFactReportModal } from "./SubmitFactReportModal";
+export { SubmitFactContributionModal } from "./SubmitFactContributionModal";
+export { SubmitFieldRenameContributionModal } from "./SubmitFieldRenameContributionModal";
+export { SubmitTagContributionModal } from "./SubmitTagContributionModal";
+export { SubmitTemplateContributionModal } from "./SubmitTemplateContributionModal";
+export { PendingContributionsOutboxModal } from "./PendingContributionsOutboxModal";
+export { PendingContributionsBanner } from "./PendingContributionsBanner";
 export { DeckFeedbackInboxModal } from "./DeckFeedbackInboxModal";
 export {
   DeckFeedbackAlertBanner,

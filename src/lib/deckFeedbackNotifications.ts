@@ -1,12 +1,12 @@
 import {
   isImportedDeck,
   isPublishedSourceDeck,
-  listDeckFeedback,
+  listDeckContributions,
   type DeckItem,
-  type ListDeckFeedbackRes,
+  type ListDeckContributionsRes,
 } from "@/lib/api";
 
-export function parseFeedbackMetaTotal(meta: ListDeckFeedbackRes["meta"]): number {
+export function parseFeedbackMetaTotal(meta: ListDeckContributionsRes["meta"]): number {
   const v = meta.total;
   if (typeof v === "number" && v >= 0) return v;
   if (typeof v === "string") {
@@ -20,7 +20,7 @@ function publishedSourceDecks(decks: DeckItem[]): DeckItem[] {
   return decks.filter((d) => !isImportedDeck(d) && isPublishedSourceDeck(d));
 }
 
-/** Open feedback counts per published source deck (deck id → count). */
+/** Open contribution counts per published source deck (deck id → count). */
 export async function fetchOpenFeedbackCounts(
   decks: DeckItem[],
   token: string
@@ -31,12 +31,12 @@ export async function fetchOpenFeedbackCounts(
   const pairs = await Promise.all(
     sources.map(async (d) => {
       try {
-        const res = await listDeckFeedback(d.id, { status: "open", limit: 1 }, token);
+        const res = await listDeckContributions(d.id, { status: "open", limit: 1 }, token);
         const total = parseFeedbackMetaTotal(res.meta);
         return [d.id, total] as const;
       } catch (e) {
         if (import.meta.env.DEV) {
-          console.warn(`[deck feedback] check failed for ${d.id}:`, e);
+          console.warn(`[deck contributions] check failed for ${d.id}:`, e);
         }
         return [d.id, 0] as const;
       }
@@ -62,7 +62,7 @@ export function anyOpenFeedback(counts: Record<string, number>): boolean {
   return totalOpenFeedback(counts) > 0;
 }
 
-/** Deck id with the most open feedback (for banner link). */
+/** Deck id with the most open contributions (for banner link). */
 export function firstDeckIdWithMostFeedback(counts: Record<string, number>): string | undefined {
   let bestId: string | undefined;
   let bestCount = 0;

@@ -38,7 +38,7 @@ export function DeckProvenanceBanner({
           )}
           <span className="text-muted-foreground"> · pinned to </span>
           <span className="font-medium">v{deck.source_version ?? "?"}</span>
-          <span className="text-muted-foreground"> · facts are read-only</span>
+          <span className="text-muted-foreground"> · local edits stay private until you contribute</span>
         </p>
       </div>
       {updateAvailable && (

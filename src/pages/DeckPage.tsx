@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   request,
   fetchDeckFactsPage,
+  fetchAllDeckFacts,
   uploadMultipart,
   buildTemplateForRequest,
   validateAddFactBody,
@@ -40,12 +41,27 @@ import {
   DeckAllCardsModal,
   DeckPublishDialog,
   DeckSyncUpdatesModal,
-  SubmitFactFeedbackModal,
+  SubmitFactContributionModal,
+  SubmitFieldRenameContributionModal,
+  SubmitTagContributionModal,
+  PendingContributionsOutboxModal,
+  PendingContributionsBanner,
   DeckFeedbackInboxModal,
   DeckOpenFeedbackBanner,
   DeckProvenanceBanner,
   DeckPublishedBanner,
 } from "@/components/deck";
+import type { FactContributionKind } from "@/components/deck/SubmitFactContributionModal";
+import {
+  countPendingContributions,
+  previewFromEntries,
+  removePendingContributionByFactId,
+  appendSentContribution,
+  upsertPendingContribution,
+  type ContributionBoxKind,
+} from "@/lib/pendingContributions";
+import type { StagedTagContribution } from "@/components/deck/SubmitTagContributionModal";
+import type { StagedFieldRenameContribution } from "@/components/deck/SubmitFieldRenameContributionModal";
 import {
   DECK_CARD_TYPOGRAPHY_DEFAULTS,
   loadDeckCardSidesTypography,
@@ -107,7 +123,12 @@ export default function DeckPage() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [feedbackSubmitOpen, setFeedbackSubmitOpen] = useState(false);
   const [feedbackSubmitFact, setFeedbackSubmitFact] = useState<FactItem | null>(null);
+  const [feedbackSubmitKind, setFeedbackSubmitKind] = useState<FactContributionKind>("report");
   const [feedbackInboxOpen, setFeedbackInboxOpen] = useState(false);
+  const [fieldRenameOpen, setFieldRenameOpen] = useState(false);
+  const [deckTagContributeOpen, setDeckTagContributeOpen] = useState(false);
+  const [pendingOutboxOpen, setPendingOutboxOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const [cardTypography, setCardTypography] = useState<DeckCardSidesTypography>(() =>
     id ? loadDeckCardSidesTypography(id) : DECK_CARD_TYPOGRAPHY_DEFAULTS
   );
@@ -144,9 +165,70 @@ export default function DeckPage() {
     setFeedbackSubmitOpen(false);
     setFeedbackSubmitFact(null);
     setFeedbackInboxOpen(false);
+    setFieldRenameOpen(false);
+    setDeckTagContributeOpen(false);
+    setPendingOutboxOpen(false);
+    setPendingCount(0);
     setFactsHasMore(false);
     setFactsTotal(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!id) {
+      setPendingCount(0);
+      return;
+    }
+    setPendingCount(countPendingContributions(id));
+  }, [id]);
+
+  const refreshPendingCount = useCallback(() => {
+    if (!id) {
+      setPendingCount(0);
+      return;
+    }
+    setPendingCount(countPendingContributions(id));
+  }, [id]);
+
+  const recordPendingContribution = useCallback(
+    (
+      kind: ContributionBoxKind,
+      opts?: {
+        factId?: string;
+        entries?: Entry[];
+        preview?: string;
+        addTags?: string[];
+        removeTags?: string[];
+        proposedFields?: string[];
+        template?: number[][];
+        message?: string;
+      }
+    ) => {
+      if (!id) return;
+      const preview =
+        opts?.preview ??
+        (opts?.addTags?.length || opts?.removeTags?.length
+          ? [
+              opts.addTags?.length ? `+${opts.addTags.join(", ")}` : "",
+              opts.removeTags?.length ? `−${opts.removeTags.join(", ")}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : opts?.proposedFields?.join(" · ")) ??
+        previewFromEntries(opts?.entries);
+      upsertPendingContribution(id, {
+        kind,
+        factId: opts?.factId,
+        preview,
+        addTags: opts?.addTags,
+        removeTags: opts?.removeTags,
+        proposedFields: opts?.proposedFields,
+        template: opts?.template,
+        message: opts?.message,
+      });
+      refreshPendingCount();
+    },
+    [id, refreshPendingCount]
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -296,18 +378,29 @@ export default function DeckPage() {
     [token, id]
   );
 
-  const handleReportFact = useCallback(
-    async (factId: string) => {
+  const openFactContribution = useCallback(
+    async (factId: string, kind: FactContributionKind) => {
       const fact =
         nextCardFact?.id === factId ? nextCardFact : await fetchFactById(factId);
       if (!fact) {
-        setError("Could not load fact for feedback.");
+        setError("Could not load fact for contribution.");
         return;
       }
+      setFeedbackSubmitKind(kind);
       setFeedbackSubmitFact(fact);
       setFeedbackSubmitOpen(true);
     },
     [nextCardFact, fetchFactById]
+  );
+
+  const handleReportFact = useCallback(
+    (factId: string) => openFactContribution(factId, "report"),
+    [openFactContribution]
+  );
+
+  const handleOfferSendEditToAuthor = useCallback(
+    (factId: string) => openFactContribution(factId, "edit"),
+    [openFactContribution]
   );
 
   useEffect(() => {
@@ -442,6 +535,17 @@ export default function DeckPage() {
         ],
         ...buildTemplateForRequest(row.length, addFactSplit, sibling),
       };
+      // Snapshot *all* fact IDs before add — factsList is only the first page and
+      // must not be used as the baseline (that falsely marked existing facts as new).
+      let idsBefore = new Set<string>();
+      if (isImportedDeck(deck)) {
+        try {
+          const before = await fetchAllDeckFacts(id, token);
+          idsBefore = new Set(before.map((f) => f.id));
+        } catch {
+          idsBefore = new Set(factsList.map((f) => f.id));
+        }
+      }
       await request<AddFactRes>(`/api/decks/${id}/facts/${addFactOp}`, {
         method: "POST",
         token,
@@ -455,6 +559,21 @@ export default function DeckPage() {
       setAddFactsOpen(false);
       await fetchDeck();
       await fetchFacts();
+      if (isImportedDeck(deck)) {
+        try {
+          const after = await fetchAllDeckFacts(id, token);
+          const newlyAdded = after.filter((f) => !idsBefore.has(f.id));
+          for (const f of newlyAdded) {
+            recordPendingContribution("add", {
+              factId: f.id,
+              entries: f.entries ?? entries,
+            });
+          }
+        } catch {
+          /* ignore — card/bulk edit still record pending */
+        }
+        refreshPendingCount();
+      }
     } catch (e) {
       setAddFactsError(e instanceof Error ? e.message : "Add Facts failed");
       setSuccessMessage("");
@@ -483,6 +602,10 @@ export default function DeckPage() {
       token,
       body: JSON.stringify(body),
     });
+    if (isImportedDeck(deck)) {
+      recordPendingContribution("edit", { factId, entries: normalized });
+      setPendingOutboxOpen(true);
+    }
     setSuccessMessage("Fact updated.");
     await fetchFacts();
     await fetchDeck();
@@ -651,6 +774,13 @@ export default function DeckPage() {
           />
         )}
 
+        {imported && (
+          <PendingContributionsBanner
+            pendingCount={pendingCount}
+            onOpen={() => setPendingOutboxOpen(true)}
+          />
+        )}
+
         {editing ? (
           <DeckEditForm
             name={name}
@@ -695,8 +825,9 @@ export default function DeckPage() {
               cardSuccess={cardSuccess}
               onUpdateCard={handleUpdateCard}
               onHideCard={handleHideCard}
-              onSaveFact={imported ? undefined : handleSaveFactFromCard}
+              onSaveFact={handleSaveFactFromCard}
               onReportFact={imported ? handleReportFact : undefined}
+              onOfferSendEditToAuthor={imported ? handleOfferSendEditToAuthor : undefined}
               onRequestFact={fetchFactById}
               authToken={token}
               rescheduleSuggested={nextCardMeta?.reschedule_suggested}
@@ -709,7 +840,7 @@ export default function DeckPage() {
               deck={deck}
               token={token}
               tagsRefreshKey={deckTagsRefreshKey}
-              factsEditable={!imported}
+              factsEditable={true}
               onEdit={() => {
                 setEditing(true);
                 setSuccessMessage("");
@@ -725,8 +856,14 @@ export default function DeckPage() {
                   ? () => setFeedbackInboxOpen(true)
                   : undefined
               }
+              onSuggestFieldRenames={imported ? () => setFieldRenameOpen(true) : undefined}
+              onSuggestDeckTags={imported ? () => setDeckTagContributeOpen(true) : undefined}
+              onOpenPendingContributions={
+                imported ? () => setPendingOutboxOpen(true) : undefined
+              }
+              pendingContributionCount={imported ? pendingCount : 0}
               onOpenCardFonts={() => setCardFontsOpen(true)}
-              onOpenAddFacts={imported ? undefined : () => setAddFactsOpen(true)}
+              onOpenAddFacts={() => setAddFactsOpen(true)}
               onOpenAllCards={() => setAllCardsOpen(true)}
               onBulkEditFacts={() => setBulkEditFactsOpen(true)}
               deleteConfirm={deleteConfirm}
@@ -775,7 +912,7 @@ export default function DeckPage() {
               />
             )}
             {token && imported && feedbackSubmitFact && (
-              <SubmitFactFeedbackModal
+              <SubmitFactContributionModal
                 open={feedbackSubmitOpen}
                 onClose={() => {
                   setFeedbackSubmitOpen(false);
@@ -783,9 +920,76 @@ export default function DeckPage() {
                 }}
                 deck={deck}
                 fact={feedbackSubmitFact}
+                kind={feedbackSubmitKind}
                 token={token}
-                onSubmitted={async () => {
-                  setSuccessMessage("Feedback sent to the deck author.");
+                onSubmitted={async (kind) => {
+                  if (feedbackSubmitFact && id) {
+                    if (kind === "edit" || kind === "add") {
+                      removePendingContributionByFactId(id, feedbackSubmitFact.id);
+                    }
+                    appendSentContribution(id, {
+                      kind,
+                      factId: feedbackSubmitFact.id,
+                      preview: previewFromEntries(feedbackSubmitFact.entries),
+                    });
+                    refreshPendingCount();
+                  }
+                  const messages: Record<FactContributionKind, string> = {
+                    report: "Report sent to the deck author.",
+                    edit: "Edit contribution sent to the deck author.",
+                    add: "New-fact contribution sent to the deck author.",
+                  };
+                  setSuccessMessage(messages[kind]);
+                }}
+              />
+            )}
+            {token && imported && (
+              <PendingContributionsOutboxModal
+                open={pendingOutboxOpen}
+                onClose={() => setPendingOutboxOpen(false)}
+                deck={deck}
+                token={token}
+                factsById={Object.fromEntries(factsList.map((f) => [f.id, f]))}
+                onChanged={refreshPendingCount}
+                onSubmittedBatch={async (sentCount) => {
+                  setSuccessMessage(
+                    sentCount === 1
+                      ? "Contribution sent to the deck author."
+                      : `${sentCount} contributions sent to the deck author.`
+                  );
+                }}
+              />
+            )}
+            {token && imported && (
+              <SubmitFieldRenameContributionModal
+                open={fieldRenameOpen}
+                onClose={() => setFieldRenameOpen(false)}
+                deck={deck}
+                onStage={async (payload: StagedFieldRenameContribution) => {
+                  recordPendingContribution("field_rename", {
+                    proposedFields: payload.proposedFields,
+                    preview: payload.proposedFields.join(" · "),
+                    message: payload.message,
+                  });
+                  setSuccessMessage("Field rename added to Contributions (pending).");
+                  setPendingOutboxOpen(true);
+                }}
+              />
+            )}
+            {token && imported && (
+              <SubmitTagContributionModal
+                open={deckTagContributeOpen}
+                onClose={() => setDeckTagContributeOpen(false)}
+                deck={deck}
+                scope="deck"
+                onStage={async (payload: StagedTagContribution) => {
+                  recordPendingContribution("deck_tags", {
+                    addTags: payload.addTags,
+                    removeTags: payload.removeTags,
+                    message: payload.message,
+                  });
+                  setSuccessMessage("Deck tag changes added to Contributions (pending).");
+                  setPendingOutboxOpen(true);
                 }}
               />
             )}
@@ -804,7 +1008,7 @@ export default function DeckPage() {
                   await refreshFeedbackCounts();
                   if (detail?.published_version != null) {
                     setSuccessMessage(
-                      `Feedback accepted and published as v${detail.published_version}. Importers can review and sync.`
+                      `Contribution accepted and published as v${detail.published_version}. Importers can review and sync.`
                     );
                   }
                 }}
@@ -825,7 +1029,7 @@ export default function DeckPage() {
                 token={token}
               />
             )}
-            {bulkEditFactsOpen && deck && token && !imported && (
+            {bulkEditFactsOpen && deck && token && (
               <BulkEditFactsModal
                 open={bulkEditFactsOpen}
                 onClose={() => {
@@ -841,12 +1045,21 @@ export default function DeckPage() {
                   await fetchDeck();
                   await fetchFacts();
                 }}
+                onFactSaved={
+                  imported
+                    ? (fact) =>
+                        recordPendingContribution("edit", {
+                          factId: fact.id,
+                          entries: fact.entries,
+                        })
+                    : undefined
+                }
                 onDeleteFact={handleDeleteFact}
                 deleteFactId={deleteFactId}
                 setDeleteFactId={setDeleteFactId}
               />
             )}
-            {addFactsOpen && deck && !imported && (
+            {addFactsOpen && deck && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center p-4"
                 role="dialog"
@@ -860,7 +1073,7 @@ export default function DeckPage() {
                 />
                 <div className="relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg">
                   <h2 id="add-facts-modal-title" className="text-lg font-semibold mb-4">
-                    Add Facts
+                    Add Facts{imported ? " (private overlay)" : ""}
                   </h2>
                   <AddFactsForm
                     deck={deck}

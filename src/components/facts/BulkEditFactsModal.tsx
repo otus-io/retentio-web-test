@@ -71,6 +71,8 @@ export interface BulkEditFactsModalProps {
   /** `meta.total` from GET /facts (total facts in deck); drives page count. */
   factsTotal: number | null;
   onRefreshFacts: () => Promise<void>;
+  /** Called after a successful fact PATCH (e.g. record import pending contribution). */
+  onFactSaved?: (fact: FactItem) => void;
   onDeleteFact: (factId: string) => void | Promise<void>;
   deleteFactId: string | null;
   setDeleteFactId: (id: string | null) => void;
@@ -85,6 +87,7 @@ export function BulkEditFactsModal({
   factsHasMore,
   factsTotal,
   onRefreshFacts,
+  onFactSaved,
   onDeleteFact,
   deleteFactId,
   setDeleteFactId,
@@ -521,6 +524,7 @@ export function BulkEditFactsModal({
           return next;
         });
         setSaveSuccess("Fact saved.");
+        onFactSaved?.(fact);
         await onRefreshFacts();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : "Failed to save fact.");
@@ -528,7 +532,7 @@ export function BulkEditFactsModal({
         setSavingFactId(null);
       }
     },
-    [token, deckId, localFacts, onRefreshFacts]
+    [token, deckId, localFacts, onRefreshFacts, onFactSaved]
   );
 
   if (!open) return null;

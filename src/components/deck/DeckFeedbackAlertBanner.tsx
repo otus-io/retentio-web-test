@@ -18,8 +18,8 @@ export function DeckFeedbackAlertBanner({
 
   const label =
     totalOpenCount === 1
-      ? "1 open feedback report on your published deck."
-      : `${totalOpenCount} open feedback reports across ${feedbackDeckCount} published deck${feedbackDeckCount !== 1 ? "s" : ""}.`;
+      ? "1 open contribution on your published deck."
+      : `${totalOpenCount} open contributions across ${feedbackDeckCount} published deck${feedbackDeckCount !== 1 ? "s" : ""}.`;
 
   return (
     <div
@@ -27,8 +27,8 @@ export function DeckFeedbackAlertBanner({
       role="status"
     >
       <p className="text-sm">
-        <span className="font-medium text-blue-900 dark:text-blue-100">Feedback waiting — </span>
-        {label} Open the deck and choose <strong>Feedback inbox</strong> to review.
+        <span className="font-medium text-blue-900 dark:text-blue-100">Contributions waiting — </span>
+        {label} Open the deck and choose <strong>Contributions inbox</strong> to review.
       </p>
       <div className="flex flex-wrap gap-2 shrink-0">
         {firstDeckId && (
@@ -56,8 +56,8 @@ export function DeckOpenFeedbackBanner({ openCount, onOpenInbox }: DeckOpenFeedb
 
   const label =
     openCount === 1
-      ? "1 open feedback report from an importer."
-      : `${openCount} open feedback reports from importers.`;
+      ? "1 open contribution from an importer."
+      : `${openCount} open contributions from importers.`;
 
   return (
     <div
@@ -65,11 +65,11 @@ export function DeckOpenFeedbackBanner({ openCount, onOpenInbox }: DeckOpenFeedb
       role="status"
     >
       <p className="text-sm">
-        <span className="font-medium text-blue-900 dark:text-blue-100">Feedback waiting — </span>
+        <span className="font-medium text-blue-900 dark:text-blue-100">Contributions waiting — </span>
         {label}
       </p>
       <Button size="sm" variant="default" onClick={onOpenInbox}>
-        Open feedback inbox
+        Open contributions inbox
       </Button>
     </div>
   );
