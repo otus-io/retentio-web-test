@@ -37,17 +37,17 @@ describe("DeckTagsPicker", () => {
     mockListTags.mockResolvedValue(deckOnlyTags);
   });
 
-  it("loads deck-scoped tags via used_on=deck", async () => {
+  it("loads deck picker tags via used_on=deck (user-wide, no deck_id)", async () => {
     render(
       <DeckTagsPicker token="tok" selectedIds={[]} onSelectedIdsChange={vi.fn()} />
     );
 
     await waitFor(() =>
-      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck", deckId: undefined })
+      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck" })
     );
   });
 
-  it("passes deckId when editing an existing deck", async () => {
+  it("still uses user-wide deck picker when editing an existing deck", async () => {
     render(
       <DeckTagsPicker
         token="tok"
@@ -58,7 +58,7 @@ describe("DeckTagsPicker", () => {
     );
 
     await waitFor(() =>
-      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck", deckId: "deck1" })
+      expect(mockListTags).toHaveBeenCalledWith("tok", { usedOn: "deck" })
     );
   });
 

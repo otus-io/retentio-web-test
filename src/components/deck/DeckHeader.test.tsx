@@ -18,6 +18,16 @@ describe("DeckHeader", () => {
     expect(screen.getByRole("link", { name: /^deck$/i })).toHaveAttribute("href", "/decks");
   });
 
+  it("renders a link to /tags", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /^tags$/i })).toHaveAttribute("href", "/tags");
+  });
+
+  it("renders a link to /media", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /^media$/i })).toHaveAttribute("href", "/media");
+  });
+
   it("renders a link to /profile", () => {
     renderHeader();
     expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "/profile");

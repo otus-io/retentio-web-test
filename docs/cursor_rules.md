@@ -43,7 +43,7 @@ This project uses [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) t
 - **Git**: feature branches only, never push to `main`, hooks via `./utils/setup-hooks.sh`
 - **CI**: `webapp-ci.yml` — `npm run test:run`, `npm run build`
 - **Docs**: bilingual user docs where paired; English-only design docs
-- **API**: `../retentio-backend/docs/api.md`; update `docs/api_progress_tracker.md` when API usage changes
+- **API**: `../retentio-backend/docs/api.md`
 
 ### React web (file-scoped)
 

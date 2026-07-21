@@ -89,6 +89,12 @@ export default function MediaPage() {
               <Link to="/decks">Deck</Link>
             </Button>
             <Button variant="ghost" asChild>
+              <Link to="/tags">Tags</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link to="/media">Media</Link>
+            </Button>
+            <Button variant="ghost" asChild>
               <Link to="/profile">Profile</Link>
             </Button>
             <Button variant="outline" onClick={handleLogout}>

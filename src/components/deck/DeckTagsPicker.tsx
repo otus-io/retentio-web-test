@@ -39,7 +39,8 @@ export function DeckTagsPicker({
     setLoadError("");
     setLoading(true);
     try {
-      const res = await listTags(token, { usedOn: "deck", deckId });
+      // User-wide deck picker (+ unused). Associations for this deck use selectedIds / getDeckTags.
+      const res = await listTags(token, { usedOn: "deck" });
       const sorted = [...res.data.tags].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       );
@@ -50,7 +51,7 @@ export function DeckTagsPicker({
     } finally {
       setLoading(false);
     }
-  }, [token, deckId]);
+  }, [token]);
 
   useEffect(() => {
     void refreshTags();
@@ -177,7 +178,7 @@ export function DeckTagsPicker({
       const msg = err instanceof Error ? err.message : "Failed to create tag";
       if (/already exists/i.test(msg)) {
         try {
-          const res = await listTags(token, { usedOn: "deck", deckId });
+          const res = await listTags(token, { usedOn: "deck" });
           const sorted = [...res.data.tags].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
           );

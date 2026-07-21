@@ -43,7 +43,7 @@
 - **Git**：仅功能分支，禁止直推 `main`，hooks：`./utils/setup-hooks.sh`
 - **CI**：`webapp-ci.yml` — `npm run test:run`、`npm run build`
 - **文档**：已有中英文配对的保持双语；设计文档仅英文
-- **API**：`../retentio-backend/docs/api.md`；API 用法变更时更新 `docs/api_progress_tracker.md`
+- **API**：`../retentio-backend/docs/api.md`
 
 ### React Web（文件范围）
 

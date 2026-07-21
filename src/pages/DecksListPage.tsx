@@ -189,6 +189,18 @@ export default function DecksListPage() {
               Deck
             </Link>
             <Link
+              to="/tags"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              Tags
+            </Link>
+            <Link
+              to="/media"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              Media
+            </Link>
+            <Link
               to="/profile"
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
             >

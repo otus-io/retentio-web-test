@@ -26,7 +26,7 @@ Vite + React + TypeScript app for Retentio deck review, catalog, and auth. HTTP 
 
 - User-facing docs: English + Chinese where the repo already pairs them (e.g. `docs/quickstart.md` + `docs/quickstart_zh.md`)
 - Design docs: English only — see `design-docs.mdc`
-- API contract: `../retentio-backend/docs/api.md`; update `docs/api_progress_tracker.md` when adding/changing API usage
+- API contract: `../retentio-backend/docs/api.md`
 
 ## Key Principles
 

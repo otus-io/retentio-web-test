@@ -12,6 +12,7 @@ import ManualPage from "@/pages/ManualPage";
 import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
 import CatalogDeckPage from "@/pages/CatalogDeckPage";
+import TagsPage from "@/pages/TagsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, authReady } = useAuth();
@@ -43,6 +44,14 @@ export const routes = [
     element: (
       <ProtectedRoute>
         <MediaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/tags",
+    element: (
+      <ProtectedRoute>
+        <TagsPage />
       </ProtectedRoute>
     ),
   },

@@ -16,6 +16,18 @@ export function DeckHeader({ onLogout }: DeckHeaderProps) {
           Deck
         </Link>
         <Link
+          to="/tags"
+          className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        >
+          Tags
+        </Link>
+        <Link
+          to="/media"
+          className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        >
+          Media
+        </Link>
+        <Link
           to="/profile"
           className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
         >

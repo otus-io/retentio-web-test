@@ -5,6 +5,12 @@ export interface TagItem {
   id: string;
   name: string;
   description: string;
+  /** Present on GET /api/tags list items only. */
+  deck_count?: number;
+  /** Present on GET /api/tags list items only. */
+  fact_count?: number;
+  /** Present on GET /api/tags list items only: "deck" and/or "fact", or []. */
+  used_on?: string[];
 }
 
 export interface CreateTagReq {
@@ -143,8 +149,16 @@ export function removeTagFromDeck(deckId: string, tagId: string, token: string):
 }
 
 /** GET /api/decks/{deckId}/facts/{factId}/tags */
-export function getFactTags(deckId: string, factId: string, token: string): Promise<TagsListRes> {
-  return request<TagsListRes>(`/api/decks/${enc(deckId)}/facts/${enc(factId)}/tags`, { token });
+export async function getFactTags(
+  deckId: string,
+  factId: string,
+  token: string
+): Promise<TagsListRes> {
+  const res = await request<TagsListRes>(
+    `/api/decks/${enc(deckId)}/facts/${enc(factId)}/tags`,
+    { token }
+  );
+  return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 
 /** PUT /api/decks/{deckId}/facts/{factId}/tags/{tagId} */

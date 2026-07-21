@@ -32,7 +32,8 @@ import {
   type UploadMediaRes,
   fileLooksLikeJson,
 } from "@/lib/api";
-import { getDeckTags } from "@/lib/tags";
+import { getDeckTags, getNextCard, listTags, type TagItem } from "@/lib/tags";
+import { Label } from "@/components/ui/label";
 import {
   DeckHeader,
   DeckEditForm,
@@ -115,6 +116,8 @@ export default function DeckPage() {
   const [loadingNextCard, setLoadingNextCard] = useState(false);
   const [cardError, setCardError] = useState("");
   const [cardSuccess, setCardSuccess] = useState("");
+  const [studyTagId, setStudyTagId] = useState("");
+  const [studyTags, setStudyTags] = useState<TagItem[]>([]);
   const [addFactsOpen, setAddFactsOpen] = useState(false);
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
   const [cardFontsOpen, setCardFontsOpen] = useState(false);
@@ -154,6 +157,8 @@ export default function DeckPage() {
     setNextCard(null);
     setNextCardFact(null);
     setNextCardMeta(null);
+    setStudyTagId("");
+    setStudyTags([]);
     setError("");
     setEditing(false);
     setSuccessMessage("");
@@ -320,7 +325,7 @@ export default function DeckPage() {
     setCardError("");
     setLoadingNextCard(true);
     try {
-      const res = await request<GetNextCardRes>(`/api/decks/${id}/card`, { token });
+      const res = await getNextCard<GetNextCardRes>(id, token, studyTagId || null);
       if (routeDeckIdRef.current !== targetDeckId) return;
       // Backend returns card: [] when there are no cards; avoid using .front/.fact_id on an array
       const card = res.data.card as NextCardItem | unknown[];
@@ -360,7 +365,26 @@ export default function DeckPage() {
     } finally {
       if (routeDeckIdRef.current === targetDeckId) setLoadingNextCard(false);
     }
-  }, [token, id]);
+  }, [token, id, studyTagId]);
+
+  useEffect(() => {
+    if (!token || !id || !deck) return;
+    let cancelled = false;
+    void listTags(token, { usedOn: "fact", deckId: id })
+      .then((res) => {
+        if (cancelled) return;
+        const sorted = [...(res.data.tags ?? [])].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        );
+        setStudyTags(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setStudyTags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, id, deck?.id, deckTagsRefreshKey]);
 
   const fetchFactById = useCallback(
     async (factId: string): Promise<FactItem | null> => {
@@ -815,27 +839,47 @@ export default function DeckPage() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full min-w-0 [&>*]:min-w-0">
-            <CardSection
-              deck={deck}
-              cardTypography={cardTypography}
-              nextCard={nextCard}
-              nextCardFact={nextCardFact}
-              loadingNextCard={loadingNextCard}
-              cardError={cardError}
-              cardSuccess={cardSuccess}
-              onUpdateCard={handleUpdateCard}
-              onHideCard={handleHideCard}
-              onSaveFact={handleSaveFactFromCard}
-              onReportFact={imported ? handleReportFact : undefined}
-              onOfferSendEditToAuthor={imported ? handleOfferSendEditToAuthor : undefined}
-              onRequestFact={fetchFactById}
-              authToken={token}
-              rescheduleSuggested={nextCardMeta?.reschedule_suggested}
-              suggestedRescheduleDays={nextCardMeta?.suggested_reschedule_days}
-              onReschedule={handleReschedule}
-              onAddCardSuccess={handleAddCardSuccess}
-              onDeleteCard={handleDeleteCard}
-            />
+            <div className="space-y-3 min-w-0">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1 min-w-[10rem] flex-1">
+                  <Label htmlFor="study-tag-filter">Study by fact tag</Label>
+                  <select
+                    id="study-tag-filter"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={studyTagId}
+                    onChange={(e) => setStudyTagId(e.target.value)}
+                  >
+                    <option value="">All tags</option>
+                    {studyTags.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <CardSection
+                deck={deck}
+                cardTypography={cardTypography}
+                nextCard={nextCard}
+                nextCardFact={nextCardFact}
+                loadingNextCard={loadingNextCard}
+                cardError={cardError}
+                cardSuccess={cardSuccess}
+                onUpdateCard={handleUpdateCard}
+                onHideCard={handleHideCard}
+                onSaveFact={handleSaveFactFromCard}
+                onReportFact={imported ? handleReportFact : undefined}
+                onOfferSendEditToAuthor={imported ? handleOfferSendEditToAuthor : undefined}
+                onRequestFact={fetchFactById}
+                authToken={token}
+                rescheduleSuggested={nextCardMeta?.reschedule_suggested}
+                suggestedRescheduleDays={nextCardMeta?.suggested_reschedule_days}
+                onReschedule={handleReschedule}
+                onAddCardSuccess={handleAddCardSuccess}
+                onDeleteCard={handleDeleteCard}
+              />
+            </div>
             <DeckInfoCard
               deck={deck}
               token={token}
