@@ -178,11 +178,17 @@ export function DeckTagsPicker({
       const msg = err instanceof Error ? err.message : "Failed to create tag";
       if (/already exists/i.test(msg)) {
         try {
-          const res = await listTags(token, { usedOn: "deck" });
+          const res = await listTags(token);
           const sorted = [...res.data.tags].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
           );
-          setTags(sorted);
+          setTags((prev) => {
+            const byId = new Map(prev.map((t) => [t.id, t]));
+            for (const t of sorted) byId.set(t.id, t);
+            return [...byId.values()].sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+            );
+          });
           const match = sorted.find((t) => normalizeTagName(t.name) === norm);
           if (match && (await attachTagId(match.id))) {
             setQuery("");

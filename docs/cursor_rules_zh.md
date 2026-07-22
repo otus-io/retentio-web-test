@@ -17,7 +17,7 @@
 | 简洁回复 | `concise-responses.mdc` | 始终生效 | 短而可扫读的答复 |
 | Git 工作流 | `git-workflow.mdc` | 始终生效 | 功能分支、hooks：`./utils/setup-hooks.sh` |
 | React Web | `react-web.mdc` | `src/**/*.{ts,tsx}` | Vite、React Router、`api.ts`、Tailwind |
-| 测试 | `testing.mdc` | `src/**/*.test.{ts,tsx}` | Vitest + Testing Library |
+| 测试 | `testing.mdc` | `src/**/*.test.*`, `e2e/**` | Vitest + Playwright |
 | CI 工作流 | `ci-workflows.mdc` | `.github/workflows/**` | `webapp-ci.yml`、部署 |
 | 设计文档 | `design-docs.mdc` | `docs/design-doc/**` | 仅英文设计文档格式 |
 | 调试日志 | `debug-logging.mdc` | 编辑任意文件时 | `logs/debug.log` 路径与埋点 |
@@ -52,8 +52,9 @@
 
 ### 测试（文件范围）
 
-- Vitest + Testing Library + user-event
+- Vitest + Testing Library + user-event 用于单元/组件测试
 - API 用 mock `fetch`；路由页面用 `MemoryRouter`
+- Playwright e2e 在 `e2e/`，覆盖真实用户流程（tags、facts、auth）
 
 ## 添加新规则
 

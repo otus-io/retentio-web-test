@@ -1,10 +1,10 @@
 ---
-description: Vitest and Testing Library conventions for the web test app
-globs: src/**/*.test.{ts,tsx}
+description: Vitest and Playwright test conventions for the web test app
+globs: "{src/**/*.test.{ts,tsx},e2e/**/*.ts,playwright.config.ts}"
 alwaysApply: false
 ---
 
-# Testing Conventions (Vitest)
+# Testing Conventions
 
 ## Blackbox principle
 
@@ -12,36 +12,25 @@ alwaysApply: false
 - Fix production code when behavior is wrong; change tests only for wrong expectations or intentional contract changes.
 - See also: `.cursor/failing-tests-debugging.mdc`
 
-## Organization
+## Unit / component (Vitest)
 
 - Colocate tests: `Component.test.tsx` next to `Component.tsx`, or `src/lib/*.test.ts`
 - Use `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`
-
-## Pattern
-
-```tsx
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
-
-describe("MyComponent", () => {
-  it("does the thing", async () => {
-    const user = userEvent.setup();
-    render(<MyComponent />);
-    await user.click(screen.getByRole("button", { name: /submit/i }));
-    expect(screen.getByText("Done")).toBeInTheDocument();
-  });
-});
-```
-
-## API tests
-
-- Mock `fetch` at module level; assert URL, method, headers, body.
-- See `src/lib/api.test.ts` for patterns.
-
-## Running tests
+- Mock `fetch` for API calls; use `MemoryRouter` for routed pages
+- See `src/lib/api.test.ts` for patterns
 
 ```bash
-npm test -- --run                    # all
-npm test -- --run src/lib/api.test.ts  # one file
+npm test -- --run
+npm test -- --run src/lib/api.test.ts
+```
+
+## E2E (Playwright)
+
+- Specs in `e2e/` (auth, tags, facts); helpers in `e2e/helpers.ts`
+- Auth via `localStorage` key `wordupx_token` (see `e2e/global-setup.ts`)
+- CI runs Chromium with secrets `E2E_USERNAME`, `E2E_PASSWORD`
+
+```bash
+E2E_USERNAME=... E2E_PASSWORD=... npm run test:e2e
+npm run test:e2e:ui
 ```

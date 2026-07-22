@@ -147,19 +147,29 @@ export async function getDeckTags(deckId: string, token: string): Promise<TagsLi
 }
 
 /** PUT /api/decks/{deckId}/tags/{tagId} */
-export function addTagToDeck(deckId: string, tagId: string, token: string): Promise<TagsListRes> {
-  return request<TagsListRes>(`/api/decks/${enc(deckId)}/tags/${enc(tagId)}`, {
+export async function addTagToDeck(
+  deckId: string,
+  tagId: string,
+  token: string
+): Promise<TagsListRes> {
+  const res = await request<TagsListRes>(`/api/decks/${enc(deckId)}/tags/${enc(tagId)}`, {
     method: "PUT",
     token,
   });
+  return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 
 /** DELETE /api/decks/{deckId}/tags/{tagId} */
-export function removeTagFromDeck(deckId: string, tagId: string, token: string): Promise<TagsListRes> {
-  return request<TagsListRes>(`/api/decks/${enc(deckId)}/tags/${enc(tagId)}`, {
+export async function removeTagFromDeck(
+  deckId: string,
+  tagId: string,
+  token: string
+): Promise<TagsListRes> {
+  const res = await request<TagsListRes>(`/api/decks/${enc(deckId)}/tags/${enc(tagId)}`, {
     method: "DELETE",
     token,
   });
+  return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 
 /** GET /api/decks/{deckId}/facts/{factId}/tags */
@@ -176,29 +186,31 @@ export async function getFactTags(
 }
 
 /** PUT /api/decks/{deckId}/facts/{factId}/tags/{tagId} */
-export function addTagToFact(
+export async function addTagToFact(
   deckId: string,
   factId: string,
   tagId: string,
   token: string
 ): Promise<TagsListRes> {
-  return request<TagsListRes>(
+  const res = await request<TagsListRes>(
     `/api/decks/${enc(deckId)}/facts/${enc(factId)}/tags/${enc(tagId)}`,
     { method: "PUT", token }
   );
+  return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 
 /** DELETE /api/decks/{deckId}/facts/{factId}/tags/{tagId} */
-export function removeTagFromFact(
+export async function removeTagFromFact(
   deckId: string,
   factId: string,
   tagId: string,
   token: string
 ): Promise<TagsListRes> {
-  return request<TagsListRes>(
+  const res = await request<TagsListRes>(
     `/api/decks/${enc(deckId)}/facts/${enc(factId)}/tags/${enc(tagId)}`,
     { method: "DELETE", token }
   );
+  return { ...res, data: { ...res.data, tags: normalizeTagsList(res.data?.tags) } };
 }
 
 /** Optional tag_id filter for study endpoints (GET next card / card stats). */

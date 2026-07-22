@@ -64,8 +64,21 @@ npm run preview
 
 ## Test
 
+Unit / component (Vitest):
+
 ```bash
 npm test
 # or
 npm run test:run
 ```
+
+End-to-end (Playwright — real browser flows against the API):
+
+```bash
+npx playwright install chromium   # once per machine
+# put E2E_USERNAME / E2E_PASSWORD in .env.local, then:
+npm run test:e2e
+npm run test:e2e:ui               # interactive debugger
+```
+
+E2E defaults to the release API (`npm run dev:release`). Override with `E2E_API_URL` / `VITE_API_URL`. Specs skip when credentials are unset (locally); CI requires `E2E_USERNAME` and `E2E_PASSWORD` secrets.

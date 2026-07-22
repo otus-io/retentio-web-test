@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "start": "serve -s dist -l ${PORT:-3000}",
     "test": "npx vitest",
-    "test:run": "npx vitest run"
+    "test:run": "npx vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -23,6 +26,7 @@
     "serve": "^14.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.5.2",

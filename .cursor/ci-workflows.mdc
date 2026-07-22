@@ -10,17 +10,18 @@ alwaysApply: false
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `test-build-deploy.yml` | Push/PR to `main`, `src/**` and related config | `npm ci`, `npm run test:run`, `npm run build`; SSH deploy on push to `main` after tests pass |
-| `pr-review.yml` | PR opened/synchronized | Automated PR review (if configured) |
+| `test-build-deploy.yml` | Push/PR to `main`, `src/**`, `e2e/**`, and related config | `npm ci`, unit tests, build, Playwright e2e; SSH deploy on push to `main` |
 
 ## CI requirements
 
 - Node.js 20; npm with frozen lockfile (`npm ci`)
-- Must pass: unit tests (`npm run test:run`), production build (`npm run build`)
-- Build uses `VITE_API_URL=https://api.retentio.app:8443` in CI
+- Must pass: unit tests (`npm run test:run`), production build, e2e (`npm run test:e2e`)
+- Build / e2e use `VITE_API_URL` / `E2E_API_URL=https://api.retentio.app:8443`
+- E2E secrets: `E2E_USERNAME`, `E2E_PASSWORD`
 
 ## Rules
 
 - Do not skip CI checks or add `[skip ci]` without team agreement
-- New features should include Vitest coverage in `src/**/*.test.{ts,tsx}`
+- New features should include Vitest coverage in `src/**/*.test.{ts,tsx}` where unit-testable
+- User-flow regressions belong in `e2e/`
 - Deploy job runs only on push to `main` after the test job succeeds
