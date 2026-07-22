@@ -156,6 +156,34 @@ describe("CardSection", () => {
     expect(screen.getByText("Loading next card…")).toBeInTheDocument();
   });
 
+  it("shows study stats and reviewed/total progress percentage", () => {
+    render(
+      <CardSection
+        {...defaultProps}
+        nextCard={null}
+        tagFilterStats={{ cardsCount: 12, dueCards: 3, reviewedCards: 9 }}
+      />
+    );
+    expect(screen.getByText("Cards")).toBeInTheDocument();
+    expect(screen.getByText("Total 12 · Overdue 3")).toBeInTheDocument();
+    expect(screen.getByText("9 / 12 reviewed")).toBeInTheDocument();
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar", { name: /reviewed cards progress/i });
+    expect(bar).toHaveAttribute("aria-valuenow", "9");
+    expect(bar).toHaveAttribute("aria-valuemax", "12");
+  });
+
+  it("does not show study stats when not provided", () => {
+    render(
+      <CardSection
+        {...defaultProps}
+        nextCard={null}
+      />
+    );
+    expect(screen.queryByText(/Total \d+/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
   it("after edit save with onOfferSendEditToAuthor, shows send-to-author notice", async () => {
     const user = userEvent.setup();
     const onSaveFact = vi.fn().mockResolvedValue(undefined);

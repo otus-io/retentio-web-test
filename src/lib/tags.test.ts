@@ -113,6 +113,36 @@ describe("tags API", () => {
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toContain("used_on=fact");
     expect(url).toContain("deck_id=deck1");
+    expect(url).not.toContain("unused=");
+  });
+
+  it("listTags unused requires usedOn=fact and deckId", async () => {
+    await expect(listTags("tok", { unused: "only" })).rejects.toThrow(
+      /unused is only valid/i
+    );
+    await expect(listTags("tok", { usedOn: "deck", unused: "exclude" })).rejects.toThrow(
+      /unused is only valid/i
+    );
+  });
+
+  it("listTags with unused=exclude adds unused query", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { tags: [] }, meta: { msg: "ok" } })
+    );
+    await listTags("tok", { usedOn: "fact", deckId: "deck1", unused: "exclude" });
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("used_on=fact");
+    expect(url).toContain("deck_id=deck1");
+    expect(url).toContain("unused=exclude");
+  });
+
+  it("listTags with unused=only adds unused query", async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse({ data: { tags: [] }, meta: { msg: "ok" } })
+    );
+    await listTags("tok", { usedOn: "fact", deckId: "deck1", unused: "only" });
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("unused=only");
   });
 
   it("getTag GETs /api/tags/{id}", async () => {

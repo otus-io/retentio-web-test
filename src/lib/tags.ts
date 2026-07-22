@@ -82,20 +82,34 @@ export function createTag(body: CreateTagReq, token: string): Promise<CreateTagR
 
 export type TagUsedOn = "deck" | "fact";
 
+/** Only valid with usedOn=fact and deckId. Omit = both (default fact picker). */
+export type TagUnusedFilter = "exclude" | "only";
+
 export interface ListTagsOptions {
   usedOn?: TagUsedOn;
   /** Required when usedOn is "fact"; optional scope when usedOn is "deck". */
   deckId?: string;
+  /**
+   * Fact picker only (`usedOn=fact` + `deckId`):
+   * - omit: tags on facts in deck + globally unused
+   * - exclude: tags on facts in this deck only
+   * - only: globally unused tags only
+   */
+  unused?: TagUnusedFilter;
 }
 
-/** GET /api/tags — optional used_on/deck_id narrow lists for deck or fact pickers. */
+/** GET /api/tags — optional used_on/deck_id/unused narrow lists for deck or fact pickers. */
 export async function listTags(token: string, options?: ListTagsOptions): Promise<ListTagsRes> {
   if (options?.usedOn === "fact" && !options.deckId) {
     throw new Error("deckId is required when usedOn is fact");
   }
+  if (options?.unused && (options.usedOn !== "fact" || !options.deckId)) {
+    throw new Error("unused is only valid with usedOn=fact and deckId");
+  }
   const params = new URLSearchParams();
   if (options?.usedOn) params.set("used_on", options.usedOn);
   if (options?.deckId) params.set("deck_id", options.deckId);
+  if (options?.unused) params.set("unused", options.unused);
   const query = params.toString();
   const path = `/api/tags${query ? `?${query}` : ""}`;
   const res = await request<ListTagsRes>(path, { token });

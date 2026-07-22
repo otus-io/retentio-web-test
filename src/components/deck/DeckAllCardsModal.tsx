@@ -127,7 +127,7 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
     setTagsLoading(true);
     setTagsError("");
     try {
-      const res = await listTags(token, { usedOn: "fact", deckId });
+      const res = await listTags(token, { usedOn: "fact", deckId, unused: "exclude" });
       const sorted = [...(res.data.tags ?? [])].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
       );
@@ -199,9 +199,6 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
             <p className="text-sm text-muted-foreground">
               Total {data.stats.cards_count} · Due {data.stats.due_cards} · Unseen {data.stats.unseen_cards} · Seen (not due) {seenOnlyCount}{" "}
               · Hidden {data.stats.hidden_cards}
-              {data.stats.orphaned_hidden_cards != null && data.stats.orphaned_hidden_cards > 0
-                ? ` · Orphaned hidden ${data.stats.orphaned_hidden_cards}`
-                : ""}
             </p>
           )}
 
@@ -248,7 +245,7 @@ export function DeckAllCardsModal({ open, onOpenChange, deckId, deckName, token 
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
-              Fact tags in this deck (plus unused tags you can attach to facts).
+              Fact tags already used on facts in this deck.
             </p>
             {tagsError && <p className="text-sm text-destructive">{tagsError}</p>}
             {!tagsLoading && filterTags.length === 0 && (

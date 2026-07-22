@@ -18,6 +18,7 @@ import {
   type DeckItem,
   type Entry,
   type FactItem,
+  type GetCardsRes,
   type GetDeckRes,
   type GetNextCardRes,
   type NextCardItem,
@@ -32,7 +33,7 @@ import {
   type UploadMediaRes,
   fileLooksLikeJson,
 } from "@/lib/api";
-import { getDeckTags, getNextCard, listTags, type TagItem } from "@/lib/tags";
+import { getDeckCards, getDeckTags, getNextCard, listTags, type TagItem } from "@/lib/tags";
 import { Label } from "@/components/ui/label";
 import {
   DeckHeader,
@@ -118,6 +119,15 @@ export default function DeckPage() {
   const [cardSuccess, setCardSuccess] = useState("");
   const [studyTagId, setStudyTagId] = useState("");
   const [studyTags, setStudyTags] = useState<TagItem[]>([]);
+  /** Study header stats: from deck.stats (all tags) or GET /cards?tag_id (tag filter). */
+  const [studyCardStats, setStudyCardStats] = useState<{
+    cardsCount: number;
+    dueCards: number;
+    reviewedCards: number;
+  } | null>(null);
+  /** Which filter the stats belong to: "" = all tags, tag id = that tag, null = none/loading. */
+  const [studyCardStatsScope, setStudyCardStatsScope] = useState<string | null>(null);
+  const [studyStatsRefreshKey, setStudyStatsRefreshKey] = useState(0);
   const [addFactsOpen, setAddFactsOpen] = useState(false);
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
   const [cardFontsOpen, setCardFontsOpen] = useState(false);
@@ -159,6 +169,9 @@ export default function DeckPage() {
     setNextCardMeta(null);
     setStudyTagId("");
     setStudyTags([]);
+    setStudyCardStats(null);
+    setStudyCardStatsScope(null);
+    setStudyStatsRefreshKey(0);
     setError("");
     setEditing(false);
     setSuccessMessage("");
@@ -325,8 +338,10 @@ export default function DeckPage() {
     setCardError("");
     setLoadingNextCard(true);
     try {
-      const res = await getNextCard<GetNextCardRes>(id, token, studyTagId || null);
+      const tagId = studyTagId || null;
+      const res = await getNextCard<GetNextCardRes>(id, token, tagId);
       if (routeDeckIdRef.current !== targetDeckId) return;
+
       // Backend returns card: [] when there are no cards; avoid using .front/.fact_id on an array
       const card = res.data.card as NextCardItem | unknown[];
       const noCard = Array.isArray(card) || card == null;
@@ -367,10 +382,68 @@ export default function DeckPage() {
     }
   }, [token, id, studyTagId]);
 
+  // All tags: reuse GET /decks/{id} stats. Tag filter: GET /cards?tag_id=… (async, does not block next card).
+  // Scope stats to the active filter so All-tags numbers never linger after a tag is selected.
+  const studyTagIdRef = useRef(studyTagId);
+  studyTagIdRef.current = studyTagId;
+
+  useEffect(() => {
+    if (!deck) {
+      setStudyCardStats(null);
+      setStudyCardStatsScope(null);
+      return;
+    }
+    if (studyTagId) return;
+    setStudyCardStats({
+      cardsCount: deck.stats.cards_count,
+      dueCards: deck.stats.due_cards,
+      reviewedCards: deck.stats.reviewed_cards,
+    });
+    setStudyCardStatsScope("");
+  }, [deck, studyTagId]);
+
+  useEffect(() => {
+    if (!studyTagId || !token || !id) return;
+    const targetDeckId = id;
+    const tagId = studyTagId;
+    // Drop mismatched stats immediately (do not keep showing All-tags / previous tag).
+    setStudyCardStats(null);
+    setStudyCardStatsScope(null);
+    void getDeckCards<GetCardsRes>(id, token, tagId)
+      .then((cardsRes) => {
+        const stillCurrentTag = studyTagIdRef.current === tagId;
+        const routeOk = routeDeckIdRef.current === targetDeckId;
+        if (!stillCurrentTag || !routeOk) return;
+        const next = {
+          cardsCount: cardsRes.data.stats.cards_count,
+          dueCards: cardsRes.data.stats.due_cards,
+          reviewedCards: cardsRes.data.stats.reviewed_cards,
+        };
+        setStudyCardStats(next);
+        setStudyCardStatsScope(tagId);
+      })
+      .catch(() => {
+        if (studyTagIdRef.current === tagId && routeDeckIdRef.current === targetDeckId) {
+          setStudyCardStats(null);
+          setStudyCardStatsScope(null);
+        }
+      });
+  }, [studyTagId, token, id, studyStatsRefreshKey]);
+
+  const displayedStudyStats =
+    studyTagId === ""
+      ? studyCardStatsScope === ""
+        ? studyCardStats
+        : null
+      : studyCardStatsScope === studyTagId
+        ? studyCardStats
+        : null;
+  const studyStatsLoading = Boolean(studyTagId && studyCardStatsScope !== studyTagId);
+
   useEffect(() => {
     if (!token || !id || !deck) return;
     let cancelled = false;
-    void listTags(token, { usedOn: "fact", deckId: id })
+    void listTags(token, { usedOn: "fact", deckId: id, unused: "exclude" })
       .then((res) => {
         if (cancelled) return;
         const sorted = [...(res.data.tags ?? [])].sort((a, b) =>
@@ -664,6 +737,8 @@ export default function DeckPage() {
       });
       setCardSuccess("Card reviewed.");
       await handleGetNextCard(false);
+      setStudyStatsRefreshKey((k) => k + 1);
+      if (!studyTagId) void fetchDeck();
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Update failed");
     }
@@ -680,6 +755,7 @@ export default function DeckPage() {
       });
       setCardSuccess("Card hidden.");
       await fetchDeck();
+      setStudyStatsRefreshKey((k) => k + 1);
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Hide failed");
@@ -693,6 +769,8 @@ export default function DeckPage() {
       await request(`/api/decks/${id}/cards/${cardId}`, { method: "DELETE", token });
       setCardSuccess("Card deleted.");
       await handleGetNextCard(false);
+      setStudyStatsRefreshKey((k) => k + 1);
+      if (!studyTagId) void fetchDeck();
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Delete failed");
     }
@@ -702,6 +780,8 @@ export default function DeckPage() {
     setCardSuccess("Card added.");
     await fetchFacts();
     await handleGetNextCard(false);
+    setStudyStatsRefreshKey((k) => k + 1);
+    if (!studyTagId) void fetchDeck();
   }
 
   async function handleReschedule(days: number) {
@@ -716,6 +796,7 @@ export default function DeckPage() {
       setCardSuccess(`Schedule shifted by ${days} days.`);
       setNextCardMeta(null);
       await fetchDeck();
+      setStudyStatsRefreshKey((k) => k + 1);
       await handleGetNextCard(false);
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Reschedule failed");
@@ -866,6 +947,8 @@ export default function DeckPage() {
                 loadingNextCard={loadingNextCard}
                 cardError={cardError}
                 cardSuccess={cardSuccess}
+                tagFilterStats={displayedStudyStats}
+                tagFilterStatsLoading={studyStatsLoading}
                 onUpdateCard={handleUpdateCard}
                 onHideCard={handleHideCard}
                 onSaveFact={handleSaveFactFromCard}

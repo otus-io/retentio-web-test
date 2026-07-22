@@ -431,6 +431,10 @@ interface CardSectionProps {
   loadingNextCard: boolean;
   cardError: string;
   cardSuccess: string;
+  /** Study-scope card stats (all tags or a fact tag): total, due/overdue, reviewed. */
+  tagFilterStats?: { cardsCount: number; dueCards: number; reviewedCards: number } | null;
+  /** True while tag-scoped stats are fetching (do not show All-tags numbers). */
+  tagFilterStatsLoading?: boolean;
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, entries: Entry[]) => Promise<void>;
@@ -461,6 +465,8 @@ export function CardSection({
   loadingNextCard,
   cardError,
   cardSuccess,
+  tagFilterStats = null,
+  tagFilterStatsLoading = false,
   onUpdateCard,
   onHideCard,
   onSaveFact,
@@ -608,10 +614,56 @@ export function CardSection({
     }
   };
 
+  const reviewedProgress =
+    tagFilterStats != null && tagFilterStats.cardsCount > 0
+      ? {
+          reviewed: Math.min(tagFilterStats.reviewedCards, tagFilterStats.cardsCount),
+          total: tagFilterStats.cardsCount,
+          percent: Math.round(
+            (Math.min(tagFilterStats.reviewedCards, tagFilterStats.cardsCount) /
+              tagFilterStats.cardsCount) *
+              100
+          ),
+        }
+      : null;
+
   return (
     <Card>
-      <CardHeader className="text-center">
+      <CardHeader className="text-center space-y-2">
         <CardTitle>Cards</CardTitle>
+        {tagFilterStatsLoading && (
+          <p className="text-sm text-muted-foreground font-normal">Loading tag stats…</p>
+        )}
+        {tagFilterStats != null && (
+          <div className="space-y-1.5 px-1">
+            <p className="text-sm text-muted-foreground font-normal">
+              Total {tagFilterStats.cardsCount} · Overdue {tagFilterStats.dueCards}
+            </p>
+            {reviewedProgress != null && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {reviewedProgress.reviewed} / {reviewedProgress.total} reviewed
+                  </span>
+                  <span>{reviewedProgress.percent}%</span>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuenow={reviewedProgress.reviewed}
+                  aria-valuemin={0}
+                  aria-valuemax={reviewedProgress.total}
+                  aria-label="Reviewed cards progress"
+                >
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width]"
+                    style={{ width: `${reviewedProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4 text-center">
         {cardError && <p className="text-sm text-destructive">{cardError}</p>}

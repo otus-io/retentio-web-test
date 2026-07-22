@@ -1029,7 +1029,7 @@ Optional query `tag_id` filters both `stats` and `cards` to facts tagged in this
 
 **Response:**
 
-`data.stats` matches `GET /api/decks/{id}` (`cards_count`, `facts_count`, `unseen_cards`, `reviewed_cards`, `due_cards`, `hidden_cards`, `new_cards_today`, `last_reviewed_at`, optional `orphaned_hidden_cards`). Response also includes `cards` (full card array).
+`data.stats` matches `GET /api/decks/{id}` (`cards_count`, `facts_count`, `unseen_cards`, `reviewed_cards`, `due_cards`, `hidden_cards`, `new_cards_today`, `last_reviewed_at`). Response also includes `cards` (full card array).
 
 ```json
 {
@@ -1042,8 +1042,7 @@ Optional query `tag_id` filters both `stats` and `cards` to facts tagged in this
       "due_cards": 7,
       "hidden_cards": 3,
       "new_cards_today": 2,
-      "last_reviewed_at": 1710000000,
-      "orphaned_hidden_cards": 1
+      "last_reviewed_at": 1710000000
     },
     "cards": [
       {

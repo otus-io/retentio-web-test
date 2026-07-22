@@ -74,7 +74,7 @@ Fact model: backend uses `entries` (required) and `fields` (optional). Frontend 
 |----------|---------|----------|--------|
 | GET .../card | data: { card, urgency } | CardDetail.fromJson(data) | OK |
 | PATCH .../card | body: **card_id** required; either (**interval** + **last_review**) OR **hidden** (not both) | updateCard(deckId, { card_id, interval?, last_review?, hidden? }) | OK |
-| GET .../cards | data: stats (DeckStats shape) + cards[]; optional tag_id | GetCardsRes.stats; orphaned_hidden_cards optional on stats | OK |
+| GET .../cards | data: stats (DeckStats shape) + cards[]; optional tag_id | GetCardsRes.stats | OK |
 | DELETE .../cards/{cardId} | — | pathParams id, cardId | OK |
 | POST .../reschedule | body: days (1–365) | body: { days } | OK |
 

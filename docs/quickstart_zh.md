@@ -1032,7 +1032,7 @@
 
 **响应示例：**
 
-`data.stats` 与 `GET /api/decks/{id}` 相同（`cards_count`、`facts_count`、`unseen_cards`、`reviewed_cards`、`due_cards`、`hidden_cards`、`new_cards_today`、`last_reviewed_at`，以及可选的 `orphaned_hidden_cards`）。响应还包含完整 `cards` 数组。
+`data.stats` 与 `GET /api/decks/{id}` 相同（`cards_count`、`facts_count`、`unseen_cards`、`reviewed_cards`、`due_cards`、`hidden_cards`、`new_cards_today`、`last_reviewed_at`）。响应还包含完整 `cards` 数组。
 
 ```json
 {
@@ -1045,8 +1045,7 @@
       "due_cards": 7,
       "hidden_cards": 3,
       "new_cards_today": 2,
-      "last_reviewed_at": 1710000000,
-      "orphaned_hidden_cards": 1
+      "last_reviewed_at": 1710000000
     },
     "cards": [
       {

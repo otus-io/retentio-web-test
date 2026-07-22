@@ -255,7 +255,8 @@ export async function request<T>(
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  const url = `${baseUrl}${path}`;
+  const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
     const msg = await parseError(res);
     notifyAuthFailure(res.status, path, msg);
@@ -495,7 +496,6 @@ export interface DeckStats {
   new_cards_today: number;
   reviewed_cards: number;
   unseen_cards: number;
-  orphaned_hidden_cards?: number;
 }
 
 export interface DeckItem {
