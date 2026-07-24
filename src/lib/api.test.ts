@@ -400,7 +400,7 @@ describe("GetNextCard response shape (front/back entry objects)", () => {
 });
 
 describe("cardEntryToRenderItems", () => {
-  it("orders text, audio, image, video, json", () => {
+  it("orders text, audio, json, image, video (Flutter slot normalize order)", () => {
     const items = cardEntryToRenderItems({
       text: "T",
       audio: "a",
@@ -408,8 +408,8 @@ describe("cardEntryToRenderItems", () => {
       video: "v",
       json: "j",
     });
-    expect(items.map((x) => x.type)).toEqual(["text", "audio", "image", "video", "json"]);
-    expect(items.map((x) => x.value)).toEqual(["T", "a", "i", "v", "j"]);
+    expect(items.map((x) => x.type)).toEqual(["text", "audio", "json", "image", "video"]);
+    expect(items.map((x) => x.value)).toEqual(["T", "a", "j", "i", "v"]);
   });
 });
 

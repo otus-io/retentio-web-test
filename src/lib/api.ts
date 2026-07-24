@@ -1307,14 +1307,14 @@ export interface CardEntry {
   json?: string;
 }
 
-/** Expands a CardEntry to ordered render pieces: text, then audio, image, video, json. */
+/** Expands a CardEntry to ordered render pieces (Flutter `_normalizeCardSlotJson` order). */
 export function cardEntryToRenderItems(entry: CardEntry): CardEntryItem[] {
   const out: CardEntryItem[] = [];
   if (entry.text) out.push({ type: "text", value: entry.text });
   if (entry.audio) out.push({ type: "audio", value: entry.audio });
+  if (entry.json) out.push({ type: "json", value: entry.json });
   if (entry.image) out.push({ type: "image", value: entry.image });
   if (entry.video) out.push({ type: "video", value: entry.video });
-  if (entry.json) out.push({ type: "json", value: entry.json });
   return out;
 }
 

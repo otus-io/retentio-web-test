@@ -64,7 +64,99 @@ describe("CardSection", () => {
     );
     expect(screen.getByText(/Due:/)).toBeInTheDocument();
     expect(screen.getByText("Apple")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Word" })).toBeInTheDocument();
     expect(screen.getByText("Click to flip")).toBeInTheDocument();
+  });
+
+  it("front multi-field uses field tabs and shows only the active tab", async () => {
+    const user = userEvent.setup();
+    const nextCard = makeNextCard({
+      card: {
+        id: "c-multi-front",
+        fact_id: "f-multi",
+        template: [[0, 1], [2]],
+        last_review: 0,
+        due_date: 1000,
+        hidden: false,
+        created_at: 0,
+        front: [
+          { field: "Word", text: "benefit" },
+          { field: "Reading", text: "ˈbenɪfɪt" },
+        ],
+        back: [{ field: "Chinese", text: "利益" }],
+      },
+    });
+    render(<CardSection {...defaultProps} nextCard={nextCard} />);
+    expect(screen.getByRole("tab", { name: "Word" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Reading" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText("benefit")).toBeInTheDocument();
+    expect(screen.queryByText("ˈbenɪfɪt")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Reading" }));
+    expect(screen.getByText("ˈbenɪfɪt")).toBeInTheDocument();
+    expect(screen.queryByText("benefit")).not.toBeInTheDocument();
+  });
+
+  it("back multi-field stacks all sections with uppercase labels (no show-more)", async () => {
+    const user = userEvent.setup();
+    const nextCard = makeNextCard({
+      card: {
+        id: "c-multi-back",
+        fact_id: "f-multi-back",
+        template: [[0], [1, 2, 3]],
+        last_review: 0,
+        due_date: 1000,
+        hidden: false,
+        created_at: 0,
+        front: [{ field: "Word", text: "benefit" }],
+        back: [
+          { field: "Chinese", text: "利益, 好处 ; 优势" },
+          {
+            field: "English Example",
+            text: "The discovery of oil brought many benefits to the town.",
+          },
+          { field: "Chinese Example", text: "石油的发现给该镇带来很多利益。" },
+        ],
+      },
+    });
+    render(<CardSection {...defaultProps} nextCard={nextCard} />);
+    await user.click(screen.getByLabelText("Flip to back"));
+
+    expect(screen.getByText("利益, 好处 ; 优势")).toBeInTheDocument();
+    expect(
+      screen.getByText("The discovery of oil brought many benefits to the town.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("石油的发现给该镇带来很多利益。")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Chinese" })).toHaveTextContent("CHINESE");
+    expect(screen.getByRole("heading", { name: "English Example" })).toHaveTextContent(
+      "ENGLISH EXAMPLE"
+    );
+    expect(screen.getByRole("heading", { name: "Chinese Example" })).toHaveTextContent(
+      "CHINESE EXAMPLE"
+    );
+    expect(screen.queryByLabelText("Show more")).not.toBeInTheDocument();
+  });
+
+  it("back single-field has no field section label", async () => {
+    const user = userEvent.setup();
+    const nextCard = makeNextCard({
+      card: {
+        id: "c-single-back",
+        fact_id: "f-single",
+        template: [[0], [1]],
+        last_review: 0,
+        due_date: 1000,
+        hidden: false,
+        created_at: 0,
+        front: [{ field: "Front", text: "Hello" }],
+        back: [{ field: "Back", text: "World" }],
+      },
+    });
+    render(<CardSection {...defaultProps} nextCard={nextCard} />);
+    await user.click(screen.getByLabelText("Flip to back"));
+    expect(screen.getByText("World")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Back" })).not.toBeInTheDocument();
+    expect(screen.queryByText("BACK")).not.toBeInTheDocument();
   });
 
   it("renders wiki-style [[main|reading]] markup as HTML ruby on card text", () => {

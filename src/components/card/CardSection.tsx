@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import type { DeckItem, Entry, FactItem } from "@/lib/api";
+import type { CardEntry, DeckItem, Entry, FactItem } from "@/lib/api";
 import { cardEntryToRenderItems, type CardEntryItem, type GetNextCardRes } from "@/lib/api";
 import type { DeckCardSidesTypography } from "@/lib/deckCardTypography";
 import { DECK_CARD_TYPOGRAPHY_DEFAULTS } from "@/lib/deckCardTypography";
@@ -14,42 +14,8 @@ import { AddCardFromFactModal } from "./AddCardFromFactModal";
 import { formatMediaMarkersForDisplay } from "@/lib/utils";
 import { looksLikeWikiRubyMarkup, parseWikiRubyMarkup } from "@/lib/wikiRubyMarkup";
 import { formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
-
-function getMinMaxIntervalSeconds(card: GetNextCardRes["data"]["card"]): {
-  minIntervalSec: number;
-  maxIntervalSec: number;
-} {
-  const lastReview = card.last_review;
-  const dueDate = card.due_date;
-  const currentIntervalSec = Math.max(
-    60,
-    lastReview === 0 ? 60 : Math.max(60, dueDate - lastReview)
-  );
-  const nowSec = nowUnixSecondsUtc();
-  const denom = Math.max(60, dueDate - lastReview);
-  const urgency = (nowSec - lastReview) / denom;
-
-  let minIntervalSec: number;
-  let maxIntervalSec: number;
-  if (urgency >= 1) {
-    minIntervalSec = currentIntervalSec * 0.5;
-    maxIntervalSec = currentIntervalSec * 4.0;
-  } else {
-    minIntervalSec = currentIntervalSec * ((0.5 - 1) * urgency + 1);
-    maxIntervalSec = currentIntervalSec * ((4.0 - 1) * urgency + 1);
-  }
-  minIntervalSec = Math.max(60, minIntervalSec);
-  maxIntervalSec = Math.max(minIntervalSec, maxIntervalSec);
-  return { minIntervalSec, maxIntervalSec };
-}
-
-function formatInterval(seconds: number): string {
-  const sec = Math.round(seconds);
-  if (sec >= 86400) return `${(sec / 86400).toFixed(1)}d`;
-  if (sec >= 3600) return `${(sec / 3600).toFixed(1)}h`;
-  if (sec >= 60) return `${Math.round(sec / 60)}m`;
-  return `${sec}s`;
-}
+import { reviewIntervalRangeFromTimestamps } from "@/lib/reviewIntervalRange";
+import { formatReviewIntervalLabel } from "@/lib/reviewIntervalLabel";
 
 // Marker format: [audio:id], [image:id], [video:id], [json:id] (API). Also bare "type:id". Ids: alphanumeric, _, :, -, .
 const MEDIA_MARKER_RE = /\[(audio|image|video|json):([^\]]+)\]/g;
@@ -422,6 +388,23 @@ export function FieldWithMedia({
   return <>{textAndAudio}</>;
 }
 
+/** Accent bar + uppercase field name (matches Flutter `_FieldSectionLabel` on multi-field backs). */
+function FieldSectionLabel({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5" role="heading" aria-label={label}>
+      <span className="h-3 w-0.5 shrink-0 rounded-sm bg-primary" aria-hidden />
+      <span className="truncate text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-foreground">
+        {label.toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
+function entryFieldLabel(entry: CardEntry, index: number): string {
+  const name = entry.field?.trim();
+  return name && name.length > 0 ? name : `Field ${index + 1}`;
+}
+
 interface CardSectionProps {
   deck: DeckItem | null;
   /** Main and ruby font sizes for front vs back; defaults match the Retentio app. */
@@ -455,8 +438,6 @@ interface CardSectionProps {
   onDeleteCard?: (cardId: string) => Promise<void>;
 }
 
-const SLIDER_DEFAULT = 0.5;
-
 export function CardSection({
   deck,
   cardTypography = DECK_CARD_TYPOGRAPHY_DEFAULTS,
@@ -483,7 +464,8 @@ export function CardSection({
   const [addCardModalOpen, setAddCardModalOpen] = useState(false);
   const [duplicateFact, setDuplicateFact] = useState<FactItem | null>(null);
   const [deleteConfirmCardId, setDeleteConfirmCardId] = useState<string | null>(null);
-  const [sliderValue, setSliderValue] = useState(SLIDER_DEFAULT);
+  /** Absolute selected interval in seconds (Flutter `selectedInterval`; default = mid/def). */
+  const [selectedIntervalSec, setSelectedIntervalSec] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
   const [editPopupOpen, setEditPopupOpen] = useState(false);
@@ -491,23 +473,39 @@ export function CardSection({
   const [editFactEntries, setEditFactEntries] = useState<Entry[]>([]);
   const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
-  const [imageRevealed, setImageRevealed] = useState(false);
-  const [examplesRevealed, setExamplesRevealed] = useState(false);
+  /** Active front field tab (Flutter always uses field tabs on the front). */
+  const [frontFieldTab, setFrontFieldTab] = useState(0);
   /** Fact id with a pending “send edit to author?” notice (import decks). */
   const [pendingContributeFactId, setPendingContributeFactId] = useState<string | null>(null);
 
   const cardResetKey = nextCard ? `${nextCard.card.id}-${nextCard.card.due_date}` : null;
 
+  const intervalRange = useMemo(() => {
+    if (!nextCard) {
+      return reviewIntervalRangeFromTimestamps({
+        nowSec: 0,
+        lastReview: 0,
+        dueDate: 0,
+      });
+    }
+    return reviewIntervalRangeFromTimestamps({
+      nowSec: nowUnixSecondsUtc(),
+      lastReview: nextCard.card.last_review,
+      dueDate: nextCard.card.due_date,
+    });
+  }, [cardResetKey, nextCard]);
+
   useEffect(() => {
-    if (nextCard) setSliderValue(SLIDER_DEFAULT);
-  }, [cardResetKey]);
+    if (nextCard) {
+      setSelectedIntervalSec(intervalRange.midInterval);
+    }
+  }, [cardResetKey, intervalRange.midInterval, nextCard]);
 
   useEffect(() => {
     if (nextCard) {
       setFlipped(false);
       setHasFlippedOnce(false);
-      setImageRevealed(false);
-      setExamplesRevealed(false);
+      setFrontFieldTab(0);
       setPendingContributeFactId(null);
     }
   }, [cardResetKey]);
@@ -517,12 +515,13 @@ export function CardSection({
     setHasFlippedOnce(true);
   };
 
-  const { intervalSec } = useMemo(() => {
-    if (!nextCard) return { minIntervalSec: 60, maxIntervalSec: 86400, intervalSec: 43200 };
-    const { minIntervalSec: min, maxIntervalSec: max } = getMinMaxIntervalSeconds(nextCard.card);
-    const interval = min + (max - min) * sliderValue;
-    return { minIntervalSec: min, maxIntervalSec: max, intervalSec: interval };
-  }, [nextCard, sliderValue]);
+  const intervalSec =
+    intervalRange.maxInterval > intervalRange.minInterval
+      ? Math.min(
+          intervalRange.maxInterval,
+          Math.max(intervalRange.minInterval, selectedIntervalSec)
+        )
+      : selectedIntervalSec;
 
   const handleSubmit = () => {
     onUpdateCard(Math.round(intervalSec));
@@ -772,7 +771,12 @@ export function CardSection({
               const backEntries = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
               const useEntries = frontEntries && backEntries;
 
-              const renderItem = (item: CardEntryItem, key: number, isFront: boolean) => {
+              const renderItem = (
+                item: CardEntryItem,
+                key: number,
+                isFront: boolean,
+                align: "center" | "start" = "center"
+              ) => {
                 const fontSizes = isFront ? fontFront : fontBack;
                 let content: ReactNode = null;
                 switch (item.type) {
@@ -791,7 +795,8 @@ export function CardSection({
                     if (authToken) content = <MediaBlock kind="video" id={item.value} token={authToken} />;
                     break;
                   case "json":
-                    content = <JsonAttachmentPlaceholder />;
+                    // Flutter study UI skips json items.
+                    content = null;
                     break;
                   default:
                     content = (
@@ -800,14 +805,38 @@ export function CardSection({
                       </span>
                     );
                 }
+                if (content == null) return null;
                 return (
-                  <span key={key} className="inline-flex flex-col items-center gap-0.5">
-                    {content ?? "—"}
+                  <span
+                    key={key}
+                    className={
+                      align === "start"
+                        ? "inline-flex w-full flex-col items-start gap-0.5 text-left"
+                        : "inline-flex flex-col items-center gap-0.5"
+                    }
+                  >
+                    {content}
                   </span>
                 );
               };
 
-              if (useEntries) {
+              const renderEntryItems = (
+                entry: CardEntry,
+                isFront: boolean,
+                align: "center" | "start",
+                keyBase: number
+              ) =>
+                cardEntryToRenderItems(entry).map((item, i) =>
+                  renderItem(item, keyBase + i, isFront, align)
+                );
+
+              /** Front: field tabs (Flutter CardContentContainer tabbed). Back: stacked sections when multi-field. */
+              const renderFlipFaces = (front: CardEntry[], back: CardEntry[]) => {
+                const safeFrontTab =
+                  front.length === 0 ? 0 : Math.min(frontFieldTab, front.length - 1);
+                const activeFront = front[safeFrontTab] ?? front[0];
+                const multiBack = back.length > 1;
+
                 return (
                   <div
                     className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
@@ -823,181 +852,147 @@ export function CardSection({
                     aria-label={flipped ? "Flip to front" : "Flip to back"}
                   >
                     <div
-                      className="relative min-h-[10rem] w-full transition-transform duration-300 [transform-style:preserve-3d]"
+                      className="relative min-h-[10rem] w-full transition-transform duration-[240ms] [transform-style:preserve-3d]"
                       style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                     >
                       <div
-                        className="absolute inset-0 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-4 text-center font-card [backface-visibility:hidden] overflow-x-auto overflow-y-auto max-h-[18rem]"
+                        className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border bg-card font-card [backface-visibility:hidden]"
                         style={{ transform: "rotateY(0deg)" }}
                       >
-                        {frontEntries.map((entry, entryIdx) => (
-                          <div key={entryIdx} className="flex flex-wrap items-center justify-center gap-3">
-                            {cardEntryToRenderItems(entry).map((item, i) =>
-                              renderItem(item, entryIdx * 1000 + i, true)
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div
-                        className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center font-card [backface-visibility:hidden]"
-                        style={{ transform: "rotateY(180deg)" }}
-                      >
-                        {backEntries.length > 0 ? (
-                          <>
-                            <div className="flex flex-wrap items-center justify-center gap-3 font-card overflow-x-auto overflow-y-auto max-h-[18rem]">
-                              {cardEntryToRenderItems(backEntries[0]).map((item, i) => renderItem(item, i, false))}
-                            </div>
-                            {backEntries.length > 1 && (
-                              examplesRevealed ? (
-                                <div className="mt-3 space-y-2 text-left">
-                                  {backEntries.slice(1).map((entry, entryIdx) => (
-                                    <p key={entryIdx} className="font-card">
-                                      {cardEntryToRenderItems(entry).map((item, i) =>
-                                        renderItem(item, entryIdx * 1000 + i, false)
-                                      )}
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : (
+                        {front.length > 0 && (
+                          <div
+                            className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border/40 px-1"
+                            role="tablist"
+                            aria-label="Front fields"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {front.map((entry, i) => {
+                              const selected = i === safeFrontTab;
+                              return (
                                 <button
+                                  key={i}
                                   type="button"
+                                  role="tab"
+                                  aria-selected={selected}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setExamplesRevealed(true);
+                                    setFrontFieldTab(i);
                                   }}
-                                  className="mt-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                  aria-label="Show more"
+                                  className={
+                                    selected
+                                      ? "shrink-0 rounded-xl px-2.5 py-1.5 text-sm font-semibold text-primary"
+                                      : "shrink-0 rounded-xl px-2.5 py-1.5 text-sm font-medium text-foreground/40"
+                                  }
                                 >
-                                  <span aria-hidden>▼</span>
+                                  {entryFieldLabel(entry, i)}
                                 </button>
-                              )
-                            )}
-                          </>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-3 overflow-x-auto overflow-y-auto p-4 text-center max-h-[18rem]">
+                          {activeFront ? (
+                            renderEntryItems(activeFront, true, "center", 0)
+                          ) : (
+                            <span className="text-muted-foreground" style={{ fontSize: fontFront.basePx }}>
+                              —
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        className="absolute inset-0 overflow-y-auto rounded-2xl border bg-muted/50 font-card [backface-visibility:hidden]"
+                        style={{ transform: "rotateY(180deg)" }}
+                      >
+                        {back.length === 0 ? (
+                          <div className="flex h-full min-h-[10rem] items-center justify-center p-4 text-center">
+                            <p className="text-muted-foreground" style={{ fontSize: fontBack.basePx }}>
+                              —
+                            </p>
+                          </div>
+                        ) : multiBack ? (
+                          <div className="flex flex-col gap-3.5 px-3.5 pb-4 pt-3 text-left">
+                            {back.map((entry, entryIdx) => (
+                              <div key={entryIdx}>
+                                {entryIdx > 0 && (
+                                  <div className="mb-3.5 border-t border-border/35" aria-hidden />
+                                )}
+                                <FieldSectionLabel label={entryFieldLabel(entry, entryIdx)} />
+                                <div className="mt-1.5 flex flex-col items-stretch gap-2">
+                                  {renderEntryItems(entry, false, "start", entryIdx * 1000)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
-                          <p className="font-card text-muted-foreground" style={{ fontSize: fontBack.basePx }}>
-                            —
-                          </p>
+                          <div className="flex min-h-[10rem] flex-wrap items-center justify-center gap-3 overflow-x-auto overflow-y-auto p-4 text-center max-h-[18rem]">
+                            {renderEntryItems(back[0], false, "center", 0)}
+                          </div>
                         )}
                       </div>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">Click to flip</p>
                   </div>
                 );
+              };
+
+              if (useEntries) {
+                return renderFlipFaces(frontEntries, backEntries);
               }
 
-              const entries = nextCardFact?.entries ?? [];
+              const factEntries = nextCardFact?.entries ?? [];
               const t = nextCard.card.template;
               const frontIndices = Array.isArray(t?.[0]) ? t[0] : [0];
               const backIndices = Array.isArray(t?.[1]) ? t[1] : [];
-              const frontFields = frontIndices.map((i) => entries[i] ?? "");
-              const backFieldsList = backIndices.map((i) => entries[i] ?? "");
-              return (
-                <div
-                  className="perspective-[1000px] cursor-pointer select-none min-h-[10rem]"
-                  onClick={handleFlip}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleFlip();
-                    }
-                  }}
-                  aria-label={flipped ? "Flip to front" : "Flip to back"}
-                >
-                  <div
-                    className="relative min-h-[10rem] w-full transition-transform duration-300 [transform-style:preserve-3d]"
-                    style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
-                  >
-                    <div
-                      className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border bg-card p-4 text-center font-card [backface-visibility:hidden]"
-                      style={{ transform: "rotateY(0deg)" }}
-                    >
-                      <div className="flex flex-wrap items-center justify-center gap-3">
-                        {frontFields.map((fieldText, i) => (
-                          <FieldWithMedia
-                            key={i}
-                            text={typeof fieldText === "string" ? fieldText : ""}
-                            token={authToken ?? null}
-                            fontSizes={fontFront}
-                            imageRevealed={imageRevealed}
-                            onRevealImage={() => setImageRevealed(true)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div
-                      className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto rounded-lg border bg-muted/50 p-4 text-center font-card [backface-visibility:hidden]"
-                      style={{ transform: "rotateY(180deg)" }}
-                    >
-                      {backFieldsList.length > 0 ? (
-                        <>
-                          <p className="font-card">
-                            <FieldWithMedia
-                              text={typeof backFieldsList[0] === "string" ? backFieldsList[0] : ""}
-                              token={authToken ?? null}
-                              fontSizes={fontBack}
-                            />
-                          </p>
-                          {backFieldsList.length > 1 && (
-                            <>
-                              {examplesRevealed ? (
-                                <div className="mt-3 space-y-2 text-left">
-                                  {backFieldsList.slice(1).map((text, i) => (
-                                    <p key={i} className="font-card">
-                                      <FieldWithMedia
-                                        text={typeof text === "string" ? text : ""}
-                                        token={authToken ?? null}
-                                        fontSizes={fontBack}
-                                      />
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExamplesRevealed(true);
-                                  }}
-                                  className="mt-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                  aria-label="Show more"
-                                >
-                                  <span aria-hidden>▼</span>
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <p className="font-card text-muted-foreground" style={{ fontSize: fontBack.basePx }}>
-                          —
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Click to flip</p>
-                </div>
+              const deckFields = deck?.fields ?? [];
+              const toCardEntry = (index: number): CardEntry => {
+                const entry = factEntries[index];
+                const field = deckFields[index];
+                if (!entry || typeof entry !== "object") {
+                  return { field, text: typeof entry === "string" ? entry : "" };
+                }
+                return {
+                  field,
+                  text: entry.text,
+                  audio: entry.audio,
+                  image: entry.image,
+                  video: entry.video,
+                  json: entry.json,
+                };
+              };
+              return renderFlipFaces(
+                frontIndices.map(toCardEntry),
+                backIndices.map(toCardEntry)
               );
             })()}
             {hasFlippedOnce && (
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Hard</span>
-                  <span>{formatInterval(intervalSec)}</span>
+                  <span>{formatReviewIntervalLabel(intervalSec)}</span>
                   <span>Easy</span>
                 </div>
                 <input
                   type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={sliderValue}
-                  onChange={(e) => setSliderValue(parseFloat(e.target.value))}
+                  min={intervalRange.minInterval}
+                  max={Math.max(intervalRange.maxInterval, intervalRange.minInterval)}
+                  step={
+                    intervalRange.maxInterval > intervalRange.minInterval
+                      ? (intervalRange.maxInterval - intervalRange.minInterval) / 100
+                      : 1
+                  }
+                  value={intervalSec}
+                  disabled={intervalRange.maxInterval <= 0}
+                  onChange={(e) => setSelectedIntervalSec(parseFloat(e.target.value))}
                   className="w-full h-2 rounded-full bg-muted cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0"
                 />
                 <div className="flex justify-center">
-                  <Button type="button" className="h-8 px-3 text-xs" onClick={handleSubmit} disabled={loadingNextCard}>
+                  <Button
+                    type="button"
+                    className="h-8 px-3 text-xs"
+                    onClick={handleSubmit}
+                    disabled={loadingNextCard || intervalRange.maxInterval <= 0}
+                  >
                     {loadingNextCard ? "Loading…" : "Review"}
                   </Button>
                 </div>
