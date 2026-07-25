@@ -8,6 +8,9 @@ import LoginPage from "@/pages/LoginPage";
 import MediaPage from "@/pages/MediaPage";
 import ProfilePage from "@/pages/ProfilePage";
 import RegisterPage from "@/pages/RegisterPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ManualPage from "@/pages/ManualPage";
 import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
@@ -31,6 +34,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export const routes = [
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/verify-email", element: <VerifyEmailPage /> },
   {
     path: "/profile",
     element: (

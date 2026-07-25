@@ -13,7 +13,7 @@ alwaysApply: false
 - **API**: `src/lib/api.ts` — `request()` to backend; base URL from `VITE_API_URL` (default `http://localhost:8080`)
 - **Auth**: `AuthContext` + JWT in `localStorage` (`wordupx_token`)
 - **i18n**: `LocaleContext` + `src/locales/` (en/zh string modules)
-- **Tests**: Vitest + Testing Library (`*.test.tsx` colocated or under `src/`)
+- **Tests**: Vitest + Testing Library under `tests/` (mirroring `src/`); Playwright under `tests/e2e/`
 
 ## File organization
 

@@ -12,9 +12,10 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["./tests/setup.ts"],
     globals: true,
-    exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**"],
+    include: ["tests/**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
     // Node 25+ enables experimental Web Storage on the global object with an
     // empty `--localstorage-file`, which breaks jsdom’s Storage mock and
     // spams warnings. Turn it off in Vitest workers (flag exists from Node 25).

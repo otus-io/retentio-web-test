@@ -4,14 +4,17 @@ import {
   acceptContribution,
   contributionsHasMore,
   entryToDisplayString,
+  getApiBaseUrl,
   listDeckContributions,
   patchContribution,
   publishDeck,
+  type ContributionMediaAttachment,
   type ContributionStatus,
   type DeckContributionItem,
   type DeckItem,
   type Entry,
 } from "@/lib/api";
+import { fetchMediaCached } from "@/lib/mediaFetchCache";
 
 const STATUS_FILTERS: { value: ContributionStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -30,6 +33,136 @@ function formatFactPreview(entries: Entry[] | undefined): string {
   return entries.map((e) => entryToDisplayString(e)).join(" · ");
 }
 
+type PreviewKind = "audio" | "image" | "video";
+
+function contributionPreviewTargets(
+  item: DeckContributionItem
+): { id: string; kind: PreviewKind; label: string; path: string }[] {
+  const base = getApiBaseUrl();
+  const fromAttachments = (item.media_attachments ?? [])
+    .map((a: ContributionMediaAttachment) => {
+      const mime = (a.mime ?? "").toLowerCase();
+      const kind: PreviewKind = mime.startsWith("image/")
+        ? "image"
+        : mime.startsWith("video/")
+          ? "video"
+          : "audio";
+      const segment = a.attachment_id || a.source_media_id;
+      if (!segment) return null;
+      const path =
+        a.preview_path?.startsWith("/")
+          ? `${base}${a.preview_path}`
+          : `${base}/api/decks/${item.source_deck_id}/contributions/${item.id}/media/${segment}`;
+      return {
+        id: segment,
+        kind,
+        label: a.filename || segment,
+        path,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+  if (fromAttachments.length) return fromAttachments;
+
+  // #59: while attachment freeze is deferred, preview via proposed media IDs.
+  const out: { id: string; kind: PreviewKind; label: string; path: string }[] = [];
+  const seen = new Set<string>();
+  for (const e of item.proposed_entries ?? []) {
+    const candidates: { id: string | undefined; kind: PreviewKind }[] = [
+      { id: e.audio, kind: "audio" },
+      { id: e.image, kind: "image" },
+      { id: e.video, kind: "video" },
+    ];
+    for (const c of candidates) {
+      if (!c.id || seen.has(c.id)) continue;
+      seen.add(c.id);
+      out.push({
+        id: c.id,
+        kind: c.kind,
+        label: c.id,
+        path: `${base}/api/decks/${item.source_deck_id}/contributions/${item.id}/media/${c.id}`,
+      });
+    }
+  }
+  return out;
+}
+
+function ContributionMediaPreview({
+  item,
+  token,
+}: {
+  item: DeckContributionItem;
+  token: string;
+}) {
+  const targets = useMemo(() => contributionPreviewTargets(item), [item]);
+  const [blobs, setBlobs] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls: string[] = [];
+    setBlobs({});
+    setError("");
+    if (!targets.length || !token) return;
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const t of targets) {
+        try {
+          const { blob } = await fetchMediaCached(t.path, token, t.kind);
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          objectUrls.push(url);
+          next[t.id] = url;
+        } catch (e) {
+          if (!cancelled) {
+            setError(e instanceof Error ? e.message : "Failed to load media preview");
+          }
+          return;
+        }
+      }
+      if (!cancelled) setBlobs(next);
+    })();
+    return () => {
+      cancelled = true;
+      for (const u of objectUrls) URL.revokeObjectURL(u);
+    };
+  }, [targets, token]);
+
+  if (!targets.length) return null;
+
+  return (
+    <span className="block space-y-1">
+      <span className="text-muted-foreground">Proposed media: </span>
+      {error && <p className="text-destructive">{error}</p>}
+      {targets.map((t) => {
+        const src = blobs[t.id];
+        if (!src) {
+          return (
+            <p key={t.id} className="text-muted-foreground">
+              Loading {t.label}…
+            </p>
+          );
+        }
+        if (t.kind === "image") {
+          return (
+            <img
+              key={t.id}
+              src={src}
+              alt={t.label}
+              className="max-h-24 rounded border object-contain"
+            />
+          );
+        }
+        if (t.kind === "video") {
+          return (
+            <video key={t.id} src={src} controls className="max-h-32 w-full rounded border" />
+          );
+        }
+        return <audio key={t.id} src={src} controls className="w-full" />;
+      })}
+    </span>
+  );
+}
+
 function canAcceptItem(item: DeckContributionItem): boolean {
   return item.status === "open" && item.type !== "report";
 }
@@ -44,6 +177,7 @@ function canDismissItem(item: DeckContributionItem): boolean {
 
 function ContributionRow({
   item,
+  token,
   selected,
   busy,
   bulkBusy,
@@ -52,6 +186,7 @@ function ContributionRow({
   onPatch,
 }: {
   item: DeckContributionItem;
+  token: string;
   selected: boolean;
   busy: boolean;
   bulkBusy: boolean;
@@ -64,6 +199,9 @@ function ContributionRow({
     (item.add_tags?.length ?? 0) > 0 || (item.remove_tags?.length ?? 0) > 0;
   const hasFieldRename = (item.proposed_fields?.length ?? 0) > 0;
   const hasTemplate = (item.template?.length ?? 0) > 0;
+  const hasMediaPreview =
+    (item.media_attachments?.length ?? 0) > 0 ||
+    (item.proposed_entries ?? []).some((e) => !!(e.audio || e.image || e.video));
   const canAccept = canAcceptItem(item);
   const canResolve = canResolveItem(item);
   const canDismiss = canDismissItem(item);
@@ -104,7 +242,12 @@ function ContributionRow({
           {item.message?.trim() && (
             <span className="block whitespace-pre-wrap">{item.message}</span>
           )}
-          {(item.reported_fact || hasProposal || hasTagDiff || hasFieldRename || hasTemplate) && (
+          {(item.reported_fact ||
+            hasProposal ||
+            hasTagDiff ||
+            hasFieldRename ||
+            hasTemplate ||
+            hasMediaPreview) && (
             <span className="block rounded bg-muted/40 px-2 py-1.5 text-xs space-y-1">
               {item.reported_fact && (
                 <p>
@@ -118,6 +261,7 @@ function ContributionRow({
                   {formatFactPreview(item.proposed_entries)}
                 </p>
               )}
+              <ContributionMediaPreview item={item} token={token} />
               {hasTagDiff && (
                 <p>
                   <span className="text-muted-foreground">Tags: </span>
@@ -524,6 +668,7 @@ export function DeckFeedbackInboxModal({
                 <ContributionRow
                   key={item.id}
                   item={item}
+                  token={token}
                   selected={selected.has(item.id)}
                   busy={busyId === item.id}
                   bulkBusy={bulkBusy}

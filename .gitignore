@@ -12,6 +12,7 @@ ca/
 /blob-report/
 /playwright/.cache/
 e2e/.auth-state.json
+tests/e2e/.auth-state.json
 
 # Miscellaneous
 *.class

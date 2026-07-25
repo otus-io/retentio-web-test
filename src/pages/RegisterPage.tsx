@@ -18,6 +18,10 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
     setLoading(true);
     try {
       await request<RegisterRes>("/auth/register", {
@@ -55,7 +59,9 @@ export default function RegisterPage() {
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-sm">
             <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Account created. Redirecting to login…</p>
+              <p className="text-center text-muted-foreground">
+                Account created. Check your email to verify your address. Redirecting to login…
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -118,6 +124,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                minLength={8}
                 required
               />
             </div>
