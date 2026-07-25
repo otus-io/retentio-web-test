@@ -36,7 +36,7 @@ on:
       - '.env.example'
       - 'utils/run-web-test-prod.sh'
       - 'utils/retentio-web-test.service'
-      - 'e2e/**'
+      - 'tests/**'
       - 'playwright.config.ts'
       - '.github/workflows/test-build-deploy.yml'
   pull_request:
@@ -53,7 +53,7 @@ on:
       - 'tailwind.config.js'
       - 'postcss.config.js'
       - '.env.example'
-      - 'e2e/**'
+      - 'tests/**'
       - 'playwright.config.ts'
       - '.github/workflows/test-build-deploy.yml'
 

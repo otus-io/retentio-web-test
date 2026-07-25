@@ -17,7 +17,7 @@ This project uses [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) t
 | Concise responses | `concise-responses.mdc` | Always active | Short, scannable replies |
 | Git workflow | `git-workflow.mdc` | Always active | Feature branches, hooks via `./utils/setup-hooks.sh` |
 | React web | `react-web.mdc` | `src/**/*.{ts,tsx}` | Vite, React Router, `api.ts`, Tailwind |
-| Testing | `testing.mdc` | `src/**/*.test.*`, `e2e/**` | Vitest + Playwright |
+| Testing | `testing.mdc` | `tests/**/*.test.*`, `tests/e2e/**` | Vitest + Playwright |
 | CI workflows | `ci-workflows.mdc` | `.github/workflows/**` | `webapp-ci.yml`, deploy |
 | Design documents | `design-docs.mdc` | `docs/design-doc/**` | English-only design doc format |
 | Debug logging | `debug-logging.mdc` | When editing any file | `logs/debug.log` location and instrumentation |
@@ -54,7 +54,7 @@ This project uses [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) t
 
 - Vitest + Testing Library + user-event for unit/component tests
 - Mock `fetch` for API calls; use `MemoryRouter` for routed pages
-- Playwright e2e in `e2e/` for real user flows (tags, facts, auth)
+- Playwright e2e in `tests/e2e/` for real user flows (tags, facts, auth)
 
 ### Debug logging
 

@@ -10,7 +10,7 @@ alwaysApply: false
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `test-build-deploy.yml` | Push/PR to `main`, `src/**`, `e2e/**`, and related config | `npm ci`, unit tests, build, Playwright e2e; SSH deploy on push to `main` |
+| `test-build-deploy.yml` | Push/PR to `main`, `src/**`, `tests/**`, and related config | `npm ci`, unit tests, build, Playwright e2e; SSH deploy on push to `main` |
 
 ## CI requirements
 
@@ -22,6 +22,6 @@ alwaysApply: false
 ## Rules
 
 - Do not skip CI checks or add `[skip ci]` without team agreement
-- New features should include Vitest coverage in `src/**/*.test.{ts,tsx}` where unit-testable
-- User-flow regressions belong in `e2e/`
+- New features should include Vitest coverage in `tests/**/*.test.{ts,tsx}` where unit-testable
+- User-flow regressions belong in `tests/e2e/`
 - Deploy job runs only on push to `main` after the test job succeeds

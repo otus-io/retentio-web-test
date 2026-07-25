@@ -1,12 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
-import { loadE2EEnv } from './e2e/load-env'
+import { loadE2EEnv } from './tests/e2e/load-env'
 
 loadE2EEnv()
 
 const isCI = !!process.env.CI
 const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || (isCI ? 'http://localhost:3000' : 'http://localhost:5173')
 const hasE2EAuth = !!(process.env.E2E_USERNAME && process.env.E2E_PASSWORD)
-const authStatePath = 'e2e/.auth-state.json'
+const authStatePath = 'tests/e2e/.auth-state.json'
 const apiURL =
   (process.env.E2E_API_URL || process.env.VITE_API_URL || 'https://api.retentio.app:8443').replace(
     /\/$/,
@@ -14,8 +14,8 @@ const apiURL =
   )
 
 export default defineConfig({
-  testDir: './e2e',
-  globalSetup: './e2e/global-setup.ts',
+  testDir: './tests/e2e',
+  globalSetup: './tests/e2e/global-setup.ts',
   fullyParallel: false,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,

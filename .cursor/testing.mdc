@@ -1,6 +1,6 @@
 ---
 description: Vitest and Playwright test conventions for the web test app
-globs: "{src/**/*.test.{ts,tsx},e2e/**/*.ts,playwright.config.ts}"
+globs: "{tests/**/*.test.{ts,tsx},tests/e2e/**/*.ts,playwright.config.ts}"
 alwaysApply: false
 ---
 
@@ -14,20 +14,21 @@ alwaysApply: false
 
 ## Unit / component (Vitest)
 
-- Colocate tests: `Component.test.tsx` next to `Component.tsx`, or `src/lib/*.test.ts`
+- Live under `tests/`, mirroring `src/` (e.g. `tests/lib/api.test.ts`, `tests/pages/LoginPage.test.tsx`)
 - Use `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`
+- Import app code via `@/` (e.g. `@/lib/api`, `@/pages/LoginPage`)
 - Mock `fetch` for API calls; use `MemoryRouter` for routed pages
-- See `src/lib/api.test.ts` for patterns
+- See `tests/lib/api.test.ts` for patterns
 
 ```bash
 npm test -- --run
-npm test -- --run src/lib/api.test.ts
+npm test -- --run tests/lib/api.test.ts
 ```
 
 ## E2E (Playwright)
 
-- Specs in `e2e/` (auth, tags, facts); helpers in `e2e/helpers.ts`
-- Auth via `localStorage` key `wordupx_token` (see `e2e/global-setup.ts`)
+- Specs in `tests/e2e/` (auth, tags, facts); helpers in `tests/e2e/helpers.ts`
+- Auth via `localStorage` key `wordupx_token` (see `tests/e2e/global-setup.ts`)
 - CI runs Chromium with secrets `E2E_USERNAME`, `E2E_PASSWORD`
 
 ```bash

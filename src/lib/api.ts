@@ -235,7 +235,9 @@ export function notifyAuthFailure(status: number, path: string, msg: string): vo
     path.startsWith("/auth/login") ||
     path.startsWith("/auth/register") ||
     path.startsWith("/auth/forgot-password") ||
-    path.startsWith("/auth/reset-password")
+    path.startsWith("/auth/reset-password") ||
+    path.startsWith("/auth/verify-email") ||
+    path.startsWith("/auth/resend-verification")
   ) {
     return;
   }
@@ -483,7 +485,7 @@ export interface UploadMediaRes {
 }
 
 export interface ProfileRes {
-  data: { username: string; email: string };
+  data: { username: string; email: string; email_verified?: boolean };
   meta?: { created_at: string };
 }
 
@@ -767,6 +769,17 @@ export interface ContributionEditPaths {
   patch_fact_path: string;
 }
 
+export interface ContributionMediaAttachment {
+  attachment_id: string;
+  source_media_id: string;
+  filename?: string;
+  mime?: string;
+  size?: number;
+  checksum?: string;
+  preview_path?: string;
+  available?: boolean;
+}
+
 export interface DeckContributionItem {
   id: string;
   source_deck_id: string;
@@ -785,6 +798,8 @@ export interface DeckContributionItem {
   template?: number[][];
   reported_fields?: string[];
   proposed_fields?: string[];
+  /** Immutable attachment metadata; preview via GET preview_path (or media id while freeze deferred). */
+  media_attachments?: ContributionMediaAttachment[];
   status: ContributionStatus;
   created_at: string;
   updated_at: string;
@@ -1384,10 +1399,69 @@ export interface RescheduleRes {
 export interface ForgotPasswordReq {
   email: string;
 }
+export interface ForgotPasswordRes {
+  data: { msg?: string; reset_token?: string };
+  meta?: { expires_in?: string } | null;
+}
 export interface ResetPasswordReq {
   token: string;
   new_password: string;
 }
+export interface ResetPasswordRes {
+  data: { msg: string };
+  meta?: null;
+}
+export interface VerifyEmailReq {
+  token: string;
+}
+export interface VerifyEmailRes {
+  data: { msg: string };
+  meta?: null;
+}
+export interface ResendVerificationReq {
+  email: string;
+}
+export interface ResendVerificationRes {
+  data: { msg: string };
+  meta?: null;
+}
+
+export async function forgotPassword(email: string): Promise<ForgotPasswordRes> {
+  return request<ForgotPasswordRes>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email } satisfies ForgotPasswordReq),
+  });
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<ResetPasswordRes> {
+  return request<ResetPasswordRes>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      new_password: newPassword,
+    } satisfies ResetPasswordReq),
+  });
+}
+
+export async function verifyEmail(token: string): Promise<VerifyEmailRes> {
+  return request<VerifyEmailRes>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token } satisfies VerifyEmailReq),
+  });
+}
+
+export async function resendVerification(
+  email: string
+): Promise<ResendVerificationRes> {
+  return request<ResendVerificationRes>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email } satisfies ResendVerificationReq),
+  });
+}
+
 export interface AddCardForFactReq {
   fact_id: string;
   /** [[front indices], [back indices]], e.g. [[0],[1]] or [[1],[0]] for reversed. */
