@@ -54,6 +54,9 @@ config.d/
 *secret*
 *credential*
 *password*
+# Auth UI source (not secrets); must follow *password* so Cursor can index/edit them
+!*ForgotPassword*
+!*ResetPassword*
 *passwd*
 *token*
 *apikey*
