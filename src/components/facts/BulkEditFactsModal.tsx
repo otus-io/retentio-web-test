@@ -48,6 +48,7 @@ import {
   type UpdateFactReq,
   type UploadMediaRes,
 } from "@/lib/api";
+import { AudioPreviewButton } from "@/components/media/AudioPreviewButton";
 import { FactTagsPicker } from "./FactTagsPicker";
 
 const PAGE_SIZE = 50;
@@ -691,6 +692,9 @@ export function BulkEditFactsModal({
                                         <span className="shrink-0 text-[10px] font-medium uppercase text-muted-foreground">
                                           {SLOT_LABEL[slot]}
                                         </span>
+                                        {slot === "audio" && token ? (
+                                          <AudioPreviewButton mediaId={mid} token={token} />
+                                        ) : null}
                                         <div className="flex min-w-0 flex-1 justify-start overflow-hidden">
                                           <div className="flex w-max min-w-0 max-w-full items-center gap-0 overflow-hidden">
                                             <span

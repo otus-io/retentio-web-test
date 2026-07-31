@@ -15,6 +15,7 @@ import {
   type Entry,
 } from "@/lib/api";
 import { fetchMediaCached } from "@/lib/mediaFetchCache";
+import { formatRelativePast } from "@/lib/unixTime";
 
 const STATUS_FILTERS: { value: ContributionStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -227,6 +228,14 @@ function ContributionRow({
             <span className="rounded-full border px-2 py-0.5 text-xs capitalize">
               {formatTypeLabel(item.type)}
             </span>
+            {item.created_at && (
+              <span
+                className="text-xs text-muted-foreground"
+                title={new Date(item.created_at).toLocaleString()}
+              >
+                {formatRelativePast(item.created_at)}
+              </span>
+            )}
           </span>
           <span className="block">
             <span className="text-muted-foreground">From </span>

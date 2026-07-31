@@ -203,6 +203,9 @@ function parseFactsJson(text: string): AddFactItemReq[] {
 /**
  * Validates layout from `anki_export_retentio_facts.py`: `export_meta.json`, `media_manifest.json`,
  * `facts.jsonl` (or `facts.json`), and `media/*` files referenced by the manifest.
+ *
+ * Fact entries may reference media ids not listed in the manifest (e.g. already on the same
+ * account from another deck). Only manifest entries are uploaded; those must have files in the ZIP.
  */
 export async function parseExportBundleFromZip(zip: JSZip): Promise<ParsedExportBundle> {
   const byPath = indexZipByPath(zip);
@@ -247,14 +250,6 @@ export async function parseExportBundleFromZip(zip: JSZip): Promise<ParsedExport
   const factsText = await (factsJsonl ?? factsJson!).async("string");
   const facts = factsJsonl ? parseFactsJsonl(factsText) : parseFactsJson(factsText);
   if (facts.length === 0) throw new Error("No facts found in facts file.");
-
-  for (const refId of referencedMediaIdsInFacts(facts)) {
-    if (!Object.prototype.hasOwnProperty.call(manifest, refId)) {
-      throw new Error(
-        `Facts reference media id ${JSON.stringify(refId)} but it is missing from media_manifest.json.`
-      );
-    }
-  }
 
   for (const [mid, meta] of Object.entries(manifest)) {
     if (!mid.trim()) throw new Error("media_manifest.json contains an empty media id key.");

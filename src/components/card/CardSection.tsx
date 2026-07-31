@@ -316,13 +316,13 @@ export function FieldWithMedia({
   const hasImage = imageSegments.length > 0 && !hideImages;
 
   const textAndAudio = (
-    <>
+    <span className="inline-flex max-w-full min-w-0 flex-row flex-nowrap items-center gap-2">
       {otherSegments.map((seg, i) =>
         seg.kind === "text" ? (
           mediaOnly ? null : (
             <span
               key={i}
-              className="break-words whitespace-pre-wrap max-h-[18rem] overflow-y-auto overflow-x-auto"
+              className="min-w-0 break-words whitespace-pre-wrap max-h-[18rem] overflow-y-auto overflow-x-auto"
             >
               <WikiRubyInline text={seg.value} fontSizes={fontSizes} />
             </span>
@@ -330,10 +330,12 @@ export function FieldWithMedia({
         ) : seg.kind === "json" ? (
           <JsonAttachmentPlaceholder key={`json-${seg.id}-${i}`} />
         ) : (
-          <MediaBlock key={`${seg.kind}-${seg.id}-${i}`} kind={seg.kind} id={seg.id} token={token} />
+          <span key={`${seg.kind}-${seg.id}-${i}`} className="shrink-0">
+            <MediaBlock kind={seg.kind} id={seg.id} token={token} />
+          </span>
         )
       )}
-    </>
+    </span>
   );
 
   const showImageHint = hasImage && onRevealImage != null && !imageRevealed;
@@ -771,64 +773,97 @@ export function CardSection({
               const backEntries = Array.isArray(nextCard.card.back) ? nextCard.card.back : null;
               const useEntries = frontEntries && backEntries;
 
-              const renderItem = (
-                item: CardEntryItem,
-                key: number,
-                isFront: boolean,
-                align: "center" | "start" = "center"
-              ) => {
+              const renderItemContent = (item: CardEntryItem, isFront: boolean): ReactNode => {
                 const fontSizes = isFront ? fontFront : fontBack;
-                let content: ReactNode = null;
                 switch (item.type) {
                   case "text":
-                    content = (
+                    return (
                       <FieldWithMedia text={item.value} token={authToken ?? null} fontSizes={fontSizes} />
                     );
-                    break;
                   case "audio":
-                    if (authToken) content = <MediaBlock kind="audio" id={item.value} token={authToken} />;
-                    break;
+                    return authToken ? (
+                      <MediaBlock kind="audio" id={item.value} token={authToken} />
+                    ) : null;
                   case "image":
-                    if (authToken) content = <MediaBlock kind="image" id={item.value} token={authToken} />;
-                    break;
+                    return authToken ? (
+                      <MediaBlock kind="image" id={item.value} token={authToken} />
+                    ) : null;
                   case "video":
-                    if (authToken) content = <MediaBlock kind="video" id={item.value} token={authToken} />;
-                    break;
+                    return authToken ? (
+                      <MediaBlock kind="video" id={item.value} token={authToken} />
+                    ) : null;
                   case "json":
                     // Flutter study UI skips json items.
-                    content = null;
-                    break;
+                    return null;
                   default:
-                    content = (
+                    return (
                       <span className="text-muted-foreground" style={{ fontSize: fontSizes.basePx }}>
                         {item.value || "—"}
                       </span>
                     );
                 }
-                if (content == null) return null;
-                return (
-                  <span
-                    key={key}
-                    className={
-                      align === "start"
-                        ? "inline-flex w-full flex-col items-start gap-0.5 text-left"
-                        : "inline-flex flex-col items-center gap-0.5"
-                    }
-                  >
-                    {content}
-                  </span>
-                );
               };
 
+              /** One field = one row: text with audio play button beside it; image/video may wrap. */
               const renderEntryItems = (
                 entry: CardEntry,
                 isFront: boolean,
                 align: "center" | "start",
                 keyBase: number
-              ) =>
-                cardEntryToRenderItems(entry).map((item, i) =>
-                  renderItem(item, keyBase + i, isFront, align)
+              ) => {
+                const items = cardEntryToRenderItems(entry);
+                const textAudio = items.filter((it) => it.type === "text" || it.type === "audio");
+                const other = items.filter((it) => it.type !== "text" && it.type !== "audio");
+                const rowClass =
+                  align === "start"
+                    ? "inline-flex w-full min-w-0 flex-row flex-nowrap items-center gap-2 text-left"
+                    : "inline-flex max-w-full min-w-0 flex-row flex-nowrap items-center justify-center gap-2";
+                const textAudioNodes = textAudio
+                  .map((item, i) => {
+                    const content = renderItemContent(item, isFront);
+                    if (content == null) return null;
+                    return (
+                      <span
+                        key={`${keyBase}-ta-${i}`}
+                        className={
+                          item.type === "text" ? "min-w-0 break-words" : "shrink-0"
+                        }
+                      >
+                        {content}
+                      </span>
+                    );
+                  })
+                  .filter(Boolean);
+                const otherNodes = other
+                  .map((item, i) => {
+                    const content = renderItemContent(item, isFront);
+                    if (content == null) return null;
+                    return (
+                      <span key={`${keyBase}-o-${i}`} className="shrink-0">
+                        {content}
+                      </span>
+                    );
+                  })
+                  .filter(Boolean);
+                if (textAudioNodes.length === 0 && otherNodes.length === 0) return null;
+                return (
+                  <span
+                    key={keyBase}
+                    className={
+                      otherNodes.length > 0
+                        ? align === "start"
+                          ? "inline-flex w-full flex-col items-stretch gap-2 text-left"
+                          : "inline-flex flex-col items-center gap-2"
+                        : undefined
+                    }
+                  >
+                    {textAudioNodes.length > 0 ? (
+                      <span className={rowClass}>{textAudioNodes}</span>
+                    ) : null}
+                    {otherNodes}
+                  </span>
                 );
+              };
 
               /** Front: field tabs (Flutter CardContentContainer tabbed). Back: stacked sections when multi-field. */
               const renderFlipFaces = (front: CardEntry[], back: CardEntry[]) => {

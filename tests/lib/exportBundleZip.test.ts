@@ -80,13 +80,17 @@ describe("parseExportBundleFromZip", () => {
     expect(jobs[0]?.kind).toBe("audio");
   });
 
-  it("rejects facts that reference a media id missing from the manifest", async () => {
+  it("allows fact media ids absent from the manifest (same-account reuse)", async () => {
     const z = new JSZip();
     z.file("export_meta.json", JSON.stringify({ deck: { name: "D", fields: ["A"], rate: 10 } }));
-    z.file("media_manifest.json", JSON.stringify({ x1: { path: "media/x1.mp3", kind: "audio" } }));
-    z.file("facts.jsonl", `${JSON.stringify({ entries: [{ text: "a", audio: "not_in_manifest" }] })}\n`);
-    z.file("media/x1.mp3", new Uint8Array([0x49, 0x44, 0x33]));
-    await expect(parseExportBundleFromZip(z)).rejects.toThrow(/missing from media_manifest/);
+    z.file("media_manifest.json", JSON.stringify({}));
+    z.file(
+      "facts.jsonl",
+      `${JSON.stringify({ entries: [{ text: "a", audio: "eloc-already-on-account" }] })}\n`
+    );
+    const parsed = await parseExportBundleFromZip(z);
+    expect(parsed.facts[0]?.entries[0]?.audio).toBe("eloc-already-on-account");
+    expect(mediaJobsFromBundle(parsed.manifest, parsed.pathPrefix)).toEqual([]);
   });
 
   it("rejects missing media file", async () => {

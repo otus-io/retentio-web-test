@@ -24,6 +24,7 @@ import {
   type PendingContributionItem,
   type SentContributionItem,
 } from "@/lib/pendingContributions";
+import { formatRelativePast } from "@/lib/unixTime";
 
 type Tab = "pending" | "sent";
 
@@ -348,6 +349,12 @@ export function PendingContributionsOutboxModal({
                               <span className="rounded-full border px-2 py-0.5 text-xs">
                                 {formatContributionKind(item.kind)}
                               </span>
+                              <span
+                                className="text-xs text-muted-foreground"
+                                title={new Date(item.savedAt).toLocaleString()}
+                              >
+                                {formatRelativePast(item.savedAt)}
+                              </span>
                               {item.factId && (
                                 <span className="font-mono text-xs text-muted-foreground">
                                   {item.factId}
@@ -395,8 +402,11 @@ export function PendingContributionsOutboxModal({
                         <span className="rounded-full border px-2 py-0.5 text-xs">
                           {formatContributionKind(item.kind as ContributionBoxKind)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(item.sentAt).toLocaleString()}
+                        <span
+                          className="text-xs text-muted-foreground"
+                          title={new Date(item.sentAt).toLocaleString()}
+                        >
+                          {formatRelativePast(item.sentAt)}
                         </span>
                         {item.contributionId && (
                           <span className="font-mono text-xs text-muted-foreground">

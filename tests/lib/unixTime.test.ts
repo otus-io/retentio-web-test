@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
+import { formatRelativePast, formatUnixSecondsUtc, nowUnixSecondsUtc } from "@/lib/unixTime";
 
 describe("formatUnixSecondsUtc", () => {
   it("returns em dash for zero", () => {
@@ -28,5 +28,30 @@ describe("nowUnixSecondsUtc", () => {
 
   it("returns whole seconds floored from Date.now()", () => {
     expect(nowUnixSecondsUtc()).toBe(Math.floor(Date.now() / 1000));
+  });
+});
+
+describe("formatRelativePast", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-25T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns just now for under a minute", () => {
+    expect(formatRelativePast("2026-04-25T11:59:30Z")).toBe("just now");
+  });
+
+  it("returns minutes, hours, and days", () => {
+    expect(formatRelativePast("2026-04-25T11:55:00Z")).toBe("5m");
+    expect(formatRelativePast("2026-04-25T10:00:00Z")).toBe("2h");
+    expect(formatRelativePast("2026-04-24T12:00:00Z")).toBe("1d");
+  });
+
+  it("returns em dash for invalid input", () => {
+    expect(formatRelativePast("not-a-date")).toBe("—");
   });
 });

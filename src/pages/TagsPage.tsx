@@ -178,6 +178,9 @@ export default function TagsPage() {
               <Link to="/media">Media</Link>
             </Button>
             <Button variant="ghost" asChild>
+              <Link to="/quality">Quality</Link>
+            </Button>
+            <Button variant="ghost" asChild>
               <Link to="/profile">Profile</Link>
             </Button>
             <Button variant="outline" onClick={handleLogout}>

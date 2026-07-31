@@ -16,6 +16,7 @@ import DecksListPage from "@/pages/DecksListPage";
 import UploadDeckPage from "@/pages/UploadDeckPage";
 import CatalogDeckPage from "@/pages/CatalogDeckPage";
 import TagsPage from "@/pages/TagsPage";
+import QualityPage from "@/pages/QualityPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, authReady } = useAuth();
@@ -58,6 +59,14 @@ export const routes = [
     element: (
       <ProtectedRoute>
         <TagsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/quality",
+    element: (
+      <ProtectedRoute>
+        <QualityPage />
       </ProtectedRoute>
     ),
   },
