@@ -88,6 +88,9 @@ export default function ProfilePage() {
             <Link to="/quality" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
               Quality
             </Link>
+            <Link to="/confidence" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+              Confidence
+            </Link>
             <Link to="/profile" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
               Profile
             </Link>
@@ -122,6 +125,7 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </dl>
+
                 {emailUnverified && (
                   <div className="space-y-2 rounded-md border border-border p-3">
                     <p className="text-sm text-muted-foreground">

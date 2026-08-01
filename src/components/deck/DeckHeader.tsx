@@ -34,6 +34,12 @@ export function DeckHeader({ onLogout }: DeckHeaderProps) {
           Quality
         </Link>
         <Link
+          to="/confidence"
+          className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        >
+          Confidence
+        </Link>
+        <Link
           to="/profile"
           className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
         >

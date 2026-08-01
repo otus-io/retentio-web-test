@@ -207,6 +207,12 @@ export default function DecksListPage() {
               Quality
             </Link>
             <Link
+              to="/confidence"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              Confidence
+            </Link>
+            <Link
               to="/profile"
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
             >

@@ -33,6 +33,14 @@ describe("DeckHeader", () => {
     expect(screen.getByRole("link", { name: /^quality$/i })).toHaveAttribute("href", "/quality");
   });
 
+  it("renders a link to /confidence", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /^confidence$/i })).toHaveAttribute(
+      "href",
+      "/confidence"
+    );
+  });
+
   it("renders a link to /profile", () => {
     renderHeader();
     expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "/profile");
