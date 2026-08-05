@@ -21,6 +21,8 @@ const mockDeck: DeckItem = {
     reviewed_cards: 1,
     unseen_cards: 4,
     last_reviewed_at: 0,
+    total_reviews: 12,
+    total_reviews_today: 3,
   },
 };
 
@@ -258,6 +260,7 @@ describe("CardSection", () => {
     );
     expect(screen.getByText("Cards")).toBeInTheDocument();
     expect(screen.getByText("Total 12 · Overdue 3")).toBeInTheDocument();
+    expect(screen.getByText("Reviews today 3 · Total reviews 12")).toBeInTheDocument();
     expect(screen.getByText("9 / 12 reviewed")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
     const bar = screen.getByRole("progressbar", { name: /reviewed cards progress/i });

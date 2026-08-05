@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,26 @@ import {
   type FactConfidenceRow,
 } from "@/lib/confidence";
 
+/** Page numbers around `current`, always including first and last, with gaps. */
+function confidencePageItems(current: number, totalPages: number): Array<number | "gap"> {
+  if (totalPages <= 1) return totalPages === 1 ? [1] : [];
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const pages = new Set<number>([1, totalPages]);
+  for (let p = current - 1; p <= current + 1; p++) {
+    if (p >= 1 && p <= totalPages) pages.add(p);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+  const out: Array<number | "gap"> = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const n = sorted[i]!;
+    if (i > 0 && n - sorted[i - 1]! > 1) out.push("gap");
+    out.push(n);
+  }
+  return out;
+}
+
 export default function ConfidencePage() {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
@@ -19,12 +39,11 @@ export default function ConfidencePage() {
   const [loadingDecks, setLoadingDecks] = useState(true);
   const [deckId, setDeckId] = useState("");
   const [rows, setRows] = useState<FactConfidenceRow[]>([]);
-  const [nextOffset, setNextOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const loadGenRef = useRef(0);
 
   const sortedDecks = useMemo(
     () => [...decks].sort((a, b) => a.name.localeCompare(b.name)),
@@ -34,6 +53,12 @@ export default function ConfidencePage() {
   const selectedDeck = useMemo(
     () => sortedDecks.find((d) => d.id === deckId) ?? null,
     [sortedDecks, deckId]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(total / CONFIDENCE_PAGE_SIZE));
+  const pageItems = useMemo(
+    () => confidencePageItems(page, total > 0 ? totalPages : 1),
+    [page, total, totalPages]
   );
 
   useEffect(() => {
@@ -65,65 +90,66 @@ export default function ConfidencePage() {
     };
   }, [token]);
 
-  const loadFirstPage = useCallback(async () => {
-    if (!token || !deckId) {
-      setRows([]);
-      setNextOffset(0);
-      setHasMore(false);
-      setTotal(0);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    setRows([]);
-    setNextOffset(0);
-    setHasMore(false);
-    setTotal(0);
-    try {
-      const page = await fetchDeckFactConfidencesPage(deckId, token, {
-        limit: CONFIDENCE_PAGE_SIZE,
-        offset: 0,
-      });
-      setRows(page.rows);
-      setNextOffset(page.nextOffset);
-      setHasMore(page.hasMore);
-      setTotal(page.total);
-    } catch (e) {
-      setRows([]);
-      setError(e instanceof Error ? e.message : "Failed to load confidence");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, deckId]);
+  const loadPage = useCallback(
+    async (pageNum: number) => {
+      if (!token || !deckId) {
+        setRows([]);
+        setPage(1);
+        setTotal(0);
+        return;
+      }
+      const safePage = Math.max(1, pageNum);
+      const gen = ++loadGenRef.current;
+      setLoading(true);
+      setError("");
+      try {
+        const offset = (safePage - 1) * CONFIDENCE_PAGE_SIZE;
+        const result = await fetchDeckFactConfidencesPage(deckId, token, {
+          limit: CONFIDENCE_PAGE_SIZE,
+          offset,
+        });
+        if (gen !== loadGenRef.current) return;
+        const nextTotal = result.total;
+        const nextTotalPages = Math.max(1, Math.ceil(nextTotal / CONFIDENCE_PAGE_SIZE));
+        if (safePage > nextTotalPages && nextTotal > 0) {
+          const clamped = nextTotalPages;
+          const clampedOffset = (clamped - 1) * CONFIDENCE_PAGE_SIZE;
+          const clampedResult = await fetchDeckFactConfidencesPage(deckId, token, {
+            limit: CONFIDENCE_PAGE_SIZE,
+            offset: clampedOffset,
+          });
+          if (gen !== loadGenRef.current) return;
+          setRows(clampedResult.rows);
+          setTotal(clampedResult.total);
+          setPage(clamped);
+          return;
+        }
+        setRows(result.rows);
+        setTotal(nextTotal);
+        setPage(safePage);
+      } catch (e) {
+        if (gen !== loadGenRef.current) return;
+        setRows([]);
+        setError(e instanceof Error ? e.message : "Failed to load confidence");
+      } finally {
+        if (gen === loadGenRef.current) setLoading(false);
+      }
+    },
+    [token, deckId]
+  );
 
   useEffect(() => {
-    void loadFirstPage();
-  }, [loadFirstPage]);
-
-  async function handleLoadMore() {
-    if (!token || !deckId || !hasMore || loadingMore) return;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const page = await fetchDeckFactConfidencesPage(deckId, token, {
-        limit: CONFIDENCE_PAGE_SIZE,
-        offset: nextOffset,
-      });
-      setRows((prev) => [...prev, ...page.rows]);
-      setNextOffset(page.nextOffset);
-      setHasMore(page.hasMore);
-      setTotal(page.total);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load more");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+    void loadPage(1);
+  }, [loadPage]);
 
   async function handleLogout() {
     await logout();
     navigate("/login", { replace: true });
   }
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * CONFIDENCE_PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * CONFIDENCE_PAGE_SIZE, total);
+  const showPager = totalPages > 1;
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -185,7 +211,7 @@ export default function ConfidencePage() {
             <p className="text-sm text-muted-foreground">
               Community confidence per fact: review <span className="font-medium">score</span>,{" "}
               <span className="font-medium">reports</span>, and derived{" "}
-              <span className="font-medium">p_good</span>. Loads {CONFIDENCE_PAGE_SIZE} at a time;
+              <span className="font-medium">p_good</span>. {CONFIDENCE_PAGE_SIZE} per page;
               weakest <span className="font-medium">p_good</span> first deck-wide.
               {selectedDeck ? (
                 <>
@@ -204,15 +230,16 @@ export default function ConfidencePage() {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            {!deckId || loadingDecks ? null : loading ? (
+            {!deckId || loadingDecks ? null : loading && rows.length === 0 ? (
               <p className="text-muted-foreground">Loading confidence…</p>
             ) : rows.length === 0 ? (
               <p className="text-muted-foreground">No facts in this deck.</p>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Showing {rows.length}
+                  Showing {rangeStart}–{rangeEnd}
                   {total > 0 ? ` of ${total}` : ""} facts
+                  {loading ? " · Loading…" : ""}
                 </p>
                 <div className="overflow-x-auto rounded-md border">
                   <table className="w-full text-sm">
@@ -247,15 +274,51 @@ export default function ConfidencePage() {
                     </tbody>
                   </table>
                 </div>
-                {hasMore && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={loadingMore}
-                    onClick={() => void handleLoadMore()}
-                  >
-                    {loadingMore ? "Loading…" : `Load more (${CONFIDENCE_PAGE_SIZE})`}
-                  </Button>
+                {showPager && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={loading || page <= 1}
+                      onClick={() => void loadPage(page - 1)}
+                    >
+                      Previous
+                    </Button>
+                    {pageItems.map((item, i) =>
+                      item === "gap" ? (
+                        <span
+                          key={`gap-${i}`}
+                          className="px-1 text-sm text-muted-foreground select-none"
+                          aria-hidden
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <Button
+                          key={item}
+                          type="button"
+                          variant={item === page ? "default" : "outline"}
+                          className="min-w-10 tabular-nums"
+                          disabled={loading}
+                          aria-current={item === page ? "page" : undefined}
+                          aria-label={`Page ${item}`}
+                          onClick={() => {
+                            if (item !== page) void loadPage(item);
+                          }}
+                        >
+                          {item}
+                        </Button>
+                      )
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={loading || page >= totalPages}
+                      onClick={() => void loadPage(page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 )}
               </div>
             )}

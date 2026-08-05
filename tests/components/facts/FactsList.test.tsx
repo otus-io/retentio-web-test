@@ -20,6 +20,8 @@ const mockDeck: DeckItem = {
     new_cards_today: 0,
     reviewed_cards: 0,
     unseen_cards: 0,
+    total_reviews: 0,
+    total_reviews_today: 0,
   },
 };
 

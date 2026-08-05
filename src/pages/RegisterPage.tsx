@@ -26,7 +26,11 @@ export default function RegisterPage() {
     try {
       await request<RegisterRes>("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ username, password, email }),
+        body: JSON.stringify({
+          username,
+          password,
+          email,
+        }),
       });
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2000);

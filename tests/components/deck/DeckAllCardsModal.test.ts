@@ -30,6 +30,8 @@ function emptyStats(overrides: Partial<DeckStats> = {}): DeckStats {
     hidden_cards: 0,
     new_cards_today: 0,
     last_reviewed_at: 0,
+    total_reviews: 0,
+    total_reviews_today: 0,
     ...overrides,
   };
 }

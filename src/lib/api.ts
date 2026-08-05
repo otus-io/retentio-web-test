@@ -485,7 +485,11 @@ export interface UploadMediaRes {
 }
 
 export interface ProfileRes {
-  data: { username: string; email: string; email_verified?: boolean };
+  data: {
+    username: string;
+    email: string;
+    email_verified?: boolean;
+  };
   meta?: { created_at: string };
 }
 
@@ -498,6 +502,10 @@ export interface DeckStats {
   new_cards_today: number;
   reviewed_cards: number;
   unseen_cards: number;
+  /** Review actions on this deck, all time (not unique cards). */
+  total_reviews: number;
+  /** Review actions since midnight UTC. */
+  total_reviews_today: number;
 }
 
 export interface DeckItem {
