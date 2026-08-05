@@ -17,6 +17,8 @@ const baseDeck: DeckItem = {
     due_cards: 0,
     hidden_cards: 0,
     new_cards_today: 0,
+    total_reviews: 0,
+    total_reviews_today: 0,
   },
   created_at: "1",
   updated_at: "1",

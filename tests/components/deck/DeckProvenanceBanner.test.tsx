@@ -17,6 +17,8 @@ const importDeck: DeckItem = {
     new_cards_today: 0,
     reviewed_cards: 0,
     unseen_cards: 0,
+    total_reviews: 0,
+    total_reviews_today: 0,
   },
   created_at: "2024-01-01T00:00:00Z",
   updated_at: "2024-01-01T00:00:00Z",

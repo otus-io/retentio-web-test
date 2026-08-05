@@ -80,7 +80,8 @@ describe("RegisterPage", () => {
     await user.click(screen.getByRole("button", { name: /create account/i }));
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toMatch(/\/auth\/register$/);
-    expect(JSON.parse(init.body as string)).toEqual({
+    const body = JSON.parse(init.body as string) as Record<string, string>;
+    expect(body).toEqual({
       username: "bob",
       email: "bob@test.com",
       password: "mypassword",

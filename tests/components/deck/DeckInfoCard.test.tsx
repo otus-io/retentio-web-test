@@ -30,6 +30,8 @@ const mockDeck: DeckItem = {
     reviewed_cards: 5,
     unseen_cards: 15,
     last_reviewed_at: 0,
+    total_reviews: 42,
+    total_reviews_today: 7,
   },
 };
 
@@ -79,6 +81,10 @@ describe("DeckInfoCard", () => {
     expect(screen.getAllByText("10").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("20")).toBeInTheDocument(); // cards_count
     expect(screen.getByText("15")).toBeInTheDocument(); // unseen_cards
+    expect(screen.getByText("Reviews today:")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("Total reviews:")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
   });
 
   it("calls onEdit when Edit Deck menu item is clicked", async () => {

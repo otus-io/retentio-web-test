@@ -15,6 +15,7 @@ const mockDeck: DeckItem = {
   stats: {
     cards_count: 0, facts_count: 0, due_cards: 0,
     hidden_cards: 0, new_cards_today: 0, reviewed_cards: 0, unseen_cards: 0,
+    total_reviews: 0, total_reviews_today: 0,
   },
 };
 

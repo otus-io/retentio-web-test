@@ -640,6 +640,12 @@ export function CardSection({
             <p className="text-sm text-muted-foreground font-normal">
               Total {tagFilterStats.cardsCount} · Overdue {tagFilterStats.dueCards}
             </p>
+            {deck != null && (
+              <p className="text-sm text-muted-foreground font-normal">
+                Reviews today {deck.stats.total_reviews_today} · Total reviews{" "}
+                {deck.stats.total_reviews}
+              </p>
+            )}
             {reviewedProgress != null && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">

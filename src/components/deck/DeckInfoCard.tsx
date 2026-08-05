@@ -328,6 +328,8 @@ export function DeckInfoCard({
             <li><span className="text-muted-foreground">Due:</span> {deck.stats.due_cards}</li>
             <li><span className="text-muted-foreground">Hidden:</span> {deck.stats.hidden_cards}</li>
             <li><span className="text-muted-foreground">New today:</span> {deck.stats.new_cards_today}</li>
+            <li><span className="text-muted-foreground">Reviews today:</span> {deck.stats.total_reviews_today}</li>
+            <li><span className="text-muted-foreground">Total reviews:</span> {deck.stats.total_reviews}</li>
             {deck.stats.last_reviewed_at != null && deck.stats.last_reviewed_at > 0 && (
               <li><span className="text-muted-foreground">Last review:</span> {formatLastReview(deck.stats.last_reviewed_at)}</li>
             )}

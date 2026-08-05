@@ -738,7 +738,8 @@ export default function DeckPage() {
       setCardSuccess("Card reviewed.");
       await handleGetNextCard(false);
       setStudyStatsRefreshKey((k) => k + 1);
-      if (!studyTagId) void fetchDeck();
+      // Refresh deck-wide review counters (total_reviews / total_reviews_today).
+      void fetchDeck();
     } catch (e) {
       setCardError(e instanceof Error ? e.message : "Update failed");
     }
