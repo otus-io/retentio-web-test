@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -83,12 +83,16 @@ import { useDeckFeedbackNotifications } from "@/hooks/useDeckFeedbackNotificatio
 
 export default function DeckPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const factQueryParam = (searchParams.get("fact") ?? "").trim();
   const { token, logout } = useAuth();
   const navigate = useNavigate();
   /** Ignore async results after navigating to another deck (avoids stale UI). */
   const routeDeckIdRef = useRef(id);
   routeDeckIdRef.current = id;
   const [deck, setDeck] = useState<DeckItem | null>(null);
+  const deckRef = useRef(deck);
+  deckRef.current = deck;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -130,6 +134,7 @@ export default function DeckPage() {
   const [studyStatsRefreshKey, setStudyStatsRefreshKey] = useState(0);
   const [addFactsOpen, setAddFactsOpen] = useState(false);
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
+  const openedFactQueryRef = useRef<string | null>(null);
   const [cardFontsOpen, setCardFontsOpen] = useState(false);
   const [allCardsOpen, setAllCardsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
@@ -189,6 +194,7 @@ export default function DeckPage() {
     setPendingCount(0);
     setFactsHasMore(false);
     setFactsTotal(null);
+    openedFactQueryRef.current = null;
   }, [id]);
 
   useEffect(() => {
@@ -198,6 +204,13 @@ export default function DeckPage() {
     }
     setPendingCount(countPendingContributions(id));
   }, [id]);
+
+  useEffect(() => {
+    if (!factQueryParam || !deck || !token) return;
+    if (openedFactQueryRef.current === factQueryParam) return;
+    openedFactQueryRef.current = factQueryParam;
+    setBulkEditFactsOpen(true);
+  }, [factQueryParam, deck, token]);
 
   const refreshPendingCount = useCallback(() => {
     if (!id) {
@@ -265,7 +278,10 @@ export default function DeckPage() {
   const fetchDeck = useCallback(async () => {
     if (!token || !id) return;
     const targetDeckId = id;
-    setLoading(true);
+    // Soft refresh when a deck is already shown — full-page `loading` would unmount modals (e.g. Edit Facts) and wipe filters.
+    const current = deckRef.current;
+    const soft = current != null && current.id === targetDeckId;
+    if (!soft) setLoading(true);
     setError("");
     try {
       const res = await request<GetDeckRes>(`/api/decks/${id}`, { token });
@@ -289,7 +305,7 @@ export default function DeckPage() {
       setError(e instanceof Error ? e.message : "Failed to load deck");
       setDeck(null);
     } finally {
-      if (routeDeckIdRef.current === targetDeckId) setLoading(false);
+      if (routeDeckIdRef.current === targetDeckId && !soft) setLoading(false);
     }
   }, [token, id]);
 
@@ -1050,7 +1066,7 @@ export default function DeckPage() {
                 fact={feedbackSubmitFact}
                 kind={feedbackSubmitKind}
                 token={token}
-                onSubmitted={async (kind) => {
+                onSubmitted={async (kind, result) => {
                   if (feedbackSubmitFact && id) {
                     if (kind === "edit" || kind === "add") {
                       removePendingContributionByFactId(id, feedbackSubmitFact.id);
@@ -1059,6 +1075,8 @@ export default function DeckPage() {
                       kind,
                       factId: feedbackSubmitFact.id,
                       preview: previewFromEntries(feedbackSubmitFact.entries),
+                      message: result.message,
+                      contributionId: result.contributionId,
                     });
                     refreshPendingCount();
                   }
@@ -1163,14 +1181,21 @@ export default function DeckPage() {
                 onClose={() => {
                   setBulkEditFactsOpen(false);
                   setDeleteFactId(null);
+                  if (factQueryParam) {
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("fact");
+                    setSearchParams(next, { replace: true });
+                    openedFactQueryRef.current = null;
+                  }
                 }}
                 deck={deck}
                 token={token}
                 factsList={factsList}
                 factsHasMore={factsHasMore}
                 factsTotal={factsTotal}
+                initialFactId={factQueryParam || null}
                 onRefreshFacts={async () => {
-                  await fetchDeck();
+                  // Facts only — avoid fetchDeck full-page loading (unmounts this modal and clears filters).
                   await fetchFacts();
                 }}
                 onFactSaved={

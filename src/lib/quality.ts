@@ -199,8 +199,126 @@ export async function putFactQuality(
   return res.data.quality;
 }
 
+export interface GetFactQualityRes {
+  data: { quality: FactQuality };
+  meta: { msg: string };
+}
+
+export interface DeleteFactQualityRes {
+  data: { fact_id: string };
+  meta: { msg: string };
+}
+
+/** GET quality; `null` when none stored (404). */
+export async function getFactQuality(
+  deckId: string,
+  factId: string,
+  token: string
+): Promise<FactQuality | null> {
+  try {
+    const res = await request<GetFactQualityRes>(
+      `/api/decks/${encodeURIComponent(deckId)}/facts/${encodeURIComponent(factId)}/quality`,
+      { token }
+    );
+    return res.data.quality;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/quality not found/i.test(msg)) return null;
+    throw e;
+  }
+}
+
+export async function deleteFactQuality(
+  deckId: string,
+  factId: string,
+  token: string
+): Promise<void> {
+  await request<DeleteFactQualityRes>(
+    `/api/decks/${encodeURIComponent(deckId)}/facts/${encodeURIComponent(factId)}/quality`,
+    { method: "DELETE", token }
+  );
+}
+
+export const HUMAN_QUALITY_MODEL = "human";
+
+export function isHumanVerifiedAspect(aspect?: AspectQuality | null): boolean {
+  if (!aspect) return false;
+  return aspect.score === QUALITY_SCORE_MAX && aspect.model.trim() === HUMAN_QUALITY_MODEL;
+}
+
+/**
+ * True when every entry with text/audio is scored 10 by model `human` on those aspects.
+ * Facts with no text and no audio are not considered verified.
+ */
+export function isFactHumanVerified(
+  fact: { entries?: { text?: string; audio?: string }[] },
+  quality: FactQuality | null | undefined
+): boolean {
+  const entries = fact.entries ?? [];
+  let scored = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const hasText = Boolean((e?.text ?? "").trim());
+    const hasAudio = Boolean((e?.audio ?? "").trim());
+    if (!hasText && !hasAudio) continue;
+    scored += 1;
+    const q = quality?.entries?.[String(i)];
+    if (hasText && !isHumanVerifiedAspect(q?.text)) return false;
+    if (hasAudio && !isHumanVerifiedAspect(q?.audio)) return false;
+  }
+  return scored > 0;
+}
+
+/** Merge existing quality with human/10 for every entry that has text and/or audio. */
+export function buildHumanVerifiedEntries(
+  fact: { entries?: { text?: string; audio?: string }[] },
+  existing: Record<string, EntryQuality> = {}
+): Record<string, EntryQuality> {
+  const out: Record<string, EntryQuality> = {};
+  for (const [key, entry] of Object.entries(existing)) {
+    out[key] = {
+      ...(entry.text ? { text: { ...entry.text } } : {}),
+      ...(entry.audio ? { audio: { ...entry.audio } } : {}),
+    };
+  }
+  const entries = fact.entries ?? [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const hasText = Boolean((e?.text ?? "").trim());
+    const hasAudio = Boolean((e?.audio ?? "").trim());
+    if (!hasText && !hasAudio) continue;
+    const key = String(i);
+    const prev = out[key] ?? {};
+    const next: EntryQuality = {};
+    if (hasText) next.text = { score: QUALITY_SCORE_MAX, model: HUMAN_QUALITY_MODEL };
+    else if (prev.text) next.text = prev.text;
+    if (hasAudio) next.audio = { score: QUALITY_SCORE_MAX, model: HUMAN_QUALITY_MODEL };
+    else if (prev.audio) next.audio = prev.audio;
+    out[key] = next;
+  }
+  return out;
+}
+
+/** Drop aspects marked human/10; omit entry keys left with no aspects. */
+export function stripHumanVerifiedAspects(
+  entries: Record<string, EntryQuality>
+): Record<string, EntryQuality> {
+  const out: Record<string, EntryQuality> = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    const next: EntryQuality = {};
+    if (entry.text && !isHumanVerifiedAspect(entry.text)) next.text = entry.text;
+    if (entry.audio && !isHumanVerifiedAspect(entry.audio)) next.audio = entry.audio;
+    if (next.text || next.audio) out[key] = next;
+  }
+  return out;
+}
+
 /** Loads every quality fact for a deck (pages at max limit until has_more is false). */
-export async function fetchAllDeckQuality(deckId: string, token: string): Promise<FactQuality[]> {
+export async function fetchAllDeckQuality(
+  deckId: string,
+  token: string,
+  opts?: { maxScore?: number }
+): Promise<FactQuality[]> {
   const pageSize = LIST_PAGINATION_MAX_LIMIT;
   const out: FactQuality[] = [];
   let offset = 0;
@@ -208,7 +326,11 @@ export async function fetchAllDeckQuality(deckId: string, token: string): Promis
     if (page > MAX_QUALITY_PAGES_SAFETY) {
       throw new Error("quality list: exceeded maximum pages");
     }
-    const res = await listDeckQuality(deckId, token, { limit: pageSize, offset });
+    const res = await listDeckQuality(deckId, token, {
+      limit: pageSize,
+      offset,
+      maxScore: opts?.maxScore,
+    });
     const batch = res.data.items ?? [];
     out.push(...batch);
     if (res.meta.has_more !== true) break;

@@ -10,15 +10,20 @@ This app reads backend base URL from `VITE_API_URL` (Vite env var).
 ### Option A: helper script (recommended for toggling)
 
 ```bash
-./utils/run-dev.sh            # release API (default)
-./utils/run-dev.sh local      # http://localhost:8080
-./utils/run-dev.sh release    # https://api.retentio.app:8443
+./run-dev.sh                  # release API (default); loads .env then .env.local
+./run-dev.sh local            # http://localhost:8080
+./run-dev.sh release          # https://api.retentio.app:8443
 
-# or via npm:
+# same via utils/ or npm:
+./utils/run-dev.sh release
 npm run dev                   # release (default)
 npm run dev:local
 npm run dev:release
 ```
+
+`run-dev.sh` **sources** (in order) `retentio-content/quality-tools/.env`, then web-test `.env`, `.env.development`, `.env.local`, `.env.development.local`. Unprefixed keys from quality-tools (`OPENAI_API_KEY`, `ELEVENLABS_*`, …) are mapped to `VITE_*` when unset. Then it sets `VITE_API_URL` for the chosen target.
+
+Restart with `./run-dev.sh release` after changing env files. On startup you should see `Fix-fact keys: VITE_OPENAI_API_KEY=set …`.
 
 ### Option B: one-off command
 
@@ -34,6 +39,16 @@ Create `.env.development.local` in project root:
 
 ```env
 VITE_API_URL=http://localhost:8080
+
+# Optional: Contributions inbox → Fix fact (regen translation / TTS in the browser).
+# These keys are bundled into the client — use only for local web-test, never production.
+VITE_OPENAI_API_KEY=
+VITE_OPENAI_MODEL=gpt-4o
+VITE_ANTHROPIC_API_KEY=
+VITE_DEEPSEEK_API_KEY=
+VITE_ELEVENLABS_API_KEY=
+VITE_ELEVENLABS_VOICE_ID=
+VITE_ELEVENLABS_MODEL_ID=eleven_v3
 ```
 
 Then run:
@@ -43,6 +58,17 @@ npm run dev
 ```
 
 `.env.development.local` is intended for machine-specific settings and should stay uncommitted.
+
+### Contributions inbox · Fix fact
+
+On a **source** deck, open **Contributions inbox** → **Fix** on an open report. The panel can:
+
+- Play current column audio
+- Regenerate translation via OpenAI (`VITE_OPENAI_*`)
+- Regenerate TTS via ElevenLabs (`VITE_ELEVENLABS_*`)
+- Apply (PATCH fact / upload media) and **Resolve & next**
+
+Column / model choices are stored in `localStorage` per deck (`retentio_fix_fact_v1:{deckId}`).
 
 ## Vite env precedence (dev)
 

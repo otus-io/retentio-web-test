@@ -66,6 +66,27 @@ describe("pendingContributions", () => {
     expect(listSentContributions("deck1")).toHaveLength(1);
   });
 
+  it("appendSentContribution keeps report message and contribution id", () => {
+    appendSentContribution("deck1", {
+      kind: "report",
+      factId: "f9",
+      preview: "Apple",
+      message: "wrong reading",
+      contributionId: "c-report-1",
+    });
+    appendSentContribution("deck1", {
+      kind: "report",
+      factId: "f9",
+      preview: "Apple",
+      message: "audio is clipped",
+      contributionId: "c-report-2",
+    });
+    const sent = listSentContributions("deck1");
+    expect(sent).toHaveLength(2);
+    expect(sent.map((r) => r.message)).toEqual(["audio is clipped", "wrong reading"]);
+    expect(sent.map((r) => r.contributionId)).toEqual(["c-report-2", "c-report-1"]);
+  });
+
   it("previewFromEntries uses first non-empty text", () => {
     expect(previewFromEntries([{ text: "" }, { text: "  hi  " }])).toBe("hi");
     expect(previewFromEntries([])).toBeUndefined();

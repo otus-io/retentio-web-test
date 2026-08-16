@@ -156,3 +156,30 @@ export async function fetchDeckFactConfidencesPage(
     limit,
   };
 }
+
+const MAX_CONFIDENCE_PAGES_SAFETY = 100_000;
+
+/** Every fact confidence record for a deck (no fact-text previews). */
+export async function fetchAllDeckConfidence(
+  deckId: string,
+  token: string
+): Promise<FactConfidence[]> {
+  const pageSize = LIST_PAGINATION_DEFAULT_LIMIT;
+  const out: FactConfidence[] = [];
+  let offset = 0;
+  for (let page = 0; ; page += 1) {
+    if (page > MAX_CONFIDENCE_PAGES_SAFETY) {
+      throw new Error("confidence list: exceeded maximum pages");
+    }
+    const res = await request<ListDeckConfidenceRes>(
+      `/api/decks/${encodeURIComponent(deckId)}/confidence?limit=${pageSize}&offset=${offset}`,
+      { token }
+    );
+    const batch = res.data.items ?? [];
+    out.push(...batch);
+    if (res.meta.has_more !== true) break;
+    offset += batch.length;
+    if (batch.length === 0) break;
+  }
+  return out;
+}

@@ -12,6 +12,11 @@ import {
 
 export type FactContributionKind = "edit" | "add" | "report";
 
+export interface FactContributionSubmitResult {
+  contributionId?: string;
+  message?: string;
+}
+
 interface SubmitFactContributionModalProps {
   open: boolean;
   onClose: () => void;
@@ -19,7 +24,10 @@ interface SubmitFactContributionModalProps {
   fact: FactItem;
   kind: FactContributionKind;
   token: string;
-  onSubmitted: (kind: FactContributionKind) => void | Promise<void>;
+  onSubmitted: (
+    kind: FactContributionKind,
+    result: FactContributionSubmitResult
+  ) => void | Promise<void>;
 }
 
 const TITLES: Record<FactContributionKind, string> = {
@@ -70,25 +78,33 @@ export function SubmitFactContributionModal({
     setSubmitting(true);
     setError("");
     try {
+      let contributionId: string | undefined;
       if (kind === "report") {
-        await submitFactReport(deck.id, fact.id, { message: trimmed }, token);
+        const res = await submitFactReport(deck.id, fact.id, { message: trimmed }, token);
+        contributionId = res.data.contribution_id;
       } else if (kind === "edit") {
-        await submitFactEditContribution(
+        const res = await submitFactEditContribution(
           deck.id,
           fact.id,
           trimmed ? { message: trimmed } : {},
           token
         );
+        contributionId = res.data.contribution_id;
       } else {
-        await submitFactAddContribution(
+        const res = await submitFactAddContribution(
           deck.id,
           fact.id,
           trimmed ? { message: trimmed } : {},
           token
         );
+        contributionId = res.data.contribution_id;
       }
+      // Notify parent before close so sent history is recorded while fact context is still mounted.
+      await onSubmitted(kind, {
+        contributionId,
+        message: trimmed || undefined,
+      });
       onClose();
-      await onSubmitted(kind);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit contribution");
     } finally {

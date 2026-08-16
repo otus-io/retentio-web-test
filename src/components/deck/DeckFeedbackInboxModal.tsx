@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FixFactPanel } from "@/components/deck/FixFactPanel";
 import {
   acceptContribution,
   contributionsHasMore,
@@ -14,6 +15,7 @@ import {
   type DeckItem,
   type Entry,
 } from "@/lib/api";
+import { canFixContribution } from "@/lib/fixFactSettings";
 import { fetchMediaCached } from "@/lib/mediaFetchCache";
 import { formatRelativePast } from "@/lib/unixTime";
 
@@ -185,6 +187,7 @@ function ContributionRow({
   onToggle,
   onAccept,
   onPatch,
+  onFix,
 }: {
   item: DeckContributionItem;
   token: string;
@@ -194,6 +197,7 @@ function ContributionRow({
   onToggle: (id: string) => void;
   onAccept: (id: string) => void;
   onPatch: (id: string, status: "open" | "resolved" | "dismissed") => void;
+  onFix: (item: DeckContributionItem) => void;
 }) {
   const hasProposal = (item.proposed_entries?.length ?? 0) > 0;
   const hasTagDiff =
@@ -207,6 +211,7 @@ function ContributionRow({
   const canResolve = canResolveItem(item);
   const canDismiss = canDismissItem(item);
   const canReopen = item.status === "resolved" || item.status === "dismissed";
+  const canFix = canFixContribution(item);
   const disabled = busy || bulkBusy;
 
   return (
@@ -296,6 +301,19 @@ function ContributionRow({
             </span>
           )}
           <span className="flex flex-wrap gap-2 pt-1">
+            {canFix && (
+              <Button
+                type="button"
+                size="sm"
+                disabled={disabled}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onFix(item);
+                }}
+              >
+                Fix
+              </Button>
+            )}
             {canAccept && (
               <Button
                 type="button"
@@ -378,6 +396,7 @@ export function DeckFeedbackInboxModal({
   const [items, setItems] = useState<DeckContributionItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<ContributionStatus | "">("open");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [fixTarget, setFixTarget] = useState<DeckContributionItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -424,10 +443,50 @@ export function DeckFeedbackInboxModal({
       setNotice("");
       setSelected(new Set());
       setBulkBusy(false);
+      setFixTarget(null);
       return;
     }
     void fetchPage(0, false);
   }, [open, statusFilter, deck.id, token, fetchPage]);
+
+  const nextFixableAfter = useCallback(
+    (currentId: string): DeckContributionItem | null => {
+      const idx = items.findIndex((i) => i.id === currentId);
+      if (idx < 0) return null;
+      for (let i = idx + 1; i < items.length; i += 1) {
+        if (canFixContribution(items[i])) return items[i];
+      }
+      return null;
+    },
+    [items]
+  );
+
+  async function handleResolveAndNext() {
+    if (!fixTarget) return;
+    const currentId = fixTarget.id;
+    const next = nextFixableAfter(currentId);
+    setBusyId(currentId);
+    setError("");
+    setNotice("");
+    try {
+      await patchContribution(deck.id, currentId, { status: "resolved" }, token);
+      await onFeedbackChanged?.();
+      if (next) {
+        setFixTarget(next);
+        setNotice(`Resolved ${currentId}. Opened next report.`);
+        // Refresh list in background so queue stays current.
+        void fetchPage(0, false);
+      } else {
+        setFixTarget(null);
+        setNotice(`Resolved ${currentId}. No further open fixable items in this page.`);
+        await fetchPage(0, false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Resolve failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const selectedItems = useMemo(
     () => items.filter((i) => selected.has(i.id)),
@@ -590,123 +649,161 @@ export function DeckFeedbackInboxModal({
       aria-modal="true"
       aria-labelledby="contributions-inbox-title"
     >
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4">
+      <div
+        className="fixed inset-0 bg-black/50"
+        onClick={fixTarget ? undefined : onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={`relative z-50 w-full max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4 ${
+          fixTarget ? "max-w-4xl" : "max-w-2xl"
+        }`}
+      >
         <h2 id="contributions-inbox-title" className="text-lg font-semibold">
-          Contributions inbox
+          {fixTarget ? "Contributions inbox · Fix" : "Contributions inbox"}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Select contributions to bulk accept &amp; publish (importers can then sync), or resolve /
-          dismiss.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((f) => (
-            <Button
-              key={f.value || "all"}
-              type="button"
-              size="sm"
-              variant={statusFilter === f.value ? "default" : "outline"}
-              onClick={() => setStatusFilter(f.value)}
-              disabled={actionsDisabled}
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
-        {loading && <p className="text-sm text-muted-foreground">Loading contributions…</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {notice && (
-          <p className="text-sm text-green-800 dark:text-green-200 rounded border border-green-600/40 bg-green-600/10 px-3 py-2">
-            {notice}
-          </p>
-        )}
-        {!loading && items.length === 0 && !error && (
-          <p className="text-sm text-muted-foreground">No contributions yet.</p>
-        )}
-        {items.length > 0 && (
+        {fixTarget ? (
           <>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected;
-                }}
-                onChange={toggleAll}
-                disabled={actionsDisabled}
-                className="h-4 w-4 rounded border"
-              />
-              <span>Select all ({items.length})</span>
-            </label>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {notice && (
+              <p className="text-sm text-green-800 dark:text-green-200 rounded border border-green-600/40 bg-green-600/10 px-3 py-2">
+                {notice}
+              </p>
+            )}
+            <FixFactPanel
+              key={fixTarget.id}
+              deck={deck}
+              token={token}
+              contribution={fixTarget}
+              onBack={() => {
+                setFixTarget(null);
+                setNotice("");
+                setError("");
+              }}
+              onResolveAndNext={() => handleResolveAndNext()}
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Select contributions to bulk accept &amp; publish (importers can then sync), resolve /
+              dismiss, or open <strong>Fix</strong> on a report to regenerate audio.
+            </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                disabled={actionsDisabled || selectableAccept.length === 0}
-                onClick={() => void handleBulkAcceptAndPublish()}
-              >
-                {bulkBusy
-                  ? "Working…"
-                  : selectableAccept.length === 0
-                    ? "Accept & publish selected"
-                    : `Accept & publish selected (${selectableAccept.length})`}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={actionsDisabled || selectableResolve.length === 0}
-                onClick={() => void handleBulkPatch("resolved")}
-              >
-                Resolve selected
-                {selectableResolve.length > 0 ? ` (${selectableResolve.length})` : ""}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={actionsDisabled || selectableDismiss.length === 0}
-                onClick={() => void handleBulkPatch("dismissed")}
-              >
-                Dismiss selected
-                {selectableDismiss.length > 0 ? ` (${selectableDismiss.length})` : ""}
+              {STATUS_FILTERS.map((f) => (
+                <Button
+                  key={f.value || "all"}
+                  type="button"
+                  size="sm"
+                  variant={statusFilter === f.value ? "default" : "outline"}
+                  onClick={() => setStatusFilter(f.value)}
+                  disabled={actionsDisabled}
+                >
+                  {f.label}
+                </Button>
+              ))}
+            </div>
+            {loading && <p className="text-sm text-muted-foreground">Loading contributions…</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {notice && (
+              <p className="text-sm text-green-800 dark:text-green-200 rounded border border-green-600/40 bg-green-600/10 px-3 py-2">
+                {notice}
+              </p>
+            )}
+            {!loading && items.length === 0 && !error && (
+              <p className="text-sm text-muted-foreground">No contributions yet.</p>
+            )}
+            {items.length > 0 && (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
+                    onChange={toggleAll}
+                    disabled={actionsDisabled}
+                    className="h-4 w-4 rounded border"
+                  />
+                  <span>Select all ({items.length})</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={actionsDisabled || selectableAccept.length === 0}
+                    onClick={() => void handleBulkAcceptAndPublish()}
+                  >
+                    {bulkBusy
+                      ? "Working…"
+                      : selectableAccept.length === 0
+                        ? "Accept & publish selected"
+                        : `Accept & publish selected (${selectableAccept.length})`}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={actionsDisabled || selectableResolve.length === 0}
+                    onClick={() => void handleBulkPatch("resolved")}
+                  >
+                    Resolve selected
+                    {selectableResolve.length > 0 ? ` (${selectableResolve.length})` : ""}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={actionsDisabled || selectableDismiss.length === 0}
+                    onClick={() => void handleBulkPatch("dismissed")}
+                  >
+                    Dismiss selected
+                    {selectableDismiss.length > 0 ? ` (${selectableDismiss.length})` : ""}
+                  </Button>
+                </div>
+                <ul className="space-y-3 list-none">
+                  {items.map((item) => (
+                    <ContributionRow
+                      key={item.id}
+                      item={item}
+                      token={token}
+                      selected={selected.has(item.id)}
+                      busy={busyId === item.id}
+                      bulkBusy={bulkBusy}
+                      onToggle={toggleOne}
+                      onAccept={(id) => void handleAccept(id)}
+                      onPatch={(id, status) => void handlePatch(id, status)}
+                      onFix={(c) => {
+                        setError("");
+                        setNotice("");
+                        setFixTarget(c);
+                      }}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+            {hasMore && (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingMore || actionsDisabled}
+                  onClick={() => void fetchPage(offset, true)}
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
+            <div className="flex justify-end pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={bulkBusy}>
+                Close
               </Button>
             </div>
-            <ul className="space-y-3 list-none">
-              {items.map((item) => (
-                <ContributionRow
-                  key={item.id}
-                  item={item}
-                  token={token}
-                  selected={selected.has(item.id)}
-                  busy={busyId === item.id}
-                  bulkBusy={bulkBusy}
-                  onToggle={toggleOne}
-                  onAccept={(id) => void handleAccept(id)}
-                  onPatch={(id, status) => void handlePatch(id, status)}
-                />
-              ))}
-            </ul>
           </>
         )}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={loadingMore || actionsDisabled}
-              onClick={() => void fetchPage(offset, true)}
-            >
-              {loadingMore ? "Loading…" : "Load more"}
-            </Button>
-          </div>
-        )}
-        <div className="flex justify-end pt-2">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={bulkBusy}>
-            Close
-          </Button>
-        </div>
       </div>
     </div>
   );

@@ -1031,6 +1031,37 @@ export async function listDeckContributions(
   );
 }
 
+const MAX_CONTRIBUTION_PAGES_SAFETY = 100_000;
+
+/** Fact ids with at least one open `report` contribution on a source deck. */
+export async function fetchOpenReportFactIds(
+  sourceDeckId: string,
+  token: string
+): Promise<Set<string>> {
+  const pageSize = LIST_PAGINATION_MAX_LIMIT;
+  const ids = new Set<string>();
+  let offset = 0;
+  for (let page = 0; ; page += 1) {
+    if (page > MAX_CONTRIBUTION_PAGES_SAFETY) {
+      throw new Error("contributions list: exceeded maximum pages");
+    }
+    const res = await listDeckContributions(
+      sourceDeckId,
+      { status: "open", type: "report", limit: pageSize, offset },
+      token
+    );
+    const batch = res.data.contributions ?? [];
+    for (const c of batch) {
+      const fid = (c.fact_id ?? "").trim();
+      if (fid) ids.add(fid);
+    }
+    if (!contributionsHasMore(res.meta)) break;
+    offset += batch.length;
+    if (batch.length === 0) break;
+  }
+  return ids;
+}
+
 export async function patchContribution(
   sourceDeckId: string,
   contributionId: string,

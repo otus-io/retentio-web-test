@@ -16,11 +16,12 @@ npm install
 ## Run in development
 
 ```bash
-npm run dev          # release API (default)
+./run-dev.sh release # loads .env / .env.local, then release API
+npm run dev          # same (release API default)
 npm run dev:local    # local backend
 ```
 
-The app uses `VITE_API_URL` for backend requests. `npm run dev` defaults to the release API; use `dev:local` for `http://localhost:8080`.
+The app uses `VITE_API_URL` for backend requests. `./run-dev.sh` / `npm run dev` default to the release API and load `.env` then `.env.local` from the repo root before starting Vite.
 
 ## Configure backend URL
 
@@ -51,9 +52,15 @@ VITE_API_URL=http://localhost:8080 npm run dev
 
 ```env
 VITE_API_URL=http://localhost:8080
+# Optional — Contributions inbox Fix fact (client-visible keys, web-test only):
+# VITE_OPENAI_API_KEY=...
+# VITE_OPENAI_MODEL=gpt-4o
+# VITE_ELEVENLABS_API_KEY=...
+# VITE_ELEVENLABS_VOICE_ID=...
+# VITE_ELEVENLABS_MODEL_ID=eleven_v3
 ```
 
-See `docs/development.md` for details and env precedence.
+See `docs/development.md` for details, env precedence, and the inbox Fix fact flow.
 
 ## Build and preview
 

@@ -7,10 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchAllDeckFacts,
   isImportedDeck,
-  normalizeStoredMediaRef,
   request,
   type DeckItem,
-  type Entry,
   type FactItem,
   type GetDecksRes,
 } from "@/lib/api";
@@ -32,8 +30,24 @@ import {
   type QualityHistogram,
   type QualityScoreBucketKey,
 } from "@/lib/quality";
-import { AudioPreviewButton } from "@/components/media/AudioPreviewButton";
+import { FixFactEntriesEditor } from "@/components/deck/FixFactEntriesEditor";
+import {
+  loadFixFactSettings,
+  saveFixFactSettings,
+  type FixFactSettings,
+} from "@/lib/fixFactSettings";
+import {
+  TTS_MODEL_OPTIONS,
+  getElevenLabsApiKey,
+  getElevenLabsVoiceId,
+} from "@/lib/fixFactTts";
 import { cn } from "@/lib/utils";
+
+const CUSTOM_TTS_MODEL = "__custom__";
+
+function ttsModelSelectValue(current: string): string {
+  return TTS_MODEL_OPTIONS.some((p) => p.value === current) ? current : CUSTOM_TTS_MODEL;
+}
 
 const SCORE_OPTIONS = Array.from(
   { length: QUALITY_SCORE_MAX - QUALITY_SCORE_MIN + 1 },
@@ -84,78 +98,40 @@ function buildFactsById(facts: FactItem[]): Record<string, FactItem> {
   return out;
 }
 
-function entryHasContent(entry: Entry | undefined): boolean {
-  if (!entry) return false;
-  return Boolean(
-    (entry.text != null && entry.text !== "") ||
-      entry.audio ||
-      entry.image ||
-      entry.video ||
-      entry.json
-  );
-}
-
 function QualityFactContent({
   fact,
+  deckId,
   fieldNames,
   highlightEntryIndex,
   token,
+  ttsModel,
+  onFactUpdated,
 }: {
   fact: FactItem | undefined;
+  deckId: string;
   fieldNames: string[];
   highlightEntryIndex: string;
   token: string;
+  ttsModel: string;
+  onFactUpdated: (fact: FactItem) => void;
 }) {
   if (!fact) {
     return <span className="text-muted-foreground">(fact missing)</span>;
   }
 
+  const highlightCol = Number.parseInt(highlightEntryIndex, 10);
+
   return (
-    <div className="space-y-2">
-      {fact.entries.map((entry, i) => {
-        const key = String(i);
-        const label = fieldNames[i]?.trim() || `Field ${i}`;
-        const highlighted = key === highlightEntryIndex;
-        const audioId = normalizeStoredMediaRef(entry.audio);
-        if (!entryHasContent(entry)) {
-          return (
-            <div
-              key={key}
-              className={cn("rounded px-1.5 py-1", highlighted && "bg-accent/70")}
-            >
-              <span className="text-xs font-medium text-muted-foreground">{label}</span>
-              <span className="ml-2 text-muted-foreground">—</span>
-            </div>
-          );
-        }
-        return (
-          <div
-            key={key}
-            className={cn("space-y-1 rounded px-1.5 py-1", highlighted && "bg-accent/70")}
-          >
-            <div className="text-xs font-medium text-muted-foreground">{label}</div>
-            {entry.text != null && entry.text !== "" && (
-              <p className="whitespace-pre-wrap break-words">{entry.text}</p>
-            )}
-            {audioId && (
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">Audio</span>
-                <AudioPreviewButton mediaId={audioId} token={token} />
-              </div>
-            )}
-            {entry.image && (
-              <p className="text-xs text-muted-foreground break-all">Image: {entry.image}</p>
-            )}
-            {entry.video && (
-              <p className="text-xs text-muted-foreground break-all">Video: {entry.video}</p>
-            )}
-            {entry.json && (
-              <p className="text-xs text-muted-foreground break-all">JSON: {entry.json}</p>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <FixFactEntriesEditor
+      deckId={deckId}
+      fields={fieldNames}
+      factId={fact.id}
+      token={token}
+      initialEntries={fact.entries ?? []}
+      ttsModel={ttsModel}
+      highlightCol={Number.isFinite(highlightCol) ? highlightCol : null}
+      onFactUpdated={onFactUpdated}
+    />
   );
 }
 
@@ -173,6 +149,8 @@ export default function QualityPage() {
   const [loadingQuality, setLoadingQuality] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [fixSettings, setFixSettings] = useState<FixFactSettings | null>(null);
+  const [ttsModelCustom, setTtsModelCustom] = useState(false);
 
   const sourceDecks = useMemo(
     () => decks.filter((d) => !isImportedDeck(d)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -185,6 +163,42 @@ export default function QualityPage() {
   );
 
   const fieldNames = selectedDeck?.fields ?? [];
+
+  useEffect(() => {
+    if (!deckId || !selectedDeck) {
+      setFixSettings(null);
+      setTtsModelCustom(false);
+      return;
+    }
+    const fields = selectedDeck.fields ?? [];
+    const loaded = loadFixFactSettings(deckId, fields);
+    setFixSettings(loaded);
+    setTtsModelCustom(!TTS_MODEL_OPTIONS.some((o) => o.value === loaded.ttsModel));
+  }, [deckId, selectedDeck]);
+
+  const updateFixSettings = useCallback(
+    (patch: Partial<FixFactSettings>) => {
+      if (!selectedDeck) return;
+      setFixSettings((prev) => {
+        const base = prev ?? loadFixFactSettings(selectedDeck.id, selectedDeck.fields ?? []);
+        const next = { ...base, ...patch };
+        saveFixFactSettings(selectedDeck.id, next);
+        return next;
+      });
+    },
+    [selectedDeck]
+  );
+
+  const missingTtsKeys = useMemo(() => {
+    const missing: string[] = [];
+    if (!getElevenLabsApiKey()) missing.push("VITE_ELEVENLABS_API_KEY");
+    if (!getElevenLabsVoiceId()) missing.push("VITE_ELEVENLABS_VOICE_ID");
+    return missing;
+  }, []);
+
+  const handleFactUpdated = useCallback((fact: FactItem) => {
+    setFactsById((prev) => ({ ...prev, [fact.id]: { ...prev[fact.id], ...fact } }));
+  }, []);
 
   const maxCount = useMemo(
     () => Math.max(0, ...QUALITY_SCORE_BUCKETS.map((b) => histogram[b.key])),
@@ -443,6 +457,51 @@ export default function QualityPage() {
                         Clear
                       </Button>
                     </div>
+                    {missingTtsKeys.length > 0 && (
+                      <p className="text-sm rounded border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-amber-950 dark:text-amber-100">
+                        Missing env for regen: {missingTtsKeys.join(", ")}. Same setup as Fix Fact
+                        (Contributions inbox).
+                      </p>
+                    )}
+                    {fixSettings && (
+                      <div className="space-y-1 max-w-md">
+                        <Label htmlFor="quality-tts-model">TTS model</Label>
+                        <select
+                          id="quality-tts-model"
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                          value={
+                            ttsModelCustom
+                              ? CUSTOM_TTS_MODEL
+                              : ttsModelSelectValue(fixSettings.ttsModel)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === CUSTOM_TTS_MODEL) {
+                              setTtsModelCustom(true);
+                              return;
+                            }
+                            setTtsModelCustom(false);
+                            updateFixSettings({ ttsModel: v });
+                          }}
+                        >
+                          {TTS_MODEL_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                          <option value={CUSTOM_TTS_MODEL}>Custom…</option>
+                        </select>
+                        {ttsModelCustom && (
+                          <input
+                            aria-label="Custom TTS model id"
+                            className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 font-mono text-xs"
+                            value={fixSettings.ttsModel}
+                            placeholder="eleven_…"
+                            onChange={(e) => updateFixSettings({ ttsModel: e.target.value })}
+                          />
+                        )}
+                      </div>
+                    )}
                     {selectedEntries.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No entries in this range.</p>
                     ) : (
@@ -471,13 +530,16 @@ export default function QualityPage() {
                                   <td className="py-2 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                                     {row.factId}
                                   </td>
-                                  <td className="py-2 pr-3 min-w-[16rem] max-w-xl">
-                                    {token ? (
+                                  <td className="py-2 pr-3 min-w-[20rem] max-w-2xl">
+                                    {token && deckId && fixSettings ? (
                                       <QualityFactContent
                                         fact={factsById[row.factId]}
+                                        deckId={deckId}
                                         fieldNames={fieldNames}
                                         highlightEntryIndex={row.entryIndex}
                                         token={token}
+                                        ttsModel={fixSettings.ttsModel}
+                                        onFactUpdated={handleFactUpdated}
                                       />
                                     ) : null}
                                   </td>

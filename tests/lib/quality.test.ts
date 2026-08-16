@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   bucketForScore,
   buildQualityHistogram,
+  buildHumanVerifiedEntries,
   entriesInBucket,
   entryMinScore,
+  isFactHumanVerified,
   listQualityEntries,
+  stripHumanVerifiedAspects,
   withMaxEntryScores,
   withUpdatedEntryScores,
   type FactQuality,
@@ -109,6 +112,74 @@ describe("withUpdatedEntryScores / withMaxEntryScores", () => {
         text: { score: 10, model: "claude" },
         audio: { score: 10, model: "elevenlabs" },
       },
+    });
+  });
+});
+
+describe("human verification helpers", () => {
+  const fact = {
+    entries: [
+      { text: "こんにちは", audio: "aud1" },
+      { text: "hello" },
+      { text: "", audio: "" },
+    ],
+  };
+
+  it("isFactHumanVerified requires human/10 on every content aspect", () => {
+    expect(isFactHumanVerified(fact, null)).toBe(false);
+    expect(
+      isFactHumanVerified(fact, {
+        fact_id: "f",
+        updated_at: "",
+        entries: {
+          "0": {
+            text: { score: 10, model: "human" },
+            audio: { score: 10, model: "human" },
+          },
+          "1": { text: { score: 10, model: "human" } },
+        },
+      })
+    ).toBe(true);
+    expect(
+      isFactHumanVerified(fact, {
+        fact_id: "f",
+        updated_at: "",
+        entries: {
+          "0": {
+            text: { score: 10, model: "human" },
+            audio: { score: 9, model: "human" },
+          },
+          "1": { text: { score: 10, model: "human" } },
+        },
+      })
+    ).toBe(false);
+  });
+
+  it("buildHumanVerifiedEntries sets human/10 and keeps other indexes", () => {
+    const built = buildHumanVerifiedEntries(fact, {
+      "0": { text: { score: 3, model: "claude" } },
+      "9": { audio: { score: 4, model: "elevenlabs" } },
+    });
+    expect(built["0"]).toEqual({
+      text: { score: 10, model: "human" },
+      audio: { score: 10, model: "human" },
+    });
+    expect(built["1"]).toEqual({ text: { score: 10, model: "human" } });
+    expect(built["9"]).toEqual({ audio: { score: 4, model: "elevenlabs" } });
+    expect(built["2"]).toBeUndefined();
+  });
+
+  it("stripHumanVerifiedAspects drops human/10 aspects", () => {
+    expect(
+      stripHumanVerifiedAspects({
+        "0": {
+          text: { score: 10, model: "human" },
+          audio: { score: 8, model: "elevenlabs" },
+        },
+        "1": { text: { score: 10, model: "human" } },
+      })
+    ).toEqual({
+      "0": { audio: { score: 8, model: "elevenlabs" } },
     });
   });
 });

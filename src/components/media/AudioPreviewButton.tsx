@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiBaseUrl, notifyAuthFailure, resolveMediaFetchUrl } from "@/lib/api";
 import { fetchMediaCached, MediaFetchError } from "@/lib/mediaFetchCache";
 
+/** Play control for an in-memory audio blob (e.g. TTS proposal before upload). */
+export function BlobAudioPlayButton({ mediaBlob }: { mediaBlob: Blob }) {
+  return <AudioPlayButton mediaBlob={mediaBlob} />;
+}
+
 function AudioPlayButton({ mediaBlob }: { mediaBlob: Blob }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
