@@ -272,4 +272,12 @@ describe("tags API", () => {
     const [url] = mockFetch.mock.calls[0] as [string];
     expect(url).toContain("/api/decks/deck1/cards?tag_id=tag9");
   });
+
+  it("getDeckCards appends stats_only when requested", async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({ data: { stats: {} }, meta: {} }));
+    await getDeckCards("deck1", "tok", "tag9", true);
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain("tag_id=tag9");
+    expect(url).toContain("stats_only=true");
+  });
 });

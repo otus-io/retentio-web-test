@@ -398,7 +398,7 @@ export default function DeckPage() {
     }
   }, [token, id, studyTagId]);
 
-  // All tags: reuse GET /decks/{id} stats. Tag filter: GET /cards?tag_id=… (async, does not block next card).
+  // All tags: reuse GET /decks/{id} stats. Tag filter: GET /cards?tag_id=…&stats_only=true (async, does not block next card).
   // Scope stats to the active filter so All-tags numbers never linger after a tag is selected.
   const studyTagIdRef = useRef(studyTagId);
   studyTagIdRef.current = studyTagId;
@@ -425,7 +425,7 @@ export default function DeckPage() {
     // Drop mismatched stats immediately (do not keep showing All-tags / previous tag).
     setStudyCardStats(null);
     setStudyCardStatsScope(null);
-    void getDeckCards<GetCardsRes>(id, token, tagId)
+    void getDeckCards<GetCardsRes>(id, token, tagId, true)
       .then((cardsRes) => {
         const stillCurrentTag = studyTagIdRef.current === tagId;
         const routeOk = routeDeckIdRef.current === targetDeckId;

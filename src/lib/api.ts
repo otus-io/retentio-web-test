@@ -1408,11 +1408,11 @@ export interface DeckCardListItem {
   created_at: number;
 }
 
-/** Response from `GET /api/decks/{id}/cards` — stats plus full card list. */
+/** Response from `GET /api/decks/{id}/cards` — `stats` plus optional `cards`. */
 export interface GetCardsRes {
   data: {
     stats: DeckStats;
-    cards: DeckCardListItem[];
+    cards?: DeckCardListItem[];
   };
   meta: { msg?: string };
 }

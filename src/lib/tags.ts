@@ -226,6 +226,16 @@ export function getNextCard<T>(deckId: string, token: string, tagId?: string | n
 }
 
 /** GET /api/decks/{deckId}/cards — optional tag_id filters card list/stats. */
-export function getDeckCards<T>(deckId: string, token: string, tagId?: string | null): Promise<T> {
-  return request<T>(`/api/decks/${enc(deckId)}/cards${deckCardQueryWithTag(tagId)}`, { token });
+export function getDeckCards<T>(
+  deckId: string,
+  token: string,
+  tagId?: string | null,
+  statsOnly?: boolean
+): Promise<T> {
+  const params = new URLSearchParams();
+  const id = tagId?.trim();
+  if (id) params.set("tag_id", id);
+  if (statsOnly) params.set("stats_only", "true");
+  const query = params.toString();
+  return request<T>(`/api/decks/${enc(deckId)}/cards${query ? `?${query}` : ""}`, { token });
 }
