@@ -7,6 +7,7 @@ import {
   Fragment,
   type ChangeEvent,
 } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -73,6 +74,7 @@ import {
   TTS_MODEL_OPTIONS,
   getElevenLabsApiKey,
   getElevenLabsVoiceId,
+  nextTtsModel,
   synthesizeWithElevenLabs,
 } from "@/lib/fixFactTts";
 import { FactTagsPicker } from "./FactTagsPicker";
@@ -793,19 +795,22 @@ export function BulkEditFactsModal({
       setSaveError("");
       setSaveSuccess("");
       try {
+        const modelId = fixSettings.ttsModel;
         const blob = await synthesizeWithElevenLabs({
           text,
-          modelId: fixSettings.ttsModel,
+          modelId,
         });
         setAudioProposal({ factId, col, blob });
-        setSaveSuccess("New audio ready — preview, then Apply or Discard.");
+        updateFixSettings({ ttsModel: nextTtsModel(modelId) });
+        setTtsModelCustom(false);
+        setSaveSuccess(`New audio ready (${modelId}) — preview, then Apply or Discard.`);
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : "Audio regen failed");
       } finally {
         setRegenKey(null);
       }
     },
-    [localFacts, fixSettings.ttsModel]
+    [localFacts, fixSettings.ttsModel, updateFixSettings]
   );
 
   const discardAudioProposal = useCallback(() => {
@@ -1185,10 +1190,18 @@ export function BulkEditFactsModal({
       aria-labelledby="bulk-edit-facts-title"
     >
       <div className="relative z-50 flex h-full w-full flex-col overflow-hidden bg-card">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b px-6 py-4">
-          <h2 id="bulk-edit-facts-title" className="text-lg font-semibold">
-            Edit Facts
-          </h2>
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link
+              to="/"
+              className="text-xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+            >
+              Retentio
+            </Link>
+            <h2 id="bulk-edit-facts-title" className="text-lg font-semibold">
+              Edit Facts
+            </h2>
+          </div>
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Close
           </Button>

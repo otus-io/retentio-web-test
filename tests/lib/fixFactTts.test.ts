@@ -1,11 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import { elevenLabsTtsUrl, synthesizeWithElevenLabs } from "@/lib/fixFactTts";
+import { elevenLabsTtsUrl, nextTtsModel, synthesizeWithElevenLabs } from "@/lib/fixFactTts";
 
 describe("elevenLabsTtsUrl", () => {
   it("builds voice TTS path", () => {
     expect(elevenLabsTtsUrl("abcVoice")).toBe(
       "https://api.elevenlabs.io/v1/text-to-speech/abcVoice"
     );
+  });
+});
+
+describe("nextTtsModel", () => {
+  it("cycles through presets and wraps", () => {
+    expect(nextTtsModel("eleven_v3")).toBe("eleven_multilingual_v2");
+    expect(nextTtsModel("eleven_flash_v2_5")).toBe("eleven_v3");
+  });
+
+  it("falls back to first preset for unknown models", () => {
+    expect(nextTtsModel("custom-model")).toBe("eleven_v3");
   });
 });
 

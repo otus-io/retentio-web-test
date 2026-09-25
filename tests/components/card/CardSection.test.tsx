@@ -308,4 +308,26 @@ describe("CardSection", () => {
     expect(onOfferSendEditToAuthor).toHaveBeenCalledWith("f1");
     expect(screen.queryByText(/saved privately/i)).not.toBeInTheDocument();
   });
+
+  it("Edit menu with onEditFact opens that editor instead of the text dialog", async () => {
+    const user = userEvent.setup();
+    const onEditFact = vi.fn();
+    const fact: FactItem = {
+      id: "f1",
+      entries: [{ text: "Apple" }, { text: "苹果" }],
+    };
+    render(
+      <CardSection
+        {...defaultProps}
+        nextCard={makeNextCard()}
+        nextCardFact={fact}
+        onEditFact={onEditFact}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole("menuitem", { name: /^edit$/i }));
+    expect(onEditFact).toHaveBeenCalledWith("f1");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 });

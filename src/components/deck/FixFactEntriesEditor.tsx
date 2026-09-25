@@ -11,11 +11,12 @@ import {
 import {
   getElevenLabsApiKey,
   getElevenLabsVoiceId,
+  nextTtsModel,
   synthesizeWithElevenLabs,
 } from "@/lib/fixFactTts";
 import { cn } from "@/lib/utils";
 
-type AudioProposal = { kind: "audio"; col: number; blob: Blob; objectUrl: string };
+type AudioProposal = { kind: "audio"; col: number; blob: Blob; objectUrl: string; modelId: string };
 type Proposal = AudioProposal | null;
 
 function cloneEntries(entries: Entry[]): Entry[] {
@@ -52,9 +53,14 @@ export function FixFactEntriesEditor({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [proposal, setProposal] = useState<Proposal>(null);
+  const [regenModel, setRegenModel] = useState(ttsModel);
   const proposalUrlRef = useRef<string | null>(null);
   const proposalReviewRef = useRef<HTMLDivElement | null>(null);
   const syncedFromParentRef = useRef<string>("");
+
+  useEffect(() => {
+    setRegenModel(ttsModel);
+  }, [ttsModel]);
 
   const replaceProposal = useCallback((next: Proposal) => {
     setProposal((prev) => {
@@ -148,13 +154,15 @@ export function FixFactEntriesEditor({
     setError("");
     setNotice("");
     try {
+      const modelId = regenModel;
       const blob = await synthesizeWithElevenLabs({
         text,
-        modelId: ttsModel,
+        modelId,
       });
       const objectUrl = URL.createObjectURL(blob);
-      replaceProposal({ kind: "audio", col, blob, objectUrl });
-      setNotice("New audio ready — review below, then Apply or Discard.");
+      replaceProposal({ kind: "audio", col, blob, objectUrl, modelId });
+      setRegenModel(nextTtsModel(modelId));
+      setNotice(`New audio ready (${modelId}) — review below, then Apply or Discard.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "TTS failed");
     } finally {
@@ -226,7 +234,7 @@ export function FixFactEntriesEditor({
                 </span>
                 {proposedHere && (
                   <span className="rounded-full bg-amber-600/20 px-2 py-0.5 text-xs">
-                    pending review
+                    pending review · {proposal.modelId}
                   </span>
                 )}
               </div>
@@ -275,7 +283,8 @@ export function FixFactEntriesEditor({
                   className="rounded-md border border-amber-600/40 bg-amber-500/10 p-3 space-y-3"
                 >
                   <p className="text-xs text-muted-foreground">
-                    Review proposed audio — Apply to save, or Discard to keep the current value.
+                    Review proposed audio ({proposal.modelId}) — Apply to save, or Discard to keep
+                    the current value. Next regen uses {regenModel}.
                   </p>
                   <audio
                     key={proposal.objectUrl}

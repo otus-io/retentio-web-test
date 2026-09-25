@@ -423,6 +423,11 @@ interface CardSectionProps {
   onUpdateCard: (intervalSeconds: number) => void;
   onHideCard: (cardId: string) => void;
   onSaveFact?: (factId: string, entries: Entry[]) => Promise<void>;
+  /**
+   * When set, card ⋮ → Edit opens the same Edit facts editor (audio preview / regen)
+   * instead of the text-only popup.
+   */
+  onEditFact?: (factId: string) => void;
   /** Import decks: open report form for the current card's fact. */
   onReportFact?: (factId: string) => void | Promise<void>;
   /**
@@ -453,6 +458,7 @@ export function CardSection({
   onUpdateCard,
   onHideCard,
   onSaveFact,
+  onEditFact,
   onReportFact,
   onOfferSendEditToAuthor,
   onRequestFact,
@@ -547,6 +553,11 @@ export function CardSection({
 
   const openEditPopup = async () => {
     if (!nextCard) return;
+    const factId = (nextCardFact?.id ?? nextCard.card.fact_id ?? "").trim();
+    if (onEditFact && factId) {
+      onEditFact(factId);
+      return;
+    }
     if (nextCardFact) {
       setEditFactId(nextCardFact.id);
       setEditFactEntries(nextCardFact.entries.map((e) => ({ ...e })));
@@ -702,7 +713,7 @@ export function CardSection({
             )}
             <div className="absolute top-2 right-2">
               <DropdownMenu align="end">
-                {nextCard && onSaveFact && (nextCardFact || onRequestFact) && (
+                {nextCard && (onSaveFact || onEditFact) && (nextCardFact || onRequestFact) && (
                   <DropdownMenuItem
                     onClick={openEditPopup}
                     disabled={loadingNextCard}

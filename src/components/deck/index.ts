@@ -12,7 +12,6 @@ export { SubmitTemplateContributionModal } from "./SubmitTemplateContributionMod
 export { PendingContributionsOutboxModal } from "./PendingContributionsOutboxModal";
 export { PendingContributionsBanner } from "./PendingContributionsBanner";
 export { DeckFeedbackInboxModal } from "./DeckFeedbackInboxModal";
-export { FixFactPanel } from "./FixFactPanel";
 export {
   DeckFeedbackAlertBanner,
   DeckOpenFeedbackBanner,

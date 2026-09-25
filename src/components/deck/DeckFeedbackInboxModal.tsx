@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FixFactPanel } from "@/components/deck/FixFactPanel";
+import { FixFactEntriesEditor } from "@/components/deck/FixFactEntriesEditor";
 import {
   acceptContribution,
   contributionsHasMore,
@@ -9,13 +9,15 @@ import {
   listDeckContributions,
   patchContribution,
   publishDeck,
+  request,
   type ContributionMediaAttachment,
   type ContributionStatus,
   type DeckContributionItem,
   type DeckItem,
   type Entry,
+  type FactItem,
 } from "@/lib/api";
-import { canFixContribution } from "@/lib/fixFactSettings";
+import { canFixContribution, loadFixFactSettings } from "@/lib/fixFactSettings";
 import { fetchMediaCached } from "@/lib/mediaFetchCache";
 import { formatRelativePast } from "@/lib/unixTime";
 
@@ -166,6 +168,83 @@ function ContributionMediaPreview({
   );
 }
 
+function ContributionFactFixPanel({
+  deckId,
+  fields,
+  factId,
+  token,
+  ttsModel,
+  highlightCol,
+  disabled,
+  onFactUpdated,
+}: {
+  deckId: string;
+  fields: string[];
+  factId: string;
+  token: string;
+  ttsModel: string;
+  highlightCol?: number | null;
+  disabled?: boolean;
+  onFactUpdated?: (fact: FactItem) => void;
+}) {
+  const [fact, setFact] = useState<FactItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    void (async () => {
+      try {
+        const res = await request<{ data: { fact: FactItem } }>(
+          `/api/decks/${encodeURIComponent(deckId)}/facts/${encodeURIComponent(factId)}`,
+          { token }
+        );
+        if (!cancelled) setFact(res.data.fact);
+      } catch (e) {
+        if (!cancelled) {
+          setFact(null);
+          setError(e instanceof Error ? e.message : "Failed to load fact");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deckId, factId, token]);
+
+  if (loading) {
+    return <p className="text-xs text-muted-foreground">Loading fact…</p>;
+  }
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>;
+  }
+  if (!fact) return null;
+
+  return (
+    <div className="rounded-md border bg-background p-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Edit fact</p>
+      <FixFactEntriesEditor
+        deckId={deckId}
+        fields={fields}
+        factId={fact.id}
+        token={token}
+        initialEntries={fact.entries ?? []}
+        ttsModel={ttsModel}
+        highlightCol={highlightCol}
+        disabled={disabled}
+        onFactUpdated={(updated) => {
+          setFact(updated);
+          onFactUpdated?.(updated);
+        }}
+      />
+    </div>
+  );
+}
+
 function canAcceptItem(item: DeckContributionItem): boolean {
   return item.status === "open" && item.type !== "report";
 }
@@ -180,24 +259,30 @@ function canDismissItem(item: DeckContributionItem): boolean {
 
 function ContributionRow({
   item,
+  deckId,
+  fields,
   token,
+  ttsModel,
   selected,
   busy,
   bulkBusy,
   onToggle,
   onAccept,
   onPatch,
-  onFix,
+  onFactPatched,
 }: {
   item: DeckContributionItem;
+  deckId: string;
+  fields: string[];
   token: string;
+  ttsModel: string;
   selected: boolean;
   busy: boolean;
   bulkBusy: boolean;
   onToggle: (id: string) => void;
   onAccept: (id: string) => void;
   onPatch: (id: string, status: "open" | "resolved" | "dismissed") => void;
-  onFix: (item: DeckContributionItem) => void;
+  onFactPatched?: (fact: FactItem) => void;
 }) {
   const hasProposal = (item.proposed_entries?.length ?? 0) > 0;
   const hasTagDiff =
@@ -211,7 +296,12 @@ function ContributionRow({
   const canResolve = canResolveItem(item);
   const canDismiss = canDismissItem(item);
   const canReopen = item.status === "resolved" || item.status === "dismissed";
-  const canFix = canFixContribution(item);
+  const showFixEditor = canFixContribution(item);
+  const factId = (item.fact_id ?? "").trim();
+  const highlightCol =
+    typeof item.entry_index === "number" && Number.isFinite(item.entry_index)
+      ? item.entry_index
+      : null;
   const disabled = busy || bulkBusy;
 
   return (
@@ -300,78 +390,65 @@ function ContributionRow({
               )}
             </span>
           )}
-          <span className="flex flex-wrap gap-2 pt-1">
-            {canFix && (
-              <Button
-                type="button"
-                size="sm"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onFix(item);
-                }}
-              >
-                Fix
-              </Button>
-            )}
-            {canAccept && (
-              <Button
-                type="button"
-                size="sm"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onAccept(item.id);
-                }}
-              >
-                Accept proposal
-              </Button>
-            )}
-            {canResolve && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPatch(item.id, "resolved");
-                }}
-              >
-                Mark resolved
-              </Button>
-            )}
-            {canDismiss && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPatch(item.id, "dismissed");
-                }}
-              >
-                Dismiss
-              </Button>
-            )}
-            {canReopen && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPatch(item.id, "open");
-                }}
-              >
-                Reopen
-              </Button>
-            )}
-          </span>
         </span>
       </label>
+      {showFixEditor && factId && (
+        <ContributionFactFixPanel
+          deckId={deckId}
+          fields={fields}
+          factId={factId}
+          token={token}
+          ttsModel={ttsModel}
+          highlightCol={highlightCol}
+          disabled={disabled}
+          onFactUpdated={onFactPatched}
+        />
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        {canAccept && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={disabled}
+            onClick={() => onAccept(item.id)}
+          >
+            Accept proposal
+          </Button>
+        )}
+        {canResolve && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onPatch(item.id, "resolved")}
+          >
+            Mark resolved
+          </Button>
+        )}
+        {canDismiss && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onPatch(item.id, "dismissed")}
+          >
+            Dismiss
+          </Button>
+        )}
+        {canReopen && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onPatch(item.id, "open")}
+          >
+            Reopen
+          </Button>
+        )}
+      </div>
     </li>
   );
 }
@@ -383,6 +460,8 @@ interface DeckFeedbackInboxModalProps {
   token: string;
   onAccepted?: (detail?: { published_version: number }) => void | Promise<void>;
   onFeedbackChanged?: () => void | Promise<void>;
+  /** Called after an inline fact PATCH (text / audio apply) from a report or fact edit. */
+  onFactPatched?: (fact: FactItem) => void;
 }
 
 export function DeckFeedbackInboxModal({
@@ -392,11 +471,11 @@ export function DeckFeedbackInboxModal({
   token,
   onAccepted,
   onFeedbackChanged,
+  onFactPatched,
 }: DeckFeedbackInboxModalProps) {
   const [items, setItems] = useState<DeckContributionItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<ContributionStatus | "">("open");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [fixTarget, setFixTarget] = useState<DeckContributionItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -405,6 +484,15 @@ export function DeckFeedbackInboxModal({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const deckFields = useMemo(
+    () => (Array.isArray(deck.fields) ? deck.fields : []),
+    [deck.fields]
+  );
+  const ttsModel = useMemo(
+    () => loadFixFactSettings(deck.id, deckFields).ttsModel,
+    [deck.id, deckFields]
+  );
 
   const fetchPage = useCallback(
     async (pageOffset: number, append: boolean) => {
@@ -443,50 +531,10 @@ export function DeckFeedbackInboxModal({
       setNotice("");
       setSelected(new Set());
       setBulkBusy(false);
-      setFixTarget(null);
       return;
     }
     void fetchPage(0, false);
   }, [open, statusFilter, deck.id, token, fetchPage]);
-
-  const nextFixableAfter = useCallback(
-    (currentId: string): DeckContributionItem | null => {
-      const idx = items.findIndex((i) => i.id === currentId);
-      if (idx < 0) return null;
-      for (let i = idx + 1; i < items.length; i += 1) {
-        if (canFixContribution(items[i])) return items[i];
-      }
-      return null;
-    },
-    [items]
-  );
-
-  async function handleResolveAndNext() {
-    if (!fixTarget) return;
-    const currentId = fixTarget.id;
-    const next = nextFixableAfter(currentId);
-    setBusyId(currentId);
-    setError("");
-    setNotice("");
-    try {
-      await patchContribution(deck.id, currentId, { status: "resolved" }, token);
-      await onFeedbackChanged?.();
-      if (next) {
-        setFixTarget(next);
-        setNotice(`Resolved ${currentId}. Opened next report.`);
-        // Refresh list in background so queue stays current.
-        void fetchPage(0, false);
-      } else {
-        setFixTarget(null);
-        setNotice(`Resolved ${currentId}. No further open fixable items in this page.`);
-        await fetchPage(0, false);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Resolve failed");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   const selectedItems = useMemo(
     () => items.filter((i) => selected.has(i.id)),
@@ -649,46 +697,16 @@ export function DeckFeedbackInboxModal({
       aria-modal="true"
       aria-labelledby="contributions-inbox-title"
     >
-      <div
-        className="fixed inset-0 bg-black/50"
-        onClick={fixTarget ? undefined : onClose}
-        aria-hidden="true"
-      />
-      <div
-        className={`relative z-50 w-full max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4 ${
-          fixTarget ? "max-w-4xl" : "max-w-2xl"
-        }`}
-      >
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div className="relative z-50 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-lg border bg-card p-6 shadow-lg flex flex-col gap-4">
         <h2 id="contributions-inbox-title" className="text-lg font-semibold">
-          {fixTarget ? "Contributions inbox · Fix" : "Contributions inbox"}
+          Contributions inbox
         </h2>
-        {fixTarget ? (
-          <>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {notice && (
-              <p className="text-sm text-green-800 dark:text-green-200 rounded border border-green-600/40 bg-green-600/10 px-3 py-2">
-                {notice}
-              </p>
-            )}
-            <FixFactPanel
-              key={fixTarget.id}
-              deck={deck}
-              token={token}
-              contribution={fixTarget}
-              onBack={() => {
-                setFixTarget(null);
-                setNotice("");
-                setError("");
-              }}
-              onResolveAndNext={() => handleResolveAndNext()}
-            />
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">
-              Select contributions to bulk accept &amp; publish (importers can then sync), resolve /
-              dismiss, or open <strong>Fix</strong> on a report to regenerate audio.
-            </p>
+        <p className="text-sm text-muted-foreground">
+          Select contributions to bulk accept &amp; publish (importers can then sync), or resolve /
+          dismiss. Open reports and fact edits include the same fact editor as Edit facts (text,
+          audio preview, regenerate audio).
+        </p>
             <div className="flex flex-wrap gap-2">
               {STATUS_FILTERS.map((f) => (
                 <Button
@@ -767,18 +785,17 @@ export function DeckFeedbackInboxModal({
                     <ContributionRow
                       key={item.id}
                       item={item}
+                      deckId={deck.id}
+                      fields={deckFields}
                       token={token}
+                      ttsModel={ttsModel}
                       selected={selected.has(item.id)}
                       busy={busyId === item.id}
                       bulkBusy={bulkBusy}
                       onToggle={toggleOne}
                       onAccept={(id) => void handleAccept(id)}
                       onPatch={(id, status) => void handlePatch(id, status)}
-                      onFix={(c) => {
-                        setError("");
-                        setNotice("");
-                        setFixTarget(c);
-                      }}
+                      onFactPatched={onFactPatched}
                     />
                   ))}
                 </ul>
@@ -797,13 +814,11 @@ export function DeckFeedbackInboxModal({
                 </Button>
               </div>
             )}
-            <div className="flex justify-end pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={bulkBusy}>
-                Close
-              </Button>
-            </div>
-          </>
-        )}
+        <div className="flex justify-end pt-2">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={bulkBusy}>
+            Close
+          </Button>
+        </div>
       </div>
     </div>
   );

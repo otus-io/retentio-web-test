@@ -13,6 +13,15 @@ export const TTS_MODEL_OPTIONS: { value: string; label: string }[] = [
   { value: "eleven_flash_v2_5", label: "ElevenLabs · eleven_flash_v2_5" },
 ];
 
+/** Next preset after `current` (wraps). Unknown / custom → first preset. */
+export function nextTtsModel(current: string): string {
+  const values = TTS_MODEL_OPTIONS.map((o) => o.value);
+  if (values.length === 0) return current.trim();
+  const idx = values.indexOf(current.trim());
+  if (idx < 0) return values[0]!;
+  return values[(idx + 1) % values.length]!;
+}
+
 export function getElevenLabsApiKey(): string {
   return String(import.meta.env.VITE_ELEVENLABS_API_KEY ?? "").trim();
 }

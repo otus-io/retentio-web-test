@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -134,6 +134,7 @@ export default function DeckPage() {
   const [studyStatsRefreshKey, setStudyStatsRefreshKey] = useState(0);
   const [addFactsOpen, setAddFactsOpen] = useState(false);
   const [bulkEditFactsOpen, setBulkEditFactsOpen] = useState(false);
+  const [editFactsFocusId, setEditFactsFocusId] = useState<string | null>(null);
   const openedFactQueryRef = useRef<string | null>(null);
   const [cardFontsOpen, setCardFontsOpen] = useState(false);
   const [allCardsOpen, setAllCardsOpen] = useState(false);
@@ -182,6 +183,7 @@ export default function DeckPage() {
     setSuccessMessage("");
     setCardSuccess("");
     setBulkEditFactsOpen(false);
+    setEditFactsFocusId(null);
     setAllCardsOpen(false);
     setPublishOpen(false);
     setSyncOpen(false);
@@ -824,17 +826,7 @@ export default function DeckPage() {
     return (
       <div className="min-h-screen p-4 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
-          <nav className="flex items-center gap-2">
-            <Link to="/decks" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Deck
-            </Link>
-            <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Profile
-            </Link>
-            <Button variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
-          </nav>
+          <DeckHeader onLogout={handleLogout} />
           <p className="text-muted-foreground">Loading deck…</p>
         </div>
       </div>
@@ -845,17 +837,7 @@ export default function DeckPage() {
     return (
       <div className="min-h-screen p-4 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
-          <nav className="flex items-center gap-2">
-            <Link to="/decks" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Deck
-            </Link>
-            <Link to="/profile" className="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              Profile
-            </Link>
-            <Button variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
-          </nav>
+          <DeckHeader onLogout={handleLogout} />
           <p className="text-destructive">{error || "Deck not found."}</p>
         </div>
       </div>
@@ -969,6 +951,10 @@ export default function DeckPage() {
                 onUpdateCard={handleUpdateCard}
                 onHideCard={handleHideCard}
                 onSaveFact={handleSaveFactFromCard}
+                onEditFact={(factId) => {
+                  setEditFactsFocusId(factId);
+                  setBulkEditFactsOpen(true);
+                }}
                 onReportFact={imported ? handleReportFact : undefined}
                 onOfferSendEditToAuthor={imported ? handleOfferSendEditToAuthor : undefined}
                 onRequestFact={fetchFactById}
@@ -1009,7 +995,10 @@ export default function DeckPage() {
               onOpenCardFonts={() => setCardFontsOpen(true)}
               onOpenAddFacts={() => setAddFactsOpen(true)}
               onOpenAllCards={() => setAllCardsOpen(true)}
-              onBulkEditFacts={() => setBulkEditFactsOpen(true)}
+              onBulkEditFacts={() => {
+                setEditFactsFocusId(null);
+                setBulkEditFactsOpen(true);
+              }}
               deleteConfirm={deleteConfirm}
               onDeleteConfirm={() => setDeleteConfirm(true)}
               onDeleteCancel={() => setDeleteConfirm(false)}
@@ -1148,6 +1137,9 @@ export default function DeckPage() {
                 }}
                 deck={deck}
                 token={token}
+                onFactPatched={() => {
+                  void fetchFacts();
+                }}
                 onAccepted={async (detail) => {
                   await fetchFacts();
                   await fetchDeck();
@@ -1181,6 +1173,7 @@ export default function DeckPage() {
                 onClose={() => {
                   setBulkEditFactsOpen(false);
                   setDeleteFactId(null);
+                  setEditFactsFocusId(null);
                   if (factQueryParam) {
                     const next = new URLSearchParams(searchParams);
                     next.delete("fact");
@@ -1193,7 +1186,7 @@ export default function DeckPage() {
                 factsList={factsList}
                 factsHasMore={factsHasMore}
                 factsTotal={factsTotal}
-                initialFactId={factQueryParam || null}
+                initialFactId={editFactsFocusId || factQueryParam || null}
                 onRefreshFacts={async () => {
                   // Facts only — avoid fetchDeck full-page loading (unmounts this modal and clears filters).
                   await fetchFacts();
